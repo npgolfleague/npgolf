@@ -1,0 +1,884 @@
+  [1m[35m (171.3ms)[0m  [1m[35mCREATE TABLE "schema_migrations" ("version" varchar NOT NULL PRIMARY KEY)[0m
+  [1m[35m (116.4ms)[0m  [1m[35mCREATE TABLE "ar_internal_metadata" ("key" varchar NOT NULL PRIMARY KEY, "value" varchar, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL)[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Migrating to CreatePages (20180504035756)
+  [1m[35m (1.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (2.0ms)[0m  [1m[35mCREATE TABLE "pages" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "title" varchar, "content" text, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL)[0m
+  [1m[35mSQL (0.0ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES (?)[0m  [["version", "20180504035756"]]
+  [1m[35m (168.1ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.0ms)[0m  [1m[34mSELECT  "ar_internal_metadata".* FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = ? LIMIT ?[0m  [["key", "environment"], ["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35mSQL (2.0ms)[0m  [1m[32mINSERT INTO "ar_internal_metadata" ("key", "value", "created_at", "updated_at") VALUES (?, ?, ?, ?)[0m  [["key", "environment"], ["value", "development"], ["created_at", "2018-05-05 20:05:45.619370"], ["updated_at", "2018-05-05 20:05:45.619370"]]
+  [1m[35m (102.5ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Started GET "/pages" for 127.0.0.1 at 2018-05-05 16:06:32 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 132ms (ActiveRecord: 1.0ms)
+
+
+  
+NoMethodError (undefined method `attr_accessible' for #<Class:0x5bb9780>
+Did you mean?  attr_accessor):
+  
+app/models/page.rb:2:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (4.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1747.7ms)
+Started GET "/pages" for 127.0.0.1 at 2018-05-05 16:10:08 -0400
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 29ms (ActiveRecord: 0.0ms)
+
+
+  
+NoMethodError (undefined method `has_friendly_id' for #<Class:0x7b68418>):
+  
+app/models/page.rb:4:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1414.8ms)
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Migrating to CreateFriendlyIdSlugs (20180505201459)
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+DEPRECATION WARNING: Directly inheriting from ActiveRecord::Migration is deprecated. Please specify the Rails release the migration was written for:
+
+  class CreateFriendlyIdSlugs < ActiveRecord::Migration[4.2] (called from require at bin/rails:4)
+  [1m[35m (13.7ms)[0m  [1m[35mCREATE TABLE "friendly_id_slugs" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "slug" varchar NOT NULL, "sluggable_id" integer NOT NULL, "sluggable_type" varchar(50), "scope" varchar, "created_at" datetime)[0m
+  [1m[35m (0.0ms)[0m  [1m[34mselect sqlite_version(*)[0m
+  [1m[35m (0.0ms)[0m  [1m[35mCREATE  INDEX "index_friendly_id_slugs_on_sluggable_id" ON "friendly_id_slugs" ("sluggable_id")[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[35mCREATE  INDEX "index_friendly_id_slugs_on_slug_and_sluggable_type" ON "friendly_id_slugs" ("slug", "sluggable_type")[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+  [1m[35m (1.3ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope" ON "friendly_id_slugs" ("slug", "sluggable_type", "scope")[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[35mCREATE  INDEX "index_friendly_id_slugs_on_sluggable_type" ON "friendly_id_slugs" ("sluggable_type")[0m
+  [1m[35mSQL (0.0ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES (?)[0m  [["version", "20180505201459"]]
+  [1m[35m (85.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.0ms)[0m  [1m[34mSELECT  "ar_internal_metadata".* FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = ? LIMIT ?[0m  [["key", "environment"], ["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (0.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+Started GET "/pages" for 127.0.0.1 at 2018-05-05 16:20:35 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (1.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 50ms (ActiveRecord: 1.0ms)
+
+
+  
+NoMethodError (undefined method `has_friendly_id' for #<Class:0x58baf68>
+Did you mean?  unfriendly_id?):
+  
+app/models/page.rb:4:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (5.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1436.8ms)
+Started GET "/pages" for 127.0.0.1 at 2018-05-05 16:27:13 -0400
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 19ms (ActiveRecord: 1.0ms)
+
+
+  
+NoMethodError (undefined method `friendly_id' for #<Class:0x7a0c088>
+Did you mean?  friendly_id?
+               unfriendly_id?):
+  
+app/models/page.rb:4:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (3.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (1.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1407.7ms)
+Started GET "/pages" for 127.0.0.1 at 2018-05-07 23:06:24 -0400
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 33ms (ActiveRecord: 1.0ms)
+
+
+  
+NameError (undefined local variable or method `friendlyId' for #<Class:0x6f94b90>
+Did you mean?  friendly_id?):
+  
+app/models/page.rb:2:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (3.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (5.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (2.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1863.2ms)
+Started GET "/pages" for 127.0.0.1 at 2018-05-07 23:07:10 -0400
+Processing by PagesController#index as HTML
+Completed 500 Internal Server Error in 26ms (ActiveRecord: 1.0ms)
+
+
+  
+NameError (undefined local variable or method `friendly_id' for #<Class:0x64578c0>
+Did you mean?  friendly_id?
+               unfriendly_id?):
+  
+app/models/page.rb:2:in `<class:Page>'
+app/models/page.rb:1:in `<top (required)>'
+app/controllers/pages_controller.rb:7:in `index'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (4.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1443.8ms)
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Migrating to DropPages (20180508034258)
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (4.5ms)[0m  [1m[35mDROP TABLE "pages"[0m
+  [1m[35mSQL (4.0ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES (?)[0m  [["version", "20180508034258"]]
+  [1m[35m (66.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.0ms)[0m  [1m[34mSELECT  "ar_internal_metadata".* FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = ? LIMIT ?[0m  [["key", "environment"], ["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (1.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+[0m
+  [1m[35m (4.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Migrating to CreatePages (20180508035558)
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (4.4ms)[0m  [1m[35mCREATE TABLE "pages" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "title" varchar, "slug" varchar, "content" text, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL)[0m
+  [1m[35mSQL (0.0ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES (?)[0m  [["version", "20180508035558"]]
+  [1m[35m (69.5ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::InternalMetadata Load (4.1ms)[0m  [1m[34mSELECT  "ar_internal_metadata".* FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = ? LIMIT ?[0m  [["key", "environment"], ["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (0.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+Started GET "/pages" for 127.0.0.1 at 2018-05-08 00:05:14 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#index as HTML
+  Rendering pages/index.html.erb within layouts/application
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT "pages".* FROM "pages"[0m
+  Rendered pages/index.html.erb within layouts/application (66.7ms)
+Completed 200 OK in 6020ms (Views: 5869.6ms | ActiveRecord: 0.3ms)
+
+
+Started GET "/pages/new" for 127.0.0.1 at 2018-05-08 00:06:31 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#new as HTML
+  Rendering pages/new.html.erb within layouts/application
+  Rendered pages/_form.html.erb (250.6ms)
+  Rendered pages/new.html.erb within layouts/application (296.4ms)
+Completed 200 OK in 784ms (Views: 716.1ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/pages/new" for 127.0.0.1 at 2018-05-08 00:08:13 -0400
+Processing by PagesController#new as HTML
+  Rendering pages/new.html.erb within layouts/application
+  Rendered pages/_form.html.erb (7.3ms)
+  Rendered pages/new.html.erb within layouts/application (65.8ms)
+Completed 200 OK in 355ms (Views: 291.6ms | ActiveRecord: 0.0ms)
+
+
+Started POST "/pages" for 127.0.0.1 at 2018-05-08 00:09:41 -0400
+Processing by PagesController#create as HTML
+  Parameters: {"utf8"=>"✓", "authenticity_token"=>"RvNMMLldkfMgDpE98t7m0UMXBV99o9vBYJ7CjO5CwlduuhlqJziikjRul53cJxMcz6j1sZLtft96JnfoyfKgwQ==", "page"=>{"title"=>"scores", "slug"=>"scores", "content"=>"MIME-Version: 1.0\r\nX-Document-Type: Worksheet\r\nContent-Location: file:///C:/6915DE0C/testhtml3.html.htm\r\nContent-Transfer-Encoding: quoted-printable\r\nContent-Type: text/html; charset=\"windows-1252\"\r\n\r\n<html xmlns:v=3D\"urn:schemas-microsoft-com:vml\"\r\nxmlns:o=3D\"urn:schemas-microsoft-com:office:office\"\r\nxmlns:x=3D\"urn:schemas-microsoft-com:office:excel\"\r\nxmlns=3D\"http://www.w3.org/TR/REC-html40\">\r\n\r\n<head>\r\n<meta http-equiv=3DContent-Type content=3D\"text/html; charset=3Dwindows-125=\r\n2\">\r\n<meta name=3DProgId content=3DExcel.Sheet>\r\n<meta name=3DGenerator content=3D\"Microsoft Excel 15\">\r\n<link rel=3DFile-List href=3D\"testhtml3.html_files/filelist.xml\">\r\n<!--[if !mso]>\r\n<style>\r\nv\\:* {behavior:url(#default#VML);}\r\no\\:* {behavior:url(#default#VML);}\r\nx\\:* {behavior:url(#default#VML);}\r\n.shape {behavior:url(#default#VML);}\r\n</style>\r\n<![endif]-->\r\n<style id=3D\"NPGL2016_13441_Styles\">\r\n<!--table\r\n\t{mso-displayed-decimal-separator:\"\\.\";\r\n\tmso-displayed-thousand-separator:\"\\,\";}\r\n.xl6613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl7213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl7713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0_\\)\\;\\[Red\\]\\\\\\(\\0022$\\0022\\#\\,\\#\\#=\r\n0\\\\\\)\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"0_\\)\\;\\[Red\\]\\\\\\(0\\\\\\)\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:left;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:left;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n.xl9313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"Short Date\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:left;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0%;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n.xl10913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0_\\)\\;\\[Red\\]\\\\\\(\\0022$\\0022\\#\\,\\#\\#=\r\n0\\\\\\)\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n-->\r\n</style>\r\n</head>\r\n\r\n<body>\r\n<!--[if !excel]>&nbsp;&nbsp;<![endif]-->\r\n<!--The following information was generated by Microsoft Excel's Publish as=\r\n Web\r\nPage wizard.-->\r\n<!--If the same item is republished from Excel, all information between the=\r\n DIV\r\ntags will be replaced.-->\r\n<!----------------------------->\r\n<!--START OF OUTPUT FROM EXCEL PUBLISH AS WEB PAGE WIZARD -->\r\n<!----------------------------->\r\n\r\n<div id=3D\"NPGL2016_13441\" align=3Dcenter x:publishsource=3D\"Excel\">\r\n\r\n<table border=3D0 cellpadding=3D0 cellspacing=3D0 width=3D475 class=3Dxl661=\r\n3441\r\n style=3D'border-collapse:collapse;table-layout:fixed;width:356pt'>\r\n <col class=3Dxl6613441 width=3D116 style=3D'mso-width-source:userset;mso-w=\r\nidth-alt:\r\n 4124;width:87pt'>\r\n <col class=3Dxl6713441 width=3D51 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1820;width:38pt'>\r\n <col class=3Dxl7113441 width=3D73 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2588;width:55pt'>\r\n <col class=3Dxl6713441 width=3D54 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1905;width:40pt'>\r\n <col class=3Dxl6813441 width=3D55 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1962;width:41pt'>\r\n <col class=3Dxl6813441 width=3D62 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2218;width:47pt'>\r\n <col class=3Dxl6813441 width=3D64 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2275;width:48pt'>\r\n <tr class=3Dxl7613441 height=3D36 style=3D'mso-height-source:userset;heigh=\r\nt:27.0pt'>\r\n  <td height=3D36 class=3Dxl9213441 width=3D116 style=3D'height:27.0pt;widt=\r\nh:87pt'>Results\r\n  from tournament on</td>\r\n  <td class=3Dxl9313441 width=3D51 style=3D'width:38pt'>&nbsp;</td>\r\n  <td class=3Dxl9413441 width=3D73 style=3D'width:55pt'>3/23/2016</td>\r\n  <td class=3Dxl9313441 width=3D54 style=3D'width:40pt'>&nbsp;</td>\r\n  <td class=3Dxl9513441 width=3D55 style=3D'width:41pt'>&nbsp;</td>\r\n  <td class=3Dxl9513441 width=3D62 style=3D'width:47pt'>&nbsp;</td>\r\n  <td class=3Dxl10813441 width=3D64 style=3D'width:48pt'>HIO Pot</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8413441 style=3D'height:10.2pt'>Pools</td>\r\n  <td class=3Dxl8513441>&nbsp;</td>\r\n  <td class=3Dxl8613441>Collected</td>\r\n  <td class=3Dxl8513441>Due</td>\r\n  <td class=3Dxl8713441>&nbsp;</td>\r\n  <td class=3Dxl8813441>Total</td>\r\n  <td class=3Dxl8713441>&nbsp;</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'>Prize</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$425</td>\r\n  <td class=3Dxl6813441>$572</td>\r\n  <td class=3Dxl10513441></td>\r\n  <td class=3Dxl6813441>$997</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>1st Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$159</td>\r\n  <td class=3Dxl6813441>$30</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>2nd Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$53</td>\r\n  <td class=3Dxl6813441>$20</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>3rd Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl10613441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$27</td>\r\n  <td class=3Dxl6813441>$10</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'>Closest to the=\r\n Pin</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$78</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$78</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl6813441>On Hole:</td>\r\n  <td class=3Dxl10913441>3</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$39</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl7613441>On Hole:</td>\r\n  <td class=3Dxl11013441>5</td>\r\n  <td class=3Dxl8313441></td>\r\n  <td class=3Dxl7613441></td>\r\n  <td class=3Dxl10713441>$39</td>\r\n  <td class=3Dxl10713441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'></td>\r\n  <td class=3Dxl11213441></td>\r\n  <td class=3Dxl11313441></td>\r\n  <td class=3Dxl11413441></td>\r\n  <td class=3Dxl11413441></td>\r\n  <td class=3Dxl11313441></td>\r\n  <td class=3Dxl11413441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl9613441 style=3D'height:10.2pt'>Tournament</td>\r\n  <td class=3Dxl9713441>Donation</td>\r\n  <td class=3Dxl9813441>Players</td>\r\n  <td class=3Dxl9713441>Collected</td>\r\n  <td class=3Dxl9913441>Paid</td>\r\n  <td class=3Dxl9913441>Extra</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7713441 style=3D'height:10.2pt'>&nbsp;</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6913441>24</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7713441 style=3D'height:10.2pt'>Skins Pool</td>\r\n  <td class=3Dxl6813441>$3</td>\r\n  <td class=3Dxl6913441>9</td>\r\n  <td class=3Dxl7813441>$27</td>\r\n  <td class=3Dxl7013441>$27</td>\r\n  <td class=3Dxl7813441>$0</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td class=3Dxl7713441>&nbsp;</td>\r\n  <td class=3Dxl7913441></td>\r\n  <td class=3Dxl6913441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td class=3Dxl7713441>&nbsp;</td>\r\n  <td class=3Dxl7913441></td>\r\n  <td class=3Dxl6913441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7213441 style=3D'height:10.2pt'>Total</td>\r\n  <td class=3Dxl7313441>&nbsp;</td>\r\n  <td class=3Dxl7413441>&nbsp;</td>\r\n  <td class=3Dxl7513441>$27</td>\r\n  <td class=3Dxl7513441>$27</td>\r\n  <td class=3Dxl7513441>$0</td>\r\n  <td class=3Dxl7513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl9613441 style=3D'height:10.2pt'>Net Skins Resul=\r\nts</td>\r\n  <td class=3Dxl9713441>&nbsp;</td>\r\n  <td class=3Dxl10013441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8913441 style=3D'height:10.2pt'>Name</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9013441>Hole</td>\r\n  <td class=3Dxl9113441>$</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>3</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>5</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>7</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl10113441 style=3D'height:10.2pt'>Quota Results<=\r\n/td>\r\n  <td class=3Dxl10113441>&nbsp;</td>\r\n  <td class=3Dxl10213441>&nbsp;</td>\r\n  <td class=3Dxl10313441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl9513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D27 style=3D'height:20.4pt'>\r\n  <td height=3D27 class=3Dxl8913441 style=3D'height:20.4pt'>Name</td>\r\n  <td class=3Dxl9013441>Goal</td>\r\n  <td class=3Dxl9013441>Points</td>\r\n  <td class=3Dxl9013441>Diff</td>\r\n  <td class=3Dxl11713441 width=3D55 style=3D'width:41pt'>Paradise Golf Pts<=\r\n/td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Chris Donnelly<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright>2 </td>\r\n  <td class=3Dxl8013441 align=3Dright>100</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8113441 align=3Dright>1 </td>\r\n  <td class=3Dxl8013441 align=3Dright>90</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8113441 align=3Dright>0 </td>\r\n  <td class=3Dxl8013441 align=3Dright>75</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Richard Noble</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright>0 </td>\r\n  <td class=3Dxl8013441 align=3Dright>75</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Evan Hochman</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Robert Offutt</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(2)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Rodney Cornwell=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(2)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(3)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matt Metzcus</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(3)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(4)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(4)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>James Boothe</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>17</td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(5)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Steven Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(7)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl10113441 style=3D'height:10.2pt'>Season Standin=\r\ngs</td>\r\n  <td class=3Dxl10113441>&nbsp;</td>\r\n  <td class=3Dxl10213441>&nbsp;</td>\r\n  <td class=3Dxl10313441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl9513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D41 style=3D'height:30.6pt'>\r\n  <td height=3D41 class=3Dxl8913441 style=3D'height:30.6pt'>Name</td>\r\n  <td class=3Dxl9013441>Goal</td>\r\n  <td class=3Dxl11713441 width=3D73 style=3D'width:55pt'>Total Paradise Gol=\r\nf Pts</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>190</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Chris Donnelly<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>6</td>\r\n  <td class=3Dxl8013441 align=3Dright>185</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Richard Noble</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>140</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Travis Noble</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>85</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>76</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Steven Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>66</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>53</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Robert Offutt</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>51</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Evan Hochman</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>46</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matthew Bahorek=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>45</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Rodney Cornwell=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>28</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>James Boothe</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>16</td>\r\n  <td class=3Dxl8013441 align=3Dright>26</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joseph Lindquis=\r\nt</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matt Metzcus</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>6</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Michael Skaglin=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Andrew Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Carmen Discepol=\r\na</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Eric Lindquist<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>John Delauro</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Daryl Blaxton</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441 align=3Dright>0</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <![if supportMisalignedColumns]>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td width=3D116 style=3D'width:87pt'></td>\r\n  <td width=3D51 style=3D'width:38pt'></td>\r\n  <td width=3D73 style=3D'width:55pt'></td>\r\n  <td width=3D54 style=3D'width:40pt'></td>\r\n  <td width=3D55 style=3D'width:41pt'></td>\r\n  <td width=3D62 style=3D'width:47pt'></td>\r\n  <td width=3D64 style=3D'width:48pt'></td>\r\n </tr>\r\n <![endif]>\r\n</table>\r\n\r\n</div>\r\n\r\n\r\n<!----------------------------->\r\n<!--END OF OUTPUT FROM EXCEL PUBLISH AS WEB PAGE WIZARD-->\r\n<!----------------------------->\r\n</body>\r\n\r\n</html>\r\n"}, "commit"=>"Create Page"}
+Unpermitted parameter: slug
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35mSQL (2.4ms)[0m  [1m[32mINSERT INTO "pages" ("title", "content", "created_at", "updated_at") VALUES (?, ?, ?, ?)[0m  [["title", "scores"], ["content", "MIME-Version: 1.0\r\nX-Document-Type: Worksheet\r\nContent-Location: file:///C:/6915DE0C/testhtml3.html.htm\r\nContent-Transfer-Encoding: quoted-printable\r\nContent-Type: text/html; charset=\"windows-1252\"\r\n\r\n<html xmlns:v=3D\"urn:schemas-microsoft-com:vml\"\r\nxmlns:o=3D\"urn:schemas-microsoft-com:office:office\"\r\nxmlns:x=3D\"urn:schemas-microsoft-com:office:excel\"\r\nxmlns=3D\"http://www.w3.org/TR/REC-html40\">\r\n\r\n<head>\r\n<meta http-equiv=3DContent-Type content=3D\"text/html; charset=3Dwindows-125=\r\n2\">\r\n<meta name=3DProgId content=3DExcel.Sheet>\r\n<meta name=3DGenerator content=3D\"Microsoft Excel 15\">\r\n<link rel=3DFile-List href=3D\"testhtml3.html_files/filelist.xml\">\r\n<!--[if !mso]>\r\n<style>\r\nv\\:* {behavior:url(#default#VML);}\r\no\\:* {behavior:url(#default#VML);}\r\nx\\:* {behavior:url(#default#VML);}\r\n.shape {behavior:url(#default#VML);}\r\n</style>\r\n<![endif]-->\r\n<style id=3D\"NPGL2016_13441_Styles\">\r\n<!--table\r\n\t{mso-displayed-decimal-separator:\"\\.\";\r\n\tmso-displayed-thousand-separator:\"\\,\";}\r\n.xl6613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl6913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl7213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#969696;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl7713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:silver;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl7913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0_\\)\\;\\[Red\\]\\\\\\(\\0022$\\0022\\#\\,\\#\\#=\r\n0\\\\\\)\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"0_\\)\\;\\[Red\\]\\\\\\(0\\\\\\)\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl8413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:left;\r\n\tvertical-align:bottom;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl8913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:left;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n.xl9313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"Short Date\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\@\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl9913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:left;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0%;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:nowrap;}\r\n.xl10513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:windowtext;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl10813441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#BB443B;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n.xl10913441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11013441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:0;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11113441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11213441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11313441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0_\\)\\;\\[Red\\]\\\\\\(\\0022$\\0022\\#\\,\\#\\#=\r\n0\\\\\\)\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11413441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:center;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11513441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\#\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11613441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:400;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:\"\\0022$\\0022\\#\\,\\#\\#0\";\r\n\ttext-align:general;\r\n\tvertical-align:bottom;\r\n\tmso-background-source:auto;\r\n\tmso-pattern:auto;\r\n\twhite-space:nowrap;}\r\n.xl11713441\r\n\t{padding:0px;\r\n\tmso-ignore:padding;\r\n\tcolor:black;\r\n\tfont-size:8.0pt;\r\n\tfont-weight:700;\r\n\tfont-style:normal;\r\n\ttext-decoration:none;\r\n\tfont-family:Arial, sans-serif;\r\n\tmso-font-charset:0;\r\n\tmso-number-format:General;\r\n\ttext-align:center;\r\n\tvertical-align:middle;\r\n\tbackground:#E2D796;\r\n\tmso-pattern:black none;\r\n\twhite-space:normal;}\r\n-->\r\n</style>\r\n</head>\r\n\r\n<body>\r\n<!--[if !excel]>&nbsp;&nbsp;<![endif]-->\r\n<!--The following information was generated by Microsoft Excel's Publish as=\r\n Web\r\nPage wizard.-->\r\n<!--If the same item is republished from Excel, all information between the=\r\n DIV\r\ntags will be replaced.-->\r\n<!----------------------------->\r\n<!--START OF OUTPUT FROM EXCEL PUBLISH AS WEB PAGE WIZARD -->\r\n<!----------------------------->\r\n\r\n<div id=3D\"NPGL2016_13441\" align=3Dcenter x:publishsource=3D\"Excel\">\r\n\r\n<table border=3D0 cellpadding=3D0 cellspacing=3D0 width=3D475 class=3Dxl661=\r\n3441\r\n style=3D'border-collapse:collapse;table-layout:fixed;width:356pt'>\r\n <col class=3Dxl6613441 width=3D116 style=3D'mso-width-source:userset;mso-w=\r\nidth-alt:\r\n 4124;width:87pt'>\r\n <col class=3Dxl6713441 width=3D51 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1820;width:38pt'>\r\n <col class=3Dxl7113441 width=3D73 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2588;width:55pt'>\r\n <col class=3Dxl6713441 width=3D54 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1905;width:40pt'>\r\n <col class=3Dxl6813441 width=3D55 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 1962;width:41pt'>\r\n <col class=3Dxl6813441 width=3D62 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2218;width:47pt'>\r\n <col class=3Dxl6813441 width=3D64 style=3D'mso-width-source:userset;mso-wi=\r\ndth-alt:\r\n 2275;width:48pt'>\r\n <tr class=3Dxl7613441 height=3D36 style=3D'mso-height-source:userset;heigh=\r\nt:27.0pt'>\r\n  <td height=3D36 class=3Dxl9213441 width=3D116 style=3D'height:27.0pt;widt=\r\nh:87pt'>Results\r\n  from tournament on</td>\r\n  <td class=3Dxl9313441 width=3D51 style=3D'width:38pt'>&nbsp;</td>\r\n  <td class=3Dxl9413441 width=3D73 style=3D'width:55pt'>3/23/2016</td>\r\n  <td class=3Dxl9313441 width=3D54 style=3D'width:40pt'>&nbsp;</td>\r\n  <td class=3Dxl9513441 width=3D55 style=3D'width:41pt'>&nbsp;</td>\r\n  <td class=3Dxl9513441 width=3D62 style=3D'width:47pt'>&nbsp;</td>\r\n  <td class=3Dxl10813441 width=3D64 style=3D'width:48pt'>HIO Pot</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8413441 style=3D'height:10.2pt'>Pools</td>\r\n  <td class=3Dxl8513441>&nbsp;</td>\r\n  <td class=3Dxl8613441>Collected</td>\r\n  <td class=3Dxl8513441>Due</td>\r\n  <td class=3Dxl8713441>&nbsp;</td>\r\n  <td class=3Dxl8813441>Total</td>\r\n  <td class=3Dxl8713441>&nbsp;</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'>Prize</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$425</td>\r\n  <td class=3Dxl6813441>$572</td>\r\n  <td class=3Dxl10513441></td>\r\n  <td class=3Dxl6813441>$997</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>1st Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$159</td>\r\n  <td class=3Dxl6813441>$30</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>2nd Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$53</td>\r\n  <td class=3Dxl6813441>$20</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl6613441 style=3D'height:10.2pt'>3rd Place</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl10613441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$27</td>\r\n  <td class=3Dxl6813441>$10</td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'>Closest to the=\r\n Pin</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$78</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$78</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl6813441>On Hole:</td>\r\n  <td class=3Dxl10913441>3</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6813441>$39</td>\r\n  <td class=3Dxl6813441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl7613441>On Hole:</td>\r\n  <td class=3Dxl11013441>5</td>\r\n  <td class=3Dxl8313441></td>\r\n  <td class=3Dxl7613441></td>\r\n  <td class=3Dxl10713441>$39</td>\r\n  <td class=3Dxl10713441></td>\r\n </tr>\r\n <tr class=3Dxl7613441 height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl11113441 style=3D'height:10.2pt'></td>\r\n  <td class=3Dxl11213441></td>\r\n  <td class=3Dxl11313441></td>\r\n  <td class=3Dxl11413441></td>\r\n  <td class=3Dxl11413441></td>\r\n  <td class=3Dxl11313441></td>\r\n  <td class=3Dxl11413441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl9613441 style=3D'height:10.2pt'>Tournament</td>\r\n  <td class=3Dxl9713441>Donation</td>\r\n  <td class=3Dxl9813441>Players</td>\r\n  <td class=3Dxl9713441>Collected</td>\r\n  <td class=3Dxl9913441>Paid</td>\r\n  <td class=3Dxl9913441>Extra</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7713441 style=3D'height:10.2pt'>&nbsp;</td>\r\n  <td class=3Dxl6813441></td>\r\n  <td class=3Dxl6913441>24</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7713441 style=3D'height:10.2pt'>Skins Pool</td>\r\n  <td class=3Dxl6813441>$3</td>\r\n  <td class=3Dxl6913441>9</td>\r\n  <td class=3Dxl7813441>$27</td>\r\n  <td class=3Dxl7013441>$27</td>\r\n  <td class=3Dxl7813441>$0</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td class=3Dxl7713441>&nbsp;</td>\r\n  <td class=3Dxl7913441></td>\r\n  <td class=3Dxl6913441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td class=3Dxl7713441>&nbsp;</td>\r\n  <td class=3Dxl7913441></td>\r\n  <td class=3Dxl6913441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7013441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n  <td class=3Dxl7813441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl7213441 style=3D'height:10.2pt'>Total</td>\r\n  <td class=3Dxl7313441>&nbsp;</td>\r\n  <td class=3Dxl7413441>&nbsp;</td>\r\n  <td class=3Dxl7513441>$27</td>\r\n  <td class=3Dxl7513441>$27</td>\r\n  <td class=3Dxl7513441>$0</td>\r\n  <td class=3Dxl7513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl9613441 style=3D'height:10.2pt'>Net Skins Resul=\r\nts</td>\r\n  <td class=3Dxl9713441>&nbsp;</td>\r\n  <td class=3Dxl10013441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n  <td class=3Dxl9913441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8913441 style=3D'height:10.2pt'>Name</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9013441>Hole</td>\r\n  <td class=3Dxl9113441>$</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>3</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>5</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>7</td>\r\n  <td class=3Dxl11613441 align=3Dright>$9</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>Birdie</td>\r\n  <td class=3Dxl11513441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441>CUT</td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl10113441 style=3D'height:10.2pt'>Quota Results<=\r\n/td>\r\n  <td class=3Dxl10113441>&nbsp;</td>\r\n  <td class=3Dxl10213441>&nbsp;</td>\r\n  <td class=3Dxl10313441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl9513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D27 style=3D'height:20.4pt'>\r\n  <td height=3D27 class=3Dxl8913441 style=3D'height:20.4pt'>Name</td>\r\n  <td class=3Dxl9013441>Goal</td>\r\n  <td class=3Dxl9013441>Points</td>\r\n  <td class=3Dxl9013441>Diff</td>\r\n  <td class=3Dxl11713441 width=3D55 style=3D'width:41pt'>Paradise Golf Pts<=\r\n/td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Chris Donnelly<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright>2 </td>\r\n  <td class=3Dxl8013441 align=3Dright>100</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8113441 align=3Dright>1 </td>\r\n  <td class=3Dxl8013441 align=3Dright>90</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8113441 align=3Dright>0 </td>\r\n  <td class=3Dxl8013441 align=3Dright>75</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Richard Noble</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright>0 </td>\r\n  <td class=3Dxl8013441 align=3Dright>75</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Evan Hochman</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Robert Offutt</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(1)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(2)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Rodney Cornwell=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(2)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(3)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matt Metzcus</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(3)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(4)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(4)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>James Boothe</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>17</td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(5)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Steven Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8113441 align=3Dright><font color=3D\"#FF0000\" style=3D'mso-=\r\nignore:color'>(7)</font></td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl10113441 style=3D'height:10.2pt'>Season Standin=\r\ngs</td>\r\n  <td class=3Dxl10113441>&nbsp;</td>\r\n  <td class=3Dxl10213441>&nbsp;</td>\r\n  <td class=3Dxl10313441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl10413441>&nbsp;</td>\r\n  <td class=3Dxl9513441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D41 style=3D'height:30.6pt'>\r\n  <td height=3D41 class=3Dxl8913441 style=3D'height:30.6pt'>Name</td>\r\n  <td class=3Dxl9013441>Goal</td>\r\n  <td class=3Dxl11713441 width=3D73 style=3D'width:55pt'>Total Paradise Gol=\r\nf Pts</td>\r\n  <td class=3Dxl9013441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n  <td class=3Dxl9113441>&nbsp;</td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Zack Wilcox</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>190</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Chris Donnelly<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>6</td>\r\n  <td class=3Dxl8013441 align=3Dright>185</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Richard Noble</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>140</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Travis Noble</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>85</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joe Sapienza</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>76</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Steven Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>66</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Jose Rodriguez<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>12</td>\r\n  <td class=3Dxl8013441 align=3Dright>53</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Robert Offutt</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>51</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Evan Hochman</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>50</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Strider Wibel</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>46</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matthew Bahorek=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>45</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Rodney Cornwell=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>28</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>James Boothe</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>16</td>\r\n  <td class=3Dxl8013441 align=3Dright>26</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Barry Mera</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Joseph Lindquis=\r\nt</td>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>25</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Matt Metzcus</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>4</td>\r\n  <td class=3Dxl8013441 align=3Dright>6</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Bryan Proefke</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>8</td>\r\n  <td class=3Dxl8013441 align=3Dright>5</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Michael Skaglin=\r\n</td>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>3</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Paul Suh</td>\r\n  <td class=3Dxl8013441 align=3Dright>11</td>\r\n  <td class=3Dxl8013441 align=3Dright>2</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Andrew Boothe</=\r\ntd>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Carmen Discepol=\r\na</td>\r\n  <td class=3Dxl8013441 align=3Dright>10</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Eric Lindquist<=\r\n/td>\r\n  <td class=3Dxl8013441 align=3Dright>7</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>John Delauro</t=\r\nd>\r\n  <td class=3Dxl8013441 align=3Dright>9</td>\r\n  <td class=3Dxl8013441 align=3Dright>1</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <tr height=3D14 style=3D'height:10.2pt'>\r\n  <td height=3D14 class=3Dxl8013441 style=3D'height:10.2pt'>Daryl Blaxton</=\r\ntd>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441 align=3Dright>0</td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8013441></td>\r\n  <td class=3Dxl8213441></td>\r\n </tr>\r\n <![if supportMisalignedColumns]>\r\n <tr height=3D0 style=3D'display:none'>\r\n  <td width=3D116 style=3D'width:87pt'></td>\r\n  <td width=3D51 style=3D'width:38pt'></td>\r\n  <td width=3D73 style=3D'width:55pt'></td>\r\n  <td width=3D54 style=3D'width:40pt'></td>\r\n  <td width=3D55 style=3D'width:41pt'></td>\r\n  <td width=3D62 style=3D'width:47pt'></td>\r\n  <td width=3D64 style=3D'width:48pt'></td>\r\n </tr>\r\n <![endif]>\r\n</table>\r\n\r\n</div>\r\n\r\n\r\n<!----------------------------->\r\n<!--END OF OUTPUT FROM EXCEL PUBLISH AS WEB PAGE WIZARD-->\r\n<!----------------------------->\r\n</body>\r\n\r\n</html>\r\n"], ["created_at", "2018-05-08 04:09:41.272644"], ["updated_at", "2018-05-08 04:09:41.272644"]]
+  [1m[35m (94.5ms)[0m  [1m[36mcommit transaction[0m
+Redirected to http://localhost:3000/pages/1
+Completed 302 Found in 112ms (ActiveRecord: 96.9ms)
+
+
+Started GET "/pages/1" for 127.0.0.1 at 2018-05-08 00:09:41 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"1"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+Completed 500 Internal Server Error in 42ms (ActiveRecord: 0.0ms)
+
+
+  
+NoMethodError (undefined method `friendly' for #<Class:0x5b61640>
+Did you mean?  friendly_id?):
+  
+app/controllers/pages_controller.rb:13:in `show'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (5.3ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (4.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (4.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (2607.6ms)
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Migrating to AddIndexPages (20180508041719)
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (0.0ms)[0m  [1m[34mselect sqlite_version(*)[0m
+  [1m[35m (0.7ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_pages_on_slug" ON "pages" ("slug")[0m
+  [1m[35mSQL (0.0ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES (?)[0m  [["version", "20180508041719"]]
+  [1m[35m (107.6ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.0ms)[0m  [1m[34mSELECT  "ar_internal_metadata".* FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = ? LIMIT ?[0m  [["key", "environment"], ["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35m (0.0ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+  [1m[35m (1.7ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_slug_and_sluggable_type' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_friendly_id_slugs_on_sluggable_id' AND type='index'
+[0m
+  [1m[35m (0.0ms)[0m  [1m[34m            SELECT sql
+            FROM sqlite_master
+            WHERE name='index_pages_on_slug' AND type='index'
+            UNION ALL
+            SELECT sql
+            FROM sqlite_temp_master
+            WHERE name='index_pages_on_slug' AND type='index'
+[0m
+Started GET "/pages/1" for 127.0.0.1 at 2018-05-08 00:21:26 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (1.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"1"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+Completed 500 Internal Server Error in 120ms (ActiveRecord: 5.1ms)
+
+
+  
+NoMethodError (undefined method `friendly' for #<Class:0x58bc7b0>
+Did you mean?  friendly_id?):
+  
+app/controllers/pages_controller.rb:13:in `show'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (3.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (4.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (4.1ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (2662.5ms)
+Started GET "/pages" for 127.0.0.1 at 2018-05-08 00:21:43 -0400
+Processing by PagesController#index as HTML
+  Rendering pages/index.html.erb within layouts/application
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT "pages".* FROM "pages"[0m
+  Rendered pages/index.html.erb within layouts/application (11.8ms)
+Completed 200 OK in 839ms (Views: 813.0ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/scores" for 127.0.0.1 at 2018-05-08 00:22:36 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (4.2ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 0], ["LIMIT", 1]]
+Completed 404 Not Found in 5ms (ActiveRecord: 4.2ms)
+
+
+  
+ActiveRecord::RecordNotFound (Couldn't find Page with 'id'=scores):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (28.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (5.2ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (0.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (2684.0ms)
+Started GET "/scores" for 127.0.0.1 at 2018-05-10 19:57:37 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 0], ["LIMIT", 1]]
+Completed 404 Not Found in 8ms (ActiveRecord: 0.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (Couldn't find Page with 'id'=scores):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (12.1ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (5.5ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (4.2ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (3118.0ms)
+Started GET "/scores" for 127.0.0.1 at 2018-05-10 19:59:51 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+Completed 500 Internal Server Error in 46ms (ActiveRecord: 0.0ms)
+
+
+  
+NoMethodError (undefined method `friendly' for #<Class:0x8e954e0>
+Did you mean?  friendly_id?):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (6.2ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (4.4ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (3014.7ms)
+Started GET "/scores" for 127.0.0.1 at 2018-05-10 20:46:13 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+Completed 404 Not Found in 398ms (ActiveRecord: 9.6ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (10.1ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (1.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (0.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (2763.3ms)
+Started GET "/pages/1" for 127.0.0.1 at 2018-05-10 20:46:47 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"1"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (0.0ms)
+Completed 200 OK in 511ms (Views: 456.1ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/scores/1" for 127.0.0.1 at 2018-05-10 20:50:20 -0400
+  
+ActionController::RoutingError (No route matches [GET] "/scores/1"):
+  
+actionpack (5.0.7) lib/action_dispatch/middleware/debug_exceptions.rb:53:in `call'
+web-console (3.6.2) lib/web_console/middleware.rb:135:in `call_app'
+web-console (3.6.2) lib/web_console/middleware.rb:30:in `block in call'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `catch'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/show_exceptions.rb:31:in `call'
+railties (5.0.7) lib/rails/rack/logger.rb:36:in `call_app'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `block in call'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `block in tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:26:in `tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `tagged'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `call'
+sprockets-rails (3.2.1) lib/sprockets/rails/quiet_assets.rb:13:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/request_id.rb:24:in `call'
+rack (2.0.5) lib/rack/method_override.rb:22:in `call'
+rack (2.0.5) lib/rack/runtime.rb:22:in `call'
+activesupport (5.0.7) lib/active_support/cache/strategy/local_cache_middleware.rb:28:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/executor.rb:12:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/static.rb:136:in `call'
+rack (2.0.5) lib/rack/sendfile.rb:111:in `call'
+railties (5.0.7) lib/rails/engine.rb:522:in `call'
+puma (3.11.4) lib/puma/configuration.rb:225:in `call'
+puma (3.11.4) lib/puma/server.rb:632:in `handle_request'
+puma (3.11.4) lib/puma/server.rb:446:in `process_client'
+puma (3.11.4) lib/puma/server.rb:306:in `block in run'
+puma (3.11.4) lib/puma/thread_pool.rb:120:in `block in spawn_thread'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (4.1ms)
+  Rendered collection of C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_route.html.erb [9 times] (68.6ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_table.html.erb (367.2ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (4.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout (4238.1ms)
+Started GET "/scores/" for 127.0.0.1 at 2018-05-10 20:50:58 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+Completed 404 Not Found in 4ms (ActiveRecord: 0.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (6.8ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (0.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (0.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (2573.0ms)
+Started GET "/" for 127.0.0.1 at 2018-05-16 16:32:40 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (2.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by Rails::WelcomeController#index as HTML
+  Parameters: {"internal"=>true}
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/railties-5.0.7/lib/rails/templates/rails/welcome/index.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/railties-5.0.7/lib/rails/templates/rails/welcome/index.html.erb (38.1ms)
+Completed 200 OK in 720ms (Views: 380.1ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/pages" for 127.0.0.1 at 2018-05-16 16:33:02 -0400
+Processing by PagesController#index as HTML
+  Rendering pages/index.html.erb within layouts/application
+  [1m[36mPage Load (11.2ms)[0m  [1m[34mSELECT "pages".* FROM "pages"[0m
+  Rendered pages/index.html.erb within layouts/application (86.4ms)
+Completed 200 OK in 2758ms (Views: 2494.2ms | ActiveRecord: 15.2ms)
+
+
+Started GET "/scores" for 127.0.0.1 at 2018-05-16 16:33:36 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+Completed 404 Not Found in 9ms (ActiveRecord: 1.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (8.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (9.1ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (3.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (3752.9ms)
+Started GET "/pages/new" for 127.0.0.1 at 2018-05-16 16:35:09 -0400
+Processing by PagesController#new as HTML
+  Rendering pages/new.html.erb within layouts/application
+  Rendered pages/_form.html.erb (470.7ms)
+  Rendered pages/new.html.erb within layouts/application (512.0ms)
+Completed 200 OK in 982ms (Views: 821.8ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/pages" for 127.0.0.1 at 2018-05-16 16:35:18 -0400
+Processing by PagesController#index as HTML
+  Rendering pages/index.html.erb within layouts/application
+  [1m[36mPage Load (0.4ms)[0m  [1m[34mSELECT "pages".* FROM "pages"[0m
+  Rendered pages/index.html.erb within layouts/application (3.0ms)
+Completed 200 OK in 253ms (Views: 201.1ms | ActiveRecord: 0.4ms)
+
+
+Started GET "/pages/1" for 127.0.0.1 at 2018-05-16 16:35:38 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"1"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (1.2ms)
+Completed 200 OK in 209ms (Views: 169.2ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/scores" for 127.0.0.1 at 2018-05-16 20:50:15 -0400
+  [1m[36mActiveRecord::SchemaMigration Load (0.0ms)[0m  [1m[34mSELECT "schema_migrations".* FROM "schema_migrations"[0m
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+Completed 404 Not Found in 133ms (ActiveRecord: 2.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (4.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (1.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1652.9ms)
+Started GET "/scores/1" for 127.0.0.1 at 2018-05-16 20:51:14 -0400
+  
+ActionController::RoutingError (No route matches [GET] "/scores/1"):
+  
+actionpack (5.0.7) lib/action_dispatch/middleware/debug_exceptions.rb:53:in `call'
+web-console (3.6.2) lib/web_console/middleware.rb:135:in `call_app'
+web-console (3.6.2) lib/web_console/middleware.rb:30:in `block in call'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `catch'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/show_exceptions.rb:31:in `call'
+railties (5.0.7) lib/rails/rack/logger.rb:36:in `call_app'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `block in call'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `block in tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:26:in `tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `tagged'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `call'
+sprockets-rails (3.2.1) lib/sprockets/rails/quiet_assets.rb:13:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/request_id.rb:24:in `call'
+rack (2.0.5) lib/rack/method_override.rb:22:in `call'
+rack (2.0.5) lib/rack/runtime.rb:22:in `call'
+activesupport (5.0.7) lib/active_support/cache/strategy/local_cache_middleware.rb:28:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/executor.rb:12:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/static.rb:136:in `call'
+rack (2.0.5) lib/rack/sendfile.rb:111:in `call'
+railties (5.0.7) lib/rails/engine.rb:522:in `call'
+puma (3.11.4) lib/puma/configuration.rb:225:in `call'
+puma (3.11.4) lib/puma/server.rb:632:in `handle_request'
+puma (3.11.4) lib/puma/server.rb:446:in `process_client'
+puma (3.11.4) lib/puma/server.rb:306:in `block in run'
+puma (3.11.4) lib/puma/thread_pool.rb:120:in `block in spawn_thread'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (1.0ms)
+  Rendered collection of C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_route.html.erb [9 times] (101.5ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_table.html.erb (67.4ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout (2111.0ms)
+Started GET "/scores" for 127.0.0.1 at 2018-05-16 20:51:37 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+Completed 404 Not Found in 2ms (ActiveRecord: 0.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1351.8ms)
+Started GET "/score" for 127.0.0.1 at 2018-05-16 21:00:51 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"score"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "score"], ["LIMIT", 1]]
+Completed 404 Not Found in 2ms (ActiveRecord: 0.0ms)
+
+
+  
+ActiveRecord::RecordNotFound (ActiveRecord::RecordNotFound):
+  
+app/controllers/pages_controller.rb:69:in `set_page'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_source.html.erb (3.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (2.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (1.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/diagnostics.html.erb within rescues/layout (1357.6ms)
+  [1m[36mPage Load (6.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" ORDER BY "pages"."id" ASC LIMIT ?[0m  [["LIMIT", 1]]
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35mSQL (21.1ms)[0m  [1m[33mUPDATE "pages" SET "slug" = ?, "updated_at" = ? WHERE "pages"."id" = ?[0m  [["slug", "scores"], ["updated_at", "2018-05-17 01:29:18.125951"], ["id", 1]]
+  [1m[35m (103.9ms)[0m  [1m[36mcommit transaction[0m
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+Started GET "/scores" for 127.0.0.1 at 2018-05-16 21:30:25 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"scores"}
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "scores"], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (1.0ms)
+Completed 200 OK in 1321ms (Views: 1292.7ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/page/1" for 127.0.0.1 at 2018-05-16 21:32:00 -0400
+  
+ActionController::RoutingError (No route matches [GET] "/page/1"):
+  
+actionpack (5.0.7) lib/action_dispatch/middleware/debug_exceptions.rb:53:in `call'
+web-console (3.6.2) lib/web_console/middleware.rb:135:in `call_app'
+web-console (3.6.2) lib/web_console/middleware.rb:30:in `block in call'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `catch'
+web-console (3.6.2) lib/web_console/middleware.rb:20:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/show_exceptions.rb:31:in `call'
+railties (5.0.7) lib/rails/rack/logger.rb:36:in `call_app'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `block in call'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `block in tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:26:in `tagged'
+activesupport (5.0.7) lib/active_support/tagged_logging.rb:69:in `tagged'
+railties (5.0.7) lib/rails/rack/logger.rb:24:in `call'
+sprockets-rails (3.2.1) lib/sprockets/rails/quiet_assets.rb:13:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/request_id.rb:24:in `call'
+rack (2.0.5) lib/rack/method_override.rb:22:in `call'
+rack (2.0.5) lib/rack/runtime.rb:22:in `call'
+activesupport (5.0.7) lib/active_support/cache/strategy/local_cache_middleware.rb:28:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/executor.rb:12:in `call'
+actionpack (5.0.7) lib/action_dispatch/middleware/static.rb:136:in `call'
+rack (2.0.5) lib/rack/sendfile.rb:111:in `call'
+railties (5.0.7) lib/rails/engine.rb:522:in `call'
+puma (3.11.4) lib/puma/configuration.rb:225:in `call'
+puma (3.11.4) lib/puma/server.rb:632:in `handle_request'
+puma (3.11.4) lib/puma/server.rb:446:in `process_client'
+puma (3.11.4) lib/puma/server.rb:306:in `block in run'
+puma (3.11.4) lib/puma/thread_pool.rb:120:in `block in spawn_thread'
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_trace.html.erb (1.0ms)
+  Rendered collection of C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_route.html.erb [9 times] (3.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/routes/_table.html.erb (1.0ms)
+  Rendering C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/_request_and_response.html.erb (50.0ms)
+  Rendered C:/RailsInstaller/Ruby2.3.0/lib/ruby/gems/2.3.0/gems/actionpack-5.0.7/lib/action_dispatch/middleware/templates/rescues/routing_error.html.erb within rescues/layout (1860.5ms)
+Started GET "/pages/1" for 127.0.0.1 at 2018-05-16 21:32:19 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"1"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "1"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 1], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (0.0ms)
+Completed 200 OK in 164ms (Views: 136.6ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/pages/" for 127.0.0.1 at 2018-05-16 21:32:27 -0400
+Processing by PagesController#index as HTML
+  Rendering pages/index.html.erb within layouts/application
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT "pages".* FROM "pages"[0m
+  Rendered pages/index.html.erb within layouts/application (2.0ms)
+Completed 200 OK in 161ms (Views: 121.5ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/pages/new" for 127.0.0.1 at 2018-05-16 21:32:48 -0400
+Processing by PagesController#new as HTML
+  Rendering pages/new.html.erb within layouts/application
+  Rendered pages/_form.html.erb (316.2ms)
+  Rendered pages/new.html.erb within layouts/application (344.3ms)
+Completed 200 OK in 518ms (Views: 480.0ms | ActiveRecord: 0.0ms)
+
+
+Started POST "/pages" for 127.0.0.1 at 2018-05-16 21:33:27 -0400
+Processing by PagesController#create as HTML
+  Parameters: {"utf8"=>"✓", "authenticity_token"=>"la2IWBTJxAnY0vs8RUThSwqeROxfs85ayuM/KX4wzC8GJ0IArXtoZcmtJ1i52sJZRtF82tiTL+VuVkayx1TnrA==", "page"=>{"title"=>"rules", "slug"=>"rules", "content"=>"Test Rules Page"}, "commit"=>"Create Page"}
+  [1m[35m (0.0ms)[0m  [1m[36mbegin transaction[0m
+  [1m[35mSQL (1.0ms)[0m  [1m[32mINSERT INTO "pages" ("title", "slug", "content", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["title", "rules"], ["slug", "rules"], ["content", "Test Rules Page"], ["created_at", "2018-05-17 01:33:28.036630"], ["updated_at", "2018-05-17 01:33:28.036630"]]
+  [1m[35m (112.6ms)[0m  [1m[36mcommit transaction[0m
+Redirected to http://localhost:3000/pages/rules
+Completed 302 Found in 127ms (ActiveRecord: 113.6ms)
+
+
+Started GET "/pages/rules" for 127.0.0.1 at 2018-05-16 21:33:28 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"rules"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "rules"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "rules"], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (0.0ms)
+Completed 200 OK in 154ms (Views: 130.2ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/pages/2" for 127.0.0.1 at 2018-05-16 21:33:49 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"2"}
+  [1m[36mPage Load (1.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "2"], ["LIMIT", 1]]
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 2], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "2"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."id" = ? LIMIT ?[0m  [["id", 2], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (0.0ms)
+Completed 200 OK in 150ms (Views: 121.1ms | ActiveRecord: 1.0ms)
+
+
+Started GET "/rules" for 127.0.0.1 at 2018-05-16 21:34:06 -0400
+Processing by PagesController#show as HTML
+  Parameters: {"id"=>"rules"}
+  [1m[36mPage Load (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "rules"], ["LIMIT", 1]]
+  [1m[36mCACHE (0.0ms)[0m  [1m[34mSELECT  "pages".* FROM "pages" WHERE "pages"."slug" = ? ORDER BY "pages"."id" ASC LIMIT ?[0m  [["slug", "rules"], ["LIMIT", 1]]
+  Rendering pages/show.html.erb within layouts/application
+  Rendered pages/show.html.erb within layouts/application (1.0ms)
+Completed 200 OK in 143ms (Views: 115.4ms | ActiveRecord: 0.0ms)
+
+
