@@ -1,0 +1,48 @@
+<h1>Sign Up</h1>
+
+<%= form_for @player do |f| %>
+  <% if @player.errors.any? %>
+    <div class="error_messages">
+      <h2>Form is invalid</h2>
+      <ul>
+        <% @player.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :email %><br />
+    <%= f.text_field :email %>
+  </div>
+  <div class="field">
+    <%= f.label :password %><br />
+    <%= f.password_field :password %>
+  </div>
+  <div class="field">
+    <%= f.label :password_confirmation %><br />
+    <%= f.password_field :password_confirmation %>
+  </div>
+  <div class="field">
+    <%= f.label :firstname %><br />
+    <%= f.text_field :firstname %>
+  </div>
+  <div class="field">
+    <%= f.label :lastname %><br />
+    <%= f.password_field :lastname %>
+  </div>
+  <div class="field">
+    <%= f.label :nickname %><br />
+    <%= f.password_field :nickname %>
+  </div>  
+    <div class="field">
+    <%= f.label :phone %><br />
+    <%= f.text_field :phone %>
+  </div>
+  <div class="field">
+    <%= f.label :gender %><br />
+    <%= f.password_field :gender %>
+  </div>
+  <div class="actions"><%= f.submit "Sign Up" %></div>
+<% end %>
