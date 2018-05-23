@@ -1,0 +1,57 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  firstname: MyString
+  lastname: MyString
+  nickname: MyString
+  email: MyString
+  phone: MyString
+  gender: MyString
+  yes_hash: MyString
+  no_hash: MyString
+  password_digest: MyString
+  highround: 1
+  averageround: 9.99
+  lowround: 1
+  numnoshows: 1
+  goal2: 1
+  goal7: 1
+  goal20: 1
+  hdcp2: 9.99
+  hdcp7: 9.99
+  hdcp20: 9.99
+  seasonprizemoney: 9.99
+  lifetimeprizemoney: 9.99
+  duespaid: false
+  reminder: false
+  active: false
+  hashdcp: false
+  cangetemail: false
+
+two:
+  firstname: MyString
+  lastname: MyString
+  nickname: MyString
+  email: MyString
+  phone: MyString
+  gender: MyString
+  yes_hash: MyString
+  no_hash: MyString
+  password_digest: MyString
+  highround: 1
+  averageround: 9.99
+  lowround: 1
+  numnoshows: 1
+  goal2: 1
+  goal7: 1
+  goal20: 1
+  hdcp2: 9.99
+  hdcp7: 9.99
+  hdcp20: 9.99
+  seasonprizemoney: 9.99
+  lifetimeprizemoney: 9.99
+  duespaid: false
+  reminder: false
+  active: false
+  hashdcp: false
+  cangetemail: false
