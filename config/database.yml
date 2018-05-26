@@ -9,6 +9,30 @@ default: &default
   pool: 5
   timeout: 5000
 
+#development:
+#  adapter: postgresql
+#  encoding: unicode
+#  database: npgolf_development
+#  pool: 5
+#  username: elindqui
+#  password:
+
+#test:
+#  adapter: postgresql
+#  encoding: unicode
+#  database: npgolf_test
+#  pool: 5
+#  username: elindqui
+#  password:
+
+#production:
+#  adapter: postgresql
+#  encoding: unicode
+#  database: npgolf_production
+#  pool: 5
+#  username: elindqui
+#  password:
+
 development:
   <<: *default
   database: db/development.sqlite3
