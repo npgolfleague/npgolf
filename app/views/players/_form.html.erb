@@ -1,0 +1,157 @@
+<%= form_for(player) do |f| %>
+  <% if player.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(player.errors.count, "error") %> prohibited this player from being saved:</h2>
+
+      <ul>
+      <% player.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :firstname %>
+    <%= f.text_field :firstname %>
+  </div>
+
+  <div class="field">
+    <%= f.label :lastname %>
+    <%= f.text_field :lastname %>
+  </div>
+
+  <div class="field">
+    <%= f.label :nickname %>
+    <%= f.text_field :nickname %>
+  </div>
+
+  <div class="field">
+    <%= f.label :email %>
+    <%= f.text_field :email %>
+  </div>
+
+  <div class="field">
+    <%= f.label :role %>
+    <%= f.text_field :role %>
+  </div>
+
+  <div class="field">
+    <%= f.label :phone %>
+    <%= f.text_field :phone %>
+  </div>
+
+  <div class="field">
+    <%= f.label :gender %>
+    <%= f.text_field :gender %>
+  </div>
+
+  <div class="field">
+    <%= f.label :yes_hash %>
+    <%= f.text_field :yes_hash %>
+  </div>
+
+  <div class="field">
+    <%= f.label :no_hash %>
+    <%= f.text_field :no_hash %>
+  </div>
+
+  <div>
+    <%= f.label :password %><br />
+    <%= f.password_field :password %>
+  </div>
+
+  <div>
+    <%= f.label :password_confirmation %><br />
+    <%= f.password_field :password_confirmation %>
+  </div>  
+
+  <div class="field">
+    <%= f.label :highround %>
+    <%= f.number_field :highround %>
+  </div>
+
+  <div class="field">
+    <%= f.label :averageround %>
+    <%= f.text_field :averageround %>
+  </div>
+
+  <div class="field">
+    <%= f.label :lowround %>
+    <%= f.number_field :lowround %>
+  </div>
+
+  <div class="field">
+    <%= f.label :numnoshows %>
+    <%= f.number_field :numnoshows %>
+  </div>
+
+  <div class="field">
+    <%= f.label :goal2 %>
+    <%= f.number_field :goal2 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :goal7 %>
+    <%= f.number_field :goal7 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :goal20 %>
+    <%= f.number_field :goal20 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :hdcp2 %>
+    <%= f.text_field :hdcp2 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :hdcp7 %>
+    <%= f.text_field :hdcp7 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :hdcp20 %>
+    <%= f.text_field :hdcp20 %>
+  </div>
+
+  <div class="field">
+    <%= f.label :seasonprizemoney %>
+    <%= f.text_field :seasonprizemoney %>
+  </div>
+
+  <div class="field">
+    <%= f.label :lifetimeprizemoney %>
+    <%= f.text_field :lifetimeprizemoney %>
+  </div>
+
+  <div class="field">
+    <%= f.label :duespaid %>
+    <%= f.check_box :duespaid %>
+  </div>
+
+  <div class="field">
+    <%= f.label :reminder %>
+    <%= f.check_box :reminder %>
+  </div>
+
+  <div class="field">
+    <%= f.label :active %>
+    <%= f.check_box :active %>
+  </div>
+
+  <div class="field">
+    <%= f.label :hashdcp %>
+    <%= f.check_box :hashdcp %>
+  </div>
+
+  <div class="field">
+    <%= f.label :cangetemail %>
+    <%= f.check_box :cangetemail %>
+  </div>
+
+  <div class="actions">
+    <%= f.submit %>
+  </div>
+<% end %>

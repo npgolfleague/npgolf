@@ -1,0 +1,73 @@
+<p id="notice"><%= notice %></p>
+
+<h1>Players</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Firstname</th>
+      <th>Lastname</th>
+      <th>Nickname</th>
+      <th>Email</th>
+      <th>Role</th>
+      <th>Phone</th>
+      <th>Gender</th>
+      <th>Highround</th>
+      <th>Averageround</th>
+      <th>Lowround</th>
+      <th>Numnoshows</th>
+      <th>Goal2</th>
+      <th>Goal7</th>
+      <th>Goal20</th>
+      <th>Hdcp2</th>
+      <th>Hdcp7</th>
+      <th>Hdcp20</th>
+      <th>Seasonprizemoney</th>
+      <th>Lifetimeprizemoney</th>
+      <th>Duespaid</th>
+      <th>Reminder</th>
+      <th>Active</th>
+      <th>Hashdcp</th>
+      <th>Cangetemail</th>
+      <th colspan="3"></th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <% @players.each do |player| %>
+      <tr>
+        <td><%= player.firstname %></td>
+        <td><%= player.lastname %></td>
+        <td><%= player.nickname %></td>
+        <td><%= player.email %></td>
+        <td><%= player.role %></td>
+        <td><%= player.phone %></td>
+        <td><%= player.gender %></td>
+        <td><%= player.highround %></td>
+        <td><%= player.averageround %></td>
+        <td><%= player.lowround %></td>
+        <td><%= player.numnoshows %></td>
+        <td><%= player.goal2 %></td>
+        <td><%= player.goal7 %></td>
+        <td><%= player.goal20 %></td>
+        <td><%= player.hdcp2 %></td>
+        <td><%= player.hdcp7 %></td>
+        <td><%= player.hdcp20 %></td>
+        <td><%= player.seasonprizemoney %></td>
+        <td><%= player.lifetimeprizemoney %></td>
+        <td><%= player.duespaid %></td>
+        <td><%= player.reminder %></td>
+        <td><%= player.active %></td>
+        <td><%= player.hashdcp %></td>
+        <td><%= player.cangetemail %></td>
+        <td><%= link_to 'Show', player %></td>
+        <td><%= link_to 'Edit', edit_player_path(player) %></td>
+        <td><%= link_to 'Destroy', player, method: :delete, data: { confirm: 'Are you sure?' } %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<br>
+
+<%= link_to 'New Player', new_player_path %>

@@ -6,6 +6,15 @@
 
     <%= stylesheet_link_tag    'application', media: 'all', 'data-turbolinks-track': 'reload' %>
     <%= javascript_include_tag 'application', 'data-turbolinks-track': 'reload' %>
+    <div id="player_header">
+    	<% if current_player %>
+    	  Logged in as <%= current_player.email %>
+    	  <%= link_to "Log Out", session_path("current"), method: "delete" %>
+    	<% else %>   
+    		<%= link_to "Sign In", new_player_path %>
+    		<%= link_to "Log In", new_session_path %>
+    	<% end %>	
+    </div>
   </head>
 
   <body>
