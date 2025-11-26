@@ -34,11 +34,18 @@ describe('npgolf API', () => {
   });
 
   test('POST /api/users creates a user', async () => {
-    const payload = { name: 'Alice', email: 'alice@example.com', password: 'S3cr3t!' };
+    const payload = { name: 'Alice', email: 'alice@example.com', password: 'SecurePass123' };
     const res = await request(app).post('/api/users').send(payload);
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('id');
     expect(res.body).toHaveProperty('name');
     expect(res.body).toHaveProperty('email');
+  });
+
+  test('POST /api/users rejects weak password', async () => {
+    const payload = { name: 'Bob', email: 'bob@example.com', password: 'weak' };
+    const res = await request(app).post('/api/users').send(payload);
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
   });
 });

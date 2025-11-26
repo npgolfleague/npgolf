@@ -24,6 +24,15 @@ router.post('/', async (req, res) => {
   try {
     let hashed = null;
     if (password) {
+      // Basic password validation: minimum 8 chars, includes letters and numbers
+      const minLen = 8;
+      const hasMin = typeof password === 'string' && password.length >= minLen;
+      const hasLetter = /[A-Za-z]/.test(password);
+      const hasNumber = /\d/.test(password);
+      if (!hasMin || !hasLetter || !hasNumber) {
+        return res.status(400).json({ error: `password must be at least ${minLen} characters and include letters and numbers` });
+      }
+
       const rounds = process.env.BCRYPT_ROUNDS ? Number(process.env.BCRYPT_ROUNDS) : 10;
       hashed = await bcrypt.hash(password, rounds);
     }
