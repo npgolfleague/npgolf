@@ -8,24 +8,29 @@ import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Users } from './pages/Users'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/users"
-            element={
-              <ProtectedRoute>
-                <Users />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/users" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
-  </React.StrictMode>
-)
+try {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <Users />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Navigate to="/users" replace />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </React.StrictMode>
+  )
+} catch (err) {
+  console.error('Frontend error:', err)
+  document.getElementById('root').innerHTML = `<h1>Error: ${err.message}</h1><pre>${err.stack}</pre>`
+}

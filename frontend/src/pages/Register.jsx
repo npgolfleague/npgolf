@@ -19,7 +19,9 @@ export const Register = () => {
       await authAPI.register(name, email, password)
       navigate('/login', { state: { message: 'Registration successful! Please log in.' } })
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed')
+      console.error('Registration error:', err)
+      const errorMsg = err.response?.data?.error || err.message || 'Registration failed'
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
