@@ -1,0 +1,11 @@
+-- schema.sql
+-- Create database and users table for npgolf
+CREATE DATABASE IF NOT EXISTS npgolf CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE npgolf;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(191) NOT NULL,
+  email VARCHAR(191) NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
