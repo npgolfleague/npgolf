@@ -43,6 +43,13 @@ router.post('/', async (req, res) => {
     );
     const insertedId = result.insertId;
     const [rows] = await pool.query('SELECT id, name, email, created_at FROM users WHERE id = ?', [insertedId]);
+    // Log successful creation for easier debugging (id and email only)
+    try {
+      console.log(`User created id=${insertedId} email=${email}`);
+    } catch (logErr) {
+      // ensure logging errors don't interfere with response
+      console.error('Logging error', logErr);
+    }
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('DB error', err);

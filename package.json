@@ -4,7 +4,9 @@
   "description": "Node backend with MySQL for the npgolf project",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+  "start": "node src/server.js",
+  "start:logs": "node scripts/run-server.js",
+  "create-app-user": "node scripts/create_app_user.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "migrate": "node scripts/migrate.js",

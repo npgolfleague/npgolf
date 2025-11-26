@@ -6,7 +6,10 @@
     <title>npgolf - Frontend</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">Loading...</div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      console.log('HTML loaded, root div found:', !!document.getElementById('root'))
+    </script>
   </body>
 </html>
