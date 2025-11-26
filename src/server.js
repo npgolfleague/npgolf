@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const app = express();
@@ -18,6 +20,17 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Serve frontend static files when present (built assets)
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  // For any non-API route, serve index.html (SPA)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.get('/', (req, res) => {
   res.json({ message: 'npgolf API - Node + MySQL backend' });
