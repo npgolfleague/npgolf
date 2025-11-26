@@ -34,7 +34,7 @@ describe('npgolf API', () => {
   });
 
   test('POST /api/users creates a user', async () => {
-    const payload = { name: 'Alice', email: 'alice@example.com' };
+    const payload = { name: 'Alice', email: 'alice@example.com', password: 'S3cr3t!' };
     const res = await request(app).post('/api/users').send(payload);
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('id');
