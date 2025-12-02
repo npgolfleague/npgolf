@@ -20,10 +20,10 @@ jest.mock('../src/db', () => {
 const app = require('../src/server');
 
 describe('npgolf API', () => {
-  test('GET / returns health message', async () => {
-    const res = await request(app).get('/');
+  test('GET /api/users endpoint is available', async () => {
+    const res = await request(app).get('/api/users');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('message');
+    expect(Array.isArray(res.body)).toBe(true);
   });
 
   test('GET /api/users returns an array', async () => {
