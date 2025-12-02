@@ -3,10 +3,10 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 
-// GET /api/users - list users
+// GET /api/users - list players
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, email, created_at FROM users ORDER BY id DESC LIMIT 100');
+    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota, created_at FROM players ORDER BY id DESC LIMIT 100');
     res.json(rows);
   } catch (err) {
     console.error('DB error', err);
@@ -14,11 +14,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/users - create user { name, email, password? }
+// POST /api/users - create player { name, email, password?, sex?, active?, quota? }
 // If `password` is provided it will be hashed before storing. Password is nullable
 // to preserve backwards compatibility.
 router.post('/', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, sex, active, quota } = req.body;
   if (!name || !email) return res.status(400).json({ error: 'name and email are required' });
 
   try {
@@ -37,15 +37,16 @@ router.post('/', async (req, res) => {
       hashed = await bcrypt.hash(password, rounds);
     }
 
+    const activeValue = active !== undefined ? active : 1;
     const [result] = await pool.execute(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashed]
+      'INSERT INTO players (name, email, sex, active, quota, password) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, sex || null, activeValue, quota || null, hashed]
     );
     const insertedId = result.insertId;
-    const [rows] = await pool.query('SELECT id, name, email, created_at FROM users WHERE id = ?', [insertedId]);
+    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota, created_at FROM players WHERE id = ?', [insertedId]);
     // Log successful creation for easier debugging (id and email only)
     try {
-      console.log(`User created id=${insertedId} email=${email}`);
+      console.log(`Player created id=${insertedId} email=${email}`);
     } catch (logErr) {
       // ensure logging errors don't interfere with response
       console.error('Logging error', logErr);
