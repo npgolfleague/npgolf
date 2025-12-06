@@ -26,4 +26,13 @@ export const usersAPI = {
   get: (id) => apiClient.get(`/users/${id}`)
 }
 
+export const coursesAPI = {
+  list: () => apiClient.get('/courses'),
+  get: (id) => apiClient.get(`/courses/${id}`),
+  create: (name, address, phone) => apiClient.post('/courses', { name, address, phone }),
+  addHoles: (courseId, holes) => apiClient.post(`/courses/${courseId}/holes`, { holes }),
+  update: (id, name, address, phone) => apiClient.put(`/courses/${id}`, { name, address, phone }),
+  delete: (id) => apiClient.delete(`/courses/${id}`)
+}
+
 export default apiClient

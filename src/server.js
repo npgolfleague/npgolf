@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
+const coursesRouter = require('./routes/courses');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -38,12 +39,23 @@ app.get('/', (req, res) => {
 
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/courses', coursesRouter);
 
 // If this file is run directly, start the server. This makes it safe to require
 // the app in tests without starting a listener.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
+  });
+  
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
   });
 }
 
