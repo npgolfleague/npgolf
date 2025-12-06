@@ -1,0 +1,28 @@
+-- 008_create_course_table.sql
+USE npgolf;
+
+-- Drop existing course table if it exists
+DROP TABLE IF EXISTS course;
+
+CREATE TABLE IF NOT EXISTS course (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(191) NOT NULL,
+  address VARCHAR(255) DEFAULT NULL,
+  phone VARCHAR(20) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hole (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  course_id INT UNSIGNED NOT NULL,
+  hole_number TINYINT UNSIGNED NOT NULL,
+  mens_distance INT UNSIGNED NOT NULL,
+  mens_par TINYINT UNSIGNED NOT NULL,
+  mens_handicap TINYINT UNSIGNED NOT NULL,
+  ladies_distance INT UNSIGNED NOT NULL,
+  ladies_par TINYINT UNSIGNED NOT NULL,
+  ladies_handicap TINYINT UNSIGNED NOT NULL,
+  UNIQUE KEY unique_course_hole (course_id, hole_number),
+  FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE
+);

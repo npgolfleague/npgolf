@@ -1,14 +1,10 @@
-import { useState, useEffect, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { usersAPI } from '../api'
-import { AuthContext } from '../context/AuthContext'
 
 export const Users = () => {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { user, logout } = useContext(AuthContext)
-  const navigate = useNavigate()
 
   useEffect(() => {
     fetchPlayers()
@@ -27,28 +23,8 @@ export const Users = () => {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">npgolf</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600">Welcome, {user?.name}!</span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h2 className="text-3xl font-bold mb-6 text-gray-800">Players</h2>
 
