@@ -10,7 +10,11 @@ CREATE TABLE IF NOT EXISTS players (
   sex CHAR(1) DEFAULT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   quota DECIMAL(5,2) DEFAULT NULL,
+  fedex_points INT DEFAULT 0,
+  tournaments_played INT DEFAULT 0,
+  prize_money DECIMAL(12,2) DEFAULT 0.00,
   password VARCHAR(255) DEFAULT NULL,
+  role VARCHAR(20) DEFAULT 'player',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -107,4 +111,35 @@ CREATE TABLE IF NOT EXISTS hole (
   ladies_handicap TINYINT UNSIGNED NOT NULL,
   UNIQUE KEY unique_course_hole (course_id, hole_number),
   FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tournament (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  date DATE NOT NULL,
+  first_tee_time TIME DEFAULT NULL,
+  course_id INT UNSIGNED NOT NULL,
+  number_of_holes TINYINT UNSIGNED NOT NULL DEFAULT 18,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE RESTRICT,
+  INDEX idx_date (date),
+  INDEX idx_course_id (course_id)
+);
+
+CREATE TABLE IF NOT EXISTS scores (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  entered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  tournament_id INT UNSIGNED NOT NULL,
+  player_id INT UNSIGNED NOT NULL,
+  hole_id INT UNSIGNED NOT NULL,
+  score TINYINT UNSIGNED NOT NULL,
+  quota DECIMAL(5,2) DEFAULT NULL,
+  foursome_group VARCHAR(50) DEFAULT NULL,
+  FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE,
+  FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  FOREIGN KEY (hole_id) REFERENCES hole(id) ON DELETE CASCADE,
+  INDEX idx_tournament_id (tournament_id),
+  INDEX idx_player_id (player_id),
+  INDEX idx_hole_id (hole_id),
+  UNIQUE KEY unique_tournament_player_hole (tournament_id, player_id, hole_id)
 );

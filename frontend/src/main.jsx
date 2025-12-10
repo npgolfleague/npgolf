@@ -7,10 +7,12 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { MainLayout } from './components/MainLayout'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { Dashboard } from './pages/Dashboard'
 import { Users } from './pages/Users'
 import { Courses } from './pages/Courses'
 import { AddCourse } from './pages/AddCourse'
 import { EditCourse } from './pages/EditCourse'
+import { ScoreEntry } from './pages/ScoreEntry'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -27,12 +29,14 @@ try {
                 </ProtectedRoute>
               }
             >
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/add" element={<AddCourse />} />
               <Route path="/courses/:id" element={<EditCourse />} />
+              <Route path="/scores" element={<ScoreEntry />} />
             </Route>
-            <Route path="/" element={<Navigate to="/users" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
       </AuthProvider>
