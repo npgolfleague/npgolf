@@ -14,6 +14,8 @@ export const MainLayout = () => {
   }
 
   const menuItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
+    { path: '/scores', label: 'Score Entry', icon: '📝' },
     { path: '/users', label: 'Players', icon: '👥' },
     { path: '/courses', label: 'Courses', icon: '⛳' },
     { path: '/courses/add', label: 'Add Course', icon: '➕' }

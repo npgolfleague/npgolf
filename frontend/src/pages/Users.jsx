@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
-import { usersAPI } from '../api'
+import { useState, useEffect, useContext } from 'react'
+import { playersAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
+import { EditPlayerModal } from '../components/EditPlayerModal'
 
 export const Users = () => {
+  const { user } = useContext(AuthContext)
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [editingPlayer, setEditingPlayer] = useState(null)
 
   useEffect(() => {
     fetchPlayers()
@@ -14,13 +18,33 @@ export const Users = () => {
     setLoading(true)
     setError('')
     try {
-      const response = await usersAPI.list()
+      const response = await playersAPI.list()
       setPlayers(response.data)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch players')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEdit = (player) => {
+    setEditingPlayer(player)
+  }
+
+  const handleCloseModal = () => {
+    setEditingPlayer(null)
+  }
+
+  const handleSave = (updatedPlayer) => {
+    // Update the player in the list
+    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p))
+    setEditingPlayer(null)
+  }
+
+  const canEditPlayer = (player) => {
+    // Admin can edit all players, regular users can only edit themselves
+    const isAdmin = user?.role === 'admin'
+    return isAdmin || (user?.id === player?.id)
   }
 
   return (
@@ -37,42 +61,59 @@ export const Users = () => {
             <table className="w-full">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">ID</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Sex</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Active</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Created At</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">FedEx Pts</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Prize Money</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {players.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-4 text-center text-gray-600">
+                    <td colSpan="8" className="px-6 py-4 text-center text-gray-600">
                       No players found
                     </td>
                   </tr>
                 ) : (
-                  players.map((player) => (
-                    <tr key={player.id} className="border-t hover:bg-gray-50">
-                      <td className="px-6 py-4 text-gray-900">{player.id}</td>
+                  players.map((player, index) => (
+                    <tr key={index} className="border-t hover:bg-gray-50">
                       <td className="px-6 py-4 text-gray-900">{player.name}</td>
                       <td className="px-6 py-4 text-gray-900">{player.email}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.sex || '-'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${player.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {player.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
+                      <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.quota || '-'}</td>
-                      <td className="px-6 py-4 text-gray-600">{new Date(player.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-4">
+                        {canEditPlayer(player) ? (
+                          <button 
+                            onClick={() => handleEdit(player)}
+                            className="text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+        )}
+
+        {editingPlayer && (
+          <EditPlayerModal
+            player={editingPlayer}
+            onClose={handleCloseModal}
+            onSave={handleSave}
+          />
         )}
       </div>
     </div>
