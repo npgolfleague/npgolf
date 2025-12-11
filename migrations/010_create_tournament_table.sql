@@ -1,0 +1,14 @@
+-- Migration: Create tournament table
+-- Date: 2025-12-05
+
+CREATE TABLE IF NOT EXISTS tournament (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  date DATE NOT NULL,
+  course_id INT UNSIGNED NOT NULL,
+  number_of_holes TINYINT UNSIGNED NOT NULL DEFAULT 18,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE RESTRICT,
+  INDEX idx_date (date),
+  INDEX idx_course_id (course_id)
+);
