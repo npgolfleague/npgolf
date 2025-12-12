@@ -15,6 +15,10 @@ import { EditCourse } from './pages/EditCourse'
 import { ScoreEntry } from './pages/ScoreEntry'
 import { TournamentPlayers } from './pages/TournamentPlayers'
 import { Leaderboard } from './pages/Leaderboard'
+import { Settings } from './pages/Settings'
+import { Tournaments } from './pages/Tournaments'
+import { AddTournament } from './pages/AddTournament'
+import { EditTournament } from './pages/EditTournament'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -24,6 +28,7 @@ try {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               element={
                 <ProtectedRoute>
@@ -31,16 +36,21 @@ try {
                 </ProtectedRoute>
               }
             >
+              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/add" element={<AddCourse />} />
               <Route path="/courses/:id" element={<EditCourse />} />
               <Route path="/scores" element={<ScoreEntry />} />
+              <Route path="/tournaments" element={<Tournaments />} />
+              <Route path="/tournaments/add" element={<AddTournament />} />
+              <Route path="/tournaments/:id/edit" element={<EditTournament />} />
               <Route path="/tournaments/:tournamentId/players" element={<TournamentPlayers />} />
               <Route path="/tournaments/:tournamentId/leaderboard" element={<Leaderboard />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
       </AuthProvider>
