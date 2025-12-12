@@ -21,6 +21,7 @@ export const ScoreEntry = () => {
   useEffect(() => {
     if (selectedTournament) {
       fetchCourseHoles(selectedTournament.course_id)
+      fetchTournamentPlayers(selectedTournament.id)
     }
   }, [selectedTournament])
 
@@ -39,6 +40,17 @@ export const ScoreEntry = () => {
       setPlayers(response.data.filter(p => p.active))
     } catch (err) {
       console.error('Error fetching players:', err)
+    }
+  }
+
+  const fetchTournamentPlayers = async (tournamentId) => {
+    try {
+      const response = await tournamentsAPI.getPlayers(tournamentId)
+      setPlayers(response.data)
+    } catch (err) {
+      console.error('Error fetching tournament players:', err)
+      // Fall back to all active players if tournament players fetch fails
+      fetchPlayers()
     }
   }
 
@@ -203,25 +215,33 @@ export const ScoreEntry = () => {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Select Players (up to 4)
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {players.map(player => (
-                <button
-                  key={player.id}
-                  onClick={() => handlePlayerToggle(player.id)}
-                  className={`p-3 rounded-lg border-2 transition text-left ${
-                    selectedPlayers.includes(player.id)
-                      ? 'border-blue-500 bg-blue-50 text-blue-900'
-                      : 'border-gray-300 bg-white text-gray-700'
-                  }`}
-                >
-                  <div className="font-semibold">{player.name}</div>
-                  <div className="text-xs text-gray-600">Quota: {player.quota || '-'}</div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              Selected: {selectedPlayers.length}/4
-            </div>
+            {players.length === 0 ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                No players registered for this tournament. Please add players to the tournament first.
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {players.map(player => (
+                    <button
+                      key={player.id}
+                      onClick={() => handlePlayerToggle(player.id)}
+                      className={`p-3 rounded-lg border-2 transition text-left ${
+                        selectedPlayers.includes(player.id)
+                          ? 'border-blue-500 bg-blue-50 text-blue-900'
+                          : 'border-gray-300 bg-white text-gray-700'
+                      }`}
+                    >
+                      <div className="font-semibold">{player.name}</div>
+                      <div className="text-xs text-gray-600">Quota: {player.quota || '-'}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 text-sm text-gray-600">
+                  Selected: {selectedPlayers.length}/4
+                </div>
+              </>
+            )}
           </div>
         )}
 

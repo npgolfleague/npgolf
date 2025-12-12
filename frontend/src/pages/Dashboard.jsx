@@ -88,7 +88,7 @@ export const Dashboard = () => {
                   {tournaments.map((tournament, index) => (
                     <div 
                       key={tournament.id} 
-                      className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                      className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow hover:border-blue-500"
                     >
                       <div className="flex items-start gap-2">
                         <span className="text-lg">
@@ -104,6 +104,21 @@ export const Dashboard = () => {
                           <p className="text-xs text-gray-600">
                             ⛳ {tournament.number_of_holes} holes
                           </p>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => navigate(`/tournaments/${tournament.id}/players`)}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              👥 Players
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <button
+                              onClick={() => navigate(`/tournaments/${tournament.id}/leaderboard`)}
+                              className="text-xs text-green-600 hover:text-green-800 font-medium"
+                            >
+                              🏆 Leaderboard
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

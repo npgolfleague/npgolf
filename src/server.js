@@ -6,7 +6,9 @@ const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const coursesRouter = require('./routes/courses');
 const tournamentsRouter = require('./routes/tournaments');
+const tournamentPlayersRouter = require('./routes/tournament-players');
 const scoresRouter = require('./routes/scores');
+const leaderboardRouter = require('./routes/leaderboard');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -43,7 +45,9 @@ app.use('/api/players', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', coursesRouter);
 app.use('/api/tournaments', tournamentsRouter);
+app.use('/api/tournaments', tournamentPlayersRouter);
 app.use('/api/scores', scoresRouter);
+app.use('/api/leaderboard', leaderboardRouter);
 
 // If this file is run directly, start the server. This makes it safe to require
 // the app in tests without starting a listener.
