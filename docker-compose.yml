@@ -1,24 +1,42 @@
 version: '3.8'
 
 services:
+  mysql:
+    image: crj001xx/mysql-docker:latest
+    container_name: npgolf-mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: npgolf
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - npgolf-network
+
   app:
     image: crj001xx/npgolf:latest
     container_name: npgolf-app
     restart: always
     ports:
       - "3000:3000"
+    depends_on:
+      - mysql
     environment:
-      DB_HOST: mysql-container
+      DB_HOST: npgolf-mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASS: Min$4Ter
-      DB_NAME: myapp
+      DB_PASS: root
+      DB_NAME: npgolf
       JWT_SECRET: your-secret-key-change-in-production
       JWT_EXPIRES_IN: 1h
       BCRYPT_ROUNDS: 10
     networks:
-      - mysql-docker_mysql-network
+      - npgolf-network
+
+volumes:
+  mysql_data:
 
 networks:
-  mysql-docker_mysql-network:
-    external: true
+  npgolf-network:
