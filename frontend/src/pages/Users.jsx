@@ -1,92 +1,119 @@
 import { useState, useEffect, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { usersAPI } from '../api'
+import { playersAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { EditPlayerModal } from '../components/EditPlayerModal'
 
 export const Users = () => {
-  const [users, setUsers] = useState([])
+  const { user } = useContext(AuthContext)
+  const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { user, logout } = useContext(AuthContext)
-  const navigate = useNavigate()
+  const [editingPlayer, setEditingPlayer] = useState(null)
 
   useEffect(() => {
-    fetchUsers()
+    fetchPlayers()
   }, [])
 
-  const fetchUsers = async () => {
+  const fetchPlayers = async () => {
     setLoading(true)
     setError('')
     try {
-      const response = await usersAPI.list()
-      setUsers(response.data)
+      const response = await playersAPI.list()
+      setPlayers(response.data)
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to fetch users')
+      setError(err.response?.data?.error || 'Failed to fetch players')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleEdit = (player) => {
+    setEditingPlayer(player)
+  }
+
+  const handleCloseModal = () => {
+    setEditingPlayer(null)
+  }
+
+  const handleSave = (updatedPlayer) => {
+    // Update the player in the list
+    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p))
+    setEditingPlayer(null)
+  }
+
+  const canEditPlayer = (player) => {
+    // Admin can edit all players, regular users can only edit themselves
+    const isAdmin = user?.role === 'admin'
+    return isAdmin || (user?.id === player?.id)
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">npgolf</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600">Welcome, {user?.name}!</span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">Users</h2>
+        <h2 className="text-3xl font-bold mb-6 text-gray-800">Players</h2>
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
         {loading ? (
-          <div className="text-center text-gray-600">Loading users...</div>
+          <div className="text-center text-gray-600">Loading players...</div>
         ) : (
           <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">ID</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Created At</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">FedEx Pts</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Prize Money</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 ? (
+                {players.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="px-6 py-4 text-center text-gray-600">
-                      No users found
+                    <td colSpan="8" className="px-6 py-4 text-center text-gray-600">
+                      No players found
                     </td>
                   </tr>
                 ) : (
-                  users.map((u) => (
-                    <tr key={u.id} className="border-t hover:bg-gray-50">
-                      <td className="px-6 py-4 text-gray-900">{u.id}</td>
-                      <td className="px-6 py-4 text-gray-900">{u.name}</td>
-                      <td className="px-6 py-4 text-gray-900">{u.email}</td>
-                      <td className="px-6 py-4 text-gray-600">{new Date(u.created_at).toLocaleDateString()}</td>
+                  players.map((player, index) => (
+                    <tr key={index} className="border-t hover:bg-gray-50">
+                      <td className="px-6 py-4 text-gray-900">{player.name}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.email}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.quota || '-'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-4">
+                        {canEditPlayer(player) ? (
+                          <button 
+                            onClick={() => handleEdit(player)}
+                            className="text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+        )}
+
+        {editingPlayer && (
+          <EditPlayerModal
+            player={editingPlayer}
+            onClose={handleCloseModal}
+            onSave={handleSave}
+          />
         )}
       </div>
     </div>

@@ -4,9 +4,17 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { MainLayout } from './components/MainLayout'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { Dashboard } from './pages/Dashboard'
 import { Users } from './pages/Users'
+import { Courses } from './pages/Courses'
+import { AddCourse } from './pages/AddCourse'
+import { EditCourse } from './pages/EditCourse'
+import { ScoreEntry } from './pages/ScoreEntry'
+import { TournamentPlayers } from './pages/TournamentPlayers'
+import { Leaderboard } from './pages/Leaderboard'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -17,14 +25,22 @@ try {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route
-              path="/users"
               element={
                 <ProtectedRoute>
-                  <Users />
+                  <MainLayout />
                 </ProtectedRoute>
               }
-            />
-            <Route path="/" element={<Navigate to="/users" replace />} />
+            >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="/courses" element={<Courses />} />
+              <Route path="/courses/add" element={<AddCourse />} />
+              <Route path="/courses/:id" element={<EditCourse />} />
+              <Route path="/scores" element={<ScoreEntry />} />
+              <Route path="/tournaments/:tournamentId/players" element={<TournamentPlayers />} />
+              <Route path="/tournaments/:tournamentId/leaderboard" element={<Leaderboard />} />
+            </Route>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
       </AuthProvider>
@@ -34,3 +50,4 @@ try {
   console.error('Frontend error:', err)
   document.getElementById('root').innerHTML = `<h1>Error: ${err.message}</h1><pre>${err.stack}</pre>`
 }
+
