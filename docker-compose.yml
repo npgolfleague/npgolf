@@ -2,9 +2,10 @@ version: '3.8'
 
 services:
   mysql:
-    image: crj001xx/mysql-docker:latest
+    image: mysql:8.0
     container_name: npgolf-mysql
     restart: always
+    platform: linux/amd64  # MySQL 8.0 official image supports multi-arch
     ports:
       - "3306:3306"
     environment:
@@ -14,8 +15,12 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - npgolf-network
+    command: --default-authentication-plugin=mysql_native_password
 
   app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: crj001xx/npgolf:latest
     container_name: npgolf-app
     restart: always

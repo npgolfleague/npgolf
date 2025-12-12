@@ -103,7 +103,13 @@ export function Leaderboard() {
                   Over/Under
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                  Quota Prize
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
                   Skins
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                  Skin Prize
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
                   Holes
@@ -144,6 +150,15 @@ export function Leaderboard() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {player.quota_prize_money > 0 ? (
+                      <div className="text-sm font-bold text-green-600">
+                        ${player.quota_prize_money}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">-</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
                     {player.skins > 0 ? (
                       <div className="text-center">
                         <div className="text-lg font-bold text-orange-600">
@@ -152,6 +167,15 @@ export function Leaderboard() {
                         <div className="text-xs text-gray-600 mt-1">
                           Holes: {player.skin_holes.sort((a, b) => a - b).join(', ')}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">-</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {player.skin_prize_money > 0 ? (
+                      <div className="text-sm font-bold text-green-600">
+                        ${player.skin_prize_money}
                       </div>
                     ) : (
                       <div className="text-sm text-gray-400">-</div>
@@ -178,7 +202,9 @@ export function Leaderboard() {
             <p><span className="font-semibold">Quota:</span> Player's handicap quota</p>
             <p><span className="font-semibold">Total Pts:</span> Sum of all quota points earned this tournament</p>
             <p><span className="font-semibold">Over/Under:</span> Total Pts minus Quota (positive is better)</p>
+            <p><span className="font-semibold">Quota Prize:</span> 1st place: 50%, 2nd: 30%, 3rd: 20% of quota pot (50% of total)</p>
             <p><span className="font-semibold">Skins 🔥:</span> Number of holes where player had the best score alone</p>
+            <p><span className="font-semibold">Skin Prize:</span> Prize money earned from skins (30% of total pot divided by total skins)</p>
             <p className="mt-2"><span className="text-green-600 font-bold">Green = Over Quota</span> | <span className="text-red-600 font-bold">Red = Under Quota</span></p>
           </div>
         </div>

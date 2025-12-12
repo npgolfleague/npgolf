@@ -17,9 +17,15 @@ export const MainLayout = () => {
     { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
     { path: '/scores', label: 'Score Entry', icon: '📝' },
     { path: '/users', label: 'Players', icon: '👥' },
-    { path: '/courses', label: 'Courses', icon: '⛳' },
-    { path: '/courses/add', label: 'Add Course', icon: '➕' }
+    { path: '/tournaments', label: 'Tournaments', icon: '🏆' },
+    { path: '/courses', label: 'Courses', icon: '⛳' }
   ]
+
+  const adminMenuItems = [
+    { path: '/settings', label: 'Settings', icon: '⚙️' }
+  ]
+
+  const allMenuItems = user?.role === 'admin' ? [...menuItems, ...adminMenuItems] : menuItems
 
   const isActive = (path) => {
     if (path === '/courses/add') {
@@ -71,7 +77,7 @@ export const MainLayout = () => {
         {/* Navigation Menu */}
         <nav className="flex-1 p-4">
           <ul className="space-y-2">
-            {menuItems.map((item) => (
+            {allMenuItems.map((item) => (
               <li key={item.path}>
                 <button
                   onClick={() => navigate(item.path)}

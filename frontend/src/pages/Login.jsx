@@ -20,7 +20,10 @@ export const Login = () => {
       const response = await authAPI.login(email, password)
       const { token, user } = response.data
       login(user, token)
-      navigate('/users')
+      // Small delay to ensure localStorage is written
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true })
+      }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed')
     } finally {

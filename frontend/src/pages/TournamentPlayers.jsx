@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tournamentsAPI } from '../api';
+import { AuthContext } from '../context/AuthContext';
 
 export function TournamentPlayers() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [tournament, setTournament] = useState(null);
   const [players, setPlayers] = useState([]);
   const [availablePlayers, setAvailablePlayers] = useState([]);
@@ -13,6 +15,8 @@ export function TournamentPlayers() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadData();
@@ -65,6 +69,19 @@ export function TournamentPlayers() {
     } catch (err) {
       console.error('Failed to remove player:', err);
       setError(err.response?.data?.error || 'Failed to remove player');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTogglePaid = async (playerId, currentPaidStatus) => {
+    try {
+      setActionLoading(true);
+      await tournamentsAPI.updatePaidStatus(tournamentId, playerId, !currentPaidStatus);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to update paid status:', err);
+      setError(err.response?.data?.error || 'Failed to update paid status');
     } finally {
       setActionLoading(false);
     }
@@ -131,6 +148,9 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Registered
               </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Paid
+              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -139,7 +159,7 @@ export function TournamentPlayers() {
           <tbody className="bg-white divide-y divide-gray-200">
             {players.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                   No players registered for this tournament
                 </td>
               </tr>
@@ -163,14 +183,39 @@ export function TournamentPlayers() {
                       {new Date(player.registration_date).toLocaleDateString()}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {isAdmin ? (
+                      <button
+                        onClick={() => handleTogglePaid(player.id, player.paid)}
+                        disabled={actionLoading}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          player.paid
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-red-100 text-red-800 hover:bg-red-200'
+                        } disabled:opacity-50`}
+                      >
+                        {player.paid ? '✓ Paid' : '✗ Unpaid'}
+                      </button>
+                    ) : (
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        player.paid
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {player.paid ? '✓ Paid' : '✗ Unpaid'}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleRemovePlayer(player.id)}
-                      disabled={actionLoading}
-                      className="text-red-600 hover:text-red-900 disabled:text-gray-400"
-                    >
-                      Remove
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleRemovePlayer(player.id)}
+                        disabled={actionLoading}
+                        className="text-red-600 hover:text-red-900 disabled:text-gray-400"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

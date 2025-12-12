@@ -8,7 +8,7 @@ router.get('/:tournamentId/players', async (req, res) => {
   
   try {
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota, p.role, tp.registration_date
+      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota, p.role, tp.registration_date, tp.paid
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       WHERE tp.tournament_id = ?
@@ -76,6 +76,32 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
     }
     
     res.json({ message: 'Player removed from tournament successfully' });
+  } catch (err) {
+    console.error('DB error', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/tournaments/:tournamentId/players/:playerId/paid - Update paid status
+router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
+  const { tournamentId, playerId } = req.params;
+  const { paid } = req.body;
+  
+  if (paid === undefined) {
+    return res.status(400).json({ error: 'paid status is required' });
+  }
+  
+  try {
+    const [result] = await pool.query(
+      'UPDATE tournament_players SET paid = ? WHERE tournament_id = ? AND player_id = ?',
+      [paid ? 1 : 0, tournamentId, playerId]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Player not found in this tournament' });
+    }
+    
+    res.json({ message: 'Paid status updated successfully' });
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });

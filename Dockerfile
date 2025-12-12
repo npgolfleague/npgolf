@@ -1,5 +1,6 @@
 ### Build the frontend
-FROM node:20 AS frontend-builder
+# Using specific digest for multi-arch support (amd64, arm64)
+FROM node:20-alpine AS frontend-builder
 WORKDIR /usr/src/app/frontend
 # Copy frontend sources
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -7,6 +8,7 @@ COPY frontend/ ./
 RUN npm ci && npm run build
 
 ### Build the backend and copy frontend assets
+# Using alpine for smaller image size and multi-arch support
 FROM node:20-alpine AS backend
 WORKDIR /usr/src/app
 RUN apk add --no-cache tini

@@ -49,7 +49,8 @@ export const tournamentsAPI = {
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   addPlayer: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
-  getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`)
+  getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
+  updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid })
 }
 
 export const scoresAPI = {
@@ -62,6 +63,11 @@ export const scoresAPI = {
 
 export const leaderboardAPI = {
   get: (tournamentId) => apiClient.get(`/leaderboard/${tournamentId}`)
+}
+
+export const settingsAPI = {
+  get: () => apiClient.get('/settings'),
+  update: (data) => apiClient.put('/settings', data)
 }
 
 export default apiClient
