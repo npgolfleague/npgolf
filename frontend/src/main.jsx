@@ -13,6 +13,8 @@ import { Courses } from './pages/Courses'
 import { AddCourse } from './pages/AddCourse'
 import { EditCourse } from './pages/EditCourse'
 import { ScoreEntry } from './pages/ScoreEntry'
+import { TournamentPlayers } from './pages/TournamentPlayers'
+import { Leaderboard } from './pages/Leaderboard'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -35,6 +37,8 @@ try {
               <Route path="/courses/add" element={<AddCourse />} />
               <Route path="/courses/:id" element={<EditCourse />} />
               <Route path="/scores" element={<ScoreEntry />} />
+              <Route path="/tournaments/:tournamentId/players" element={<TournamentPlayers />} />
+              <Route path="/tournaments/:tournamentId/leaderboard" element={<Leaderboard />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>

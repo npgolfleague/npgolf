@@ -45,7 +45,11 @@ export const tournamentsAPI = {
   get: (id) => apiClient.get(`/tournaments/${id}`),
   create: (date, course_id, number_of_holes) => apiClient.post('/tournaments', { date, course_id, number_of_holes }),
   update: (id, date, course_id, number_of_holes) => apiClient.put(`/tournaments/${id}`, { date, course_id, number_of_holes }),
-  delete: (id) => apiClient.delete(`/tournaments/${id}`)
+  delete: (id) => apiClient.delete(`/tournaments/${id}`),
+  getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
+  addPlayer: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId }),
+  removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
+  getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`)
 }
 
 export const scoresAPI = {
@@ -54,6 +58,10 @@ export const scoresAPI = {
   saveScores: (scores) => apiClient.post('/scores', { scores }),
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
   delete: (id) => apiClient.delete(`/scores/${id}`)
+}
+
+export const leaderboardAPI = {
+  get: (tournamentId) => apiClient.get(`/leaderboard/${tournamentId}`)
 }
 
 export default apiClient
