@@ -5,7 +5,6 @@ services:
     image: mysql:8.0
     container_name: npgolf-mysql
     restart: always
-    platform: linux/amd64  # MySQL 8.0 official image supports multi-arch
     ports:
       - "3306:3306"
     environment:
