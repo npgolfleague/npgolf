@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: npgolf-mysql-pi
+    restart: always
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: npgolf
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - npgolf-network
+    command: --default-authentication-plugin=mysql_native_password
+
+  app:
+    image: crj001xx/npgolf:latest
+    container_name: npgolf-app-pi
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: npgolf-mysql-pi
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: npgolf
+      JWT_SECRET: your-secret-key-change-in-production
+      JWT_EXPIRES_IN: 1h
+      BCRYPT_ROUNDS: 10
+    networks:
+      - npgolf-network
+
+volumes:
+  mysql_data:
+
+networks:
+  npgolf-network:

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-// Use import.meta.env instead of process.env for Vite
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+// Use relative URL so it works whether accessed via localhost or IP address
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 const apiClient = axios.create({
   baseURL: API_BASE
@@ -18,7 +18,7 @@ apiClient.interceptors.request.use((config) => {
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password) => apiClient.post('/players', { name, email, password })
+  register: (name, email, password) => apiClient.post('/auth/register', { name, email, password })
 }
 
 export const playersAPI = {
@@ -56,6 +56,7 @@ export const tournamentsAPI = {
 export const scoresAPI = {
   list: (params) => apiClient.get('/scores', { params }),
   getFoursomeScores: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${group}`),
+  getFoursomeGroups: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/groups`),
   saveScores: (scores) => apiClient.post('/scores', { scores }),
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
   delete: (id) => apiClient.delete(`/scores/${id}`)

@@ -7,6 +7,7 @@ export const ScoreEntry = () => {
   const [selectedTournament, setSelectedTournament] = useState(null)
   const [selectedPlayers, setSelectedPlayers] = useState([])
   const [foursomeGroup, setFoursomeGroup] = useState('')
+  const [foursomeGroups, setFoursomeGroups] = useState([])
   const [currentHole, setCurrentHole] = useState(1)
   const [holes, setHoles] = useState([])
   const [scores, setScores] = useState({})
@@ -22,8 +23,15 @@ export const ScoreEntry = () => {
     if (selectedTournament) {
       fetchCourseHoles(selectedTournament.course_id)
       fetchTournamentPlayers(selectedTournament.id)
+      fetchFoursomeGroups(selectedTournament.id)
     }
   }, [selectedTournament])
+
+  useEffect(() => {
+    if (selectedTournament && foursomeGroup && selectedPlayers.length > 0) {
+      loadExistingScores()
+    }
+  }, [selectedTournament, foursomeGroup, selectedPlayers])
 
   const fetchTournaments = async () => {
     try {
@@ -65,6 +73,55 @@ export const ScoreEntry = () => {
     }
   }
 
+  const fetchFoursomeGroups = async (tournamentId) => {
+    try {
+      const response = await scoresAPI.getFoursomeGroups(tournamentId)
+      setFoursomeGroups(response.data)
+    } catch (err) {
+      console.error('Error fetching foursome groups:', err)
+      setFoursomeGroups([])
+    }
+  }
+
+  const handleGroupSelect = async (groupName) => {
+    setFoursomeGroup(groupName)
+    if (groupName && selectedTournament) {
+      try {
+        // Get the scores for this group to find the players
+        const response = await scoresAPI.getFoursomeScores(selectedTournament.id, groupName)
+        const playerIds = [...new Set(response.data.map(score => score.player_id))]
+        setSelectedPlayers(playerIds)
+      } catch (err) {
+        console.error('Error loading group players:', err)
+      }
+    }
+  }
+
+  const loadExistingScores = async () => {
+    try {
+      const response = await scoresAPI.getFoursomeScores(selectedTournament.id, foursomeGroup)
+      const existingScores = response.data
+      
+      // Convert existing scores to the format expected by the component
+      const loadedScores = {}
+      existingScores.forEach(scoreRecord => {
+        const hole = holes.find(h => h.id === scoreRecord.hole_id)
+        if (hole) {
+          loadedScores[`${hole.hole_number}-${scoreRecord.player_id}-score`] = scoreRecord.score
+          loadedScores[`${hole.hole_number}-${scoreRecord.player_id}-quota`] = scoreRecord.quota
+        }
+      })
+      
+      setScores(loadedScores)
+    } catch (err) {
+      console.error('Error loading existing scores:', err)
+      // Don't alert on 404 - just means no scores exist yet
+      if (err.response?.status !== 404) {
+        console.error('Failed to load existing scores')
+      }
+    }
+  }
+
   const handlePlayerToggle = (playerId) => {
     setSelectedPlayers(prev => {
       if (prev.includes(playerId)) {
@@ -76,11 +133,99 @@ export const ScoreEntry = () => {
     })
   }
 
+  // Calculate quota points based on score relative to par
+  const calculateQuotaPoints = (score, par) => {
+    if (!score || !par) return 0
+    const scoreInt = parseInt(score)
+    const parInt = parseInt(par)
+    const relative = scoreInt - parInt
+
+    // Ace (hole-in-one) = 8 points
+    if (scoreInt === 1) return 8
+    
+    // 3 under par = 8 points (double eagle)
+    if (relative === -3) return 8
+    
+    // 2 under par = 6 points (eagle)
+    if (relative === -2) return 6
+    
+    // 1 under par = 4 points (birdie)
+    if (relative === -1) return 4
+    
+    // Par = 2 points
+    if (relative === 0) return 2
+    
+    // 1 over par = 1 point (bogey)
+    if (relative === 1) return 1
+    
+    // 2+ over par = 0 points (double bogey or worse)
+    if (relative >= 2) return 0
+    
+    return 0
+  }
+
+  // Calculate score based on quota points and par
+  const calculateScoreFromQuota = (quotaPoints, par) => {
+    if (quotaPoints === null || quotaPoints === undefined || quotaPoints === '' || !par) return ''
+    const pts = parseInt(quotaPoints)
+    const parInt = parseInt(par)
+
+    // 8 points
+    if (pts === 8) {
+      // For par 3 or 4, ace (score 1)
+      // For par 5, double eagle (score 2)
+      return parInt === 5 ? 2 : 1
+    }
+    
+    // 6 points = eagle (2 under par)
+    if (pts === 6) return parInt - 2
+    
+    // 4 points = birdie (1 under par)
+    if (pts === 4) return parInt - 1
+    
+    // 2 points = par
+    if (pts === 2) return parInt
+    
+    // 1 point = bogey (1 over par)
+    if (pts === 1) return parInt + 1
+    
+    // 0 points = double bogey or worse (2+ over par)
+    if (pts === 0) return parInt + 2
+    
+    return ''
+  }
+
   const handleScoreChange = (playerId, field, value) => {
-    setScores(prev => ({
-      ...prev,
-      [`${currentHole}-${playerId}-${field}`]: value
-    }))
+    setScores(prev => {
+      const newScores = {
+        ...prev,
+        [`${currentHole}-${playerId}-${field}`]: value
+      }
+      
+      const currentHoleData = holes.find(h => h.hole_number === currentHole)
+      const player = players.find(p => p.id === playerId)
+      
+      if (currentHoleData && player) {
+        // Use mens_par or womens_par based on player's sex
+        const par = player.sex === 'F' ? currentHoleData.womens_par : currentHoleData.mens_par
+        
+        // Auto-calculate quota points when score is entered
+        if (field === 'score' && value) {
+          const quotaPoints = calculateQuotaPoints(value, par)
+          newScores[`${currentHole}-${playerId}-quota`] = quotaPoints
+        }
+        
+        // Auto-calculate score when quota points are entered
+        if (field === 'quota' && value !== '') {
+          const score = calculateScoreFromQuota(value, par)
+          if (score !== '') {
+            newScores[`${currentHole}-${playerId}-score`] = score
+          }
+        }
+      }
+      
+      return newScores
+    })
   }
 
   const saveCurrentHole = async () => {
@@ -105,7 +250,7 @@ export const ScoreEntry = () => {
         player_id: playerId,
         hole_id: currentHoleData.id,
         score: parseInt(scoreValue),
-        quota: quotaValue ? parseFloat(quotaValue) : null,
+        quota: quotaValue ? parseInt(quotaValue) : null,
         foursome_group: foursomeGroup
       }
     }).filter(Boolean)
@@ -154,7 +299,7 @@ export const ScoreEntry = () => {
     for (let hole = 1; hole <= currentHole; hole++) {
       const quotaValue = scores[`${hole}-${playerId}-quota`]
       if (quotaValue) {
-        total += parseFloat(quotaValue)
+        total += parseInt(quotaValue)
       }
     }
     return total
@@ -196,6 +341,26 @@ export const ScoreEntry = () => {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Foursome Group <span className="text-red-500">*</span>
             </label>
+            
+            {foursomeGroups.length > 0 && (
+              <>
+                <label className="block text-xs text-gray-600 mb-1">Select Existing Group</label>
+                <select
+                  className="w-full p-3 border border-gray-300 rounded-lg text-lg mb-2"
+                  value={foursomeGroup}
+                  onChange={(e) => handleGroupSelect(e.target.value)}
+                >
+                  <option value="">Choose existing group or enter new...</option>
+                  {foursomeGroups.map((group, idx) => (
+                    <option key={idx} value={group.foursome_group}>
+                      {group.foursome_group} ({group.players})
+                    </option>
+                  ))}
+                </select>
+                <label className="block text-xs text-gray-600 mb-1">Or Enter New Group Name</label>
+              </>
+            )}
+            
             <input
               type="text"
               className="w-full p-3 border border-gray-300 rounded-lg text-lg"
@@ -212,9 +377,19 @@ export const ScoreEntry = () => {
         {/* Player Selection */}
         {selectedTournament && foursomeGroup && (
           <div className="bg-white rounded-lg shadow p-4 mb-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Select Players (up to 4)
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Select Players (up to 4)
+              </label>
+              {selectedPlayers.length > 0 && (
+                <button
+                  onClick={() => setSelectedPlayers([])}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
             {players.length === 0 ? (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
                 No players registered for this tournament. Please add players to the tournament first.
@@ -226,19 +401,27 @@ export const ScoreEntry = () => {
                     <button
                       key={player.id}
                       onClick={() => handlePlayerToggle(player.id)}
-                      className={`p-3 rounded-lg border-2 transition text-left ${
+                      className={`p-3 rounded-lg border-2 transition-all text-left relative ${
                         selectedPlayers.includes(player.id)
-                          ? 'border-blue-500 bg-blue-50 text-blue-900'
-                          : 'border-gray-300 bg-white text-gray-700'
+                          ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-md'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                       }`}
                     >
-                      <div className="font-semibold">{player.name}</div>
+                      {selectedPlayers.includes(player.id) && (
+                        <div className="absolute top-1 right-1 text-blue-600 text-xl">✓</div>
+                      )}
+                      <div className="font-semibold pr-6">{player.name}</div>
                       <div className="text-xs text-gray-600">Quota: {player.quota || '-'}</div>
                     </button>
                   ))}
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  Selected: {selectedPlayers.length}/4
+                <div className="mt-2 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    Selected: {selectedPlayers.length}/4
+                  </div>
+                  <div className="text-xs text-gray-500 italic">
+                    Click players to add/remove
+                  </div>
                 </div>
               </>
             )}
@@ -261,7 +444,7 @@ export const ScoreEntry = () => {
                       <span className="font-medium text-gray-800">{player?.name}</span>
                       <div className="flex gap-3">
                         <span className="text-blue-600 font-bold">{total || 0}</span>
-                        <span className="text-green-600 font-semibold">Q: {quotaTotal.toFixed(1)}</span>
+                        <span className="text-green-600 font-semibold">Q: {Math.round(quotaTotal)}</span>
                       </div>
                     </div>
                   )
@@ -307,8 +490,7 @@ export const ScoreEntry = () => {
                         <label className="block text-xs text-gray-600 mb-1">Quota</label>
                         <input
                           type="number"
-                          inputMode="decimal"
-                          step="0.5"
+                          inputMode="numeric"
                           className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-green-500 focus:outline-none"
                           placeholder="#"
                           value={scores[`${currentHole}-${playerId}-quota`] || ''}
