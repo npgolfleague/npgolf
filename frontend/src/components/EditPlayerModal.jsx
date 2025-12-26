@@ -4,6 +4,7 @@ import { playersAPI } from '../api'
 
 export const EditPlayerModal = ({ player, onClose, onSave }) => {
   const { user } = useContext(AuthContext)
+  const isCreateMode = !player?.id
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -14,7 +15,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     tournaments_played: '',
     prize_money: '',
     active: 1,
-    role: 'player'
+    role: 'player',
+    password: ''
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -30,7 +32,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     console.log('EditPlayerModal - Player to edit:', player)
     console.log('EditPlayerModal - isAdmin:', isAdmin)
     console.log('EditPlayerModal - canEdit:', canEdit)
-  }, [user, player, isAdmin, canEdit])
+    console.log('EditPlayerModal - isCreateMode:', isCreateMode)
+  }, [user, player, isAdmin, canEdit, isCreateMode])
 
   useEffect(() => {
     if (player) {
@@ -64,12 +67,17 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     setSaving(true)
 
     try {
-      // Prepare data based on user role
-      let dataToUpdate = {}
+      let response
       
-      if (isAdmin) {
-        // Admin can update all fields - convert empty strings to null for numeric fields
-        dataToUpdate = {
+      if (isCreateMode) {
+        // Creating new player - only admin can do this
+        if (!isAdmin) {
+          setError('Only administrators can create players')
+          setSaving(false)
+          return
+        }
+        
+        const dataToCreate = {
           name: formData.name,
           email: formData.email,
           phone: formData.phone || null,
@@ -79,21 +87,45 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
           tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
           prize_money: formData.prize_money ? Number(formData.prize_money) : null,
           active: formData.active,
-          role: formData.role
+          role: formData.role,
+          password: formData.password || null
         }
+        
+        console.log('Creating player with data:', dataToCreate)
+        response = await playersAPI.create(dataToCreate)
+        console.log('Create response:', response.data)
       } else {
-        // Regular player can only update their own name, email, phone, sex
-        dataToUpdate = {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || null,
-          sex: formData.sex || null
+        // Updating existing player
+        let dataToUpdate = {}
+        
+        if (isAdmin) {
+          // Admin can update all fields - convert empty strings to null for numeric fields
+          dataToUpdate = {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone || null,
+            sex: formData.sex || null,
+            quota: formData.quota ? Number(formData.quota) : null,
+            fedex_points: formData.fedex_points ? Number(formData.fedex_points) : null,
+            tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
+            prize_money: formData.prize_money ? Number(formData.prize_money) : null,
+            active: formData.active,
+            role: formData.role
+          }
+        } else {
+          // Regular player can only update their own name, email, phone, sex
+          dataToUpdate = {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone || null,
+            sex: formData.sex || null
+          }
         }
-      }
 
-      console.log('Updating player:', player.id, 'with data:', dataToUpdate)
-      const response = await playersAPI.update(player.id, dataToUpdate)
-      console.log('Update response:', response.data)
+        console.log('Updating player:', player.id, 'with data:', dataToUpdate)
+        response = await playersAPI.update(player.id, dataToUpdate)
+        console.log('Update response:', response.data)
+      }
       
       setSuccess(true)
       setTimeout(() => {
@@ -135,7 +167,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h3 className="text-2xl font-bold mb-4 text-gray-800">
-          {isAdmin ? 'Edit Player' : 'Edit My Profile'}
+          {isCreateMode ? 'Add New Player' : (isAdmin ? 'Edit Player' : 'Edit My Profile')}
         </h3>
 
         {error && (
@@ -144,7 +176,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
 
         {success && (
           <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-            Player updated successfully!
+            Player {isCreateMode ? 'created' : 'updated'} successfully!
           </div>
         )}
 
@@ -179,6 +211,24 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            {/* Password - Only for create mode */}
+            {isCreateMode && (
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Password {isCreateMode ? '' : '(optional)'}
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Min 8 chars, letters & numbers"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Optional - leave blank for passwordless account</p>
+              </div>
+            )}
 
             {/* Phone - Always visible */}
             <div>

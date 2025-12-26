@@ -36,8 +36,13 @@ export const Users = () => {
   }
 
   const handleSave = (updatedPlayer) => {
-    // Update the player in the list
-    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p))
+    // If it's a new player (not in list), add it; otherwise update
+    const exists = players.some(p => p.id === updatedPlayer.id)
+    if (exists) {
+      setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p))
+    } else {
+      setPlayers(prev => [updatedPlayer, ...prev])
+    }
     setEditingPlayer(null)
   }
 
@@ -50,7 +55,17 @@ export const Users = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">Players</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-bold text-gray-800">Players</h2>
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setEditingPlayer({})}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+            >
+              + Add Player
+            </button>
+          )}
+        </div>
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
