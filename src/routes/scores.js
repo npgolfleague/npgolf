@@ -41,6 +41,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/scores/tournament/:tournamentId/groups - Get all foursome groups for a tournament
+router.get('/tournament/:tournamentId/groups', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT DISTINCT s.foursome_group,
+              GROUP_CONCAT(DISTINCT p.name ORDER BY p.name SEPARATOR ', ') as players
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
+       GROUP BY s.foursome_group
+       ORDER BY s.foursome_group`,
+      [tournamentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching foursome groups:', err);
+    res.status(500).json({ error: 'Failed to fetch foursome groups' });
+  }
+});
+
 // GET /api/scores/tournament/:tournamentId/foursome/:group - Get scores for a specific foursome
 router.get('/tournament/:tournamentId/foursome/:group', async (req, res) => {
   try {

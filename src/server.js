@@ -27,21 +27,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Serve frontend static files when present (built assets)
-const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
-  // For any non-API route, serve index.html (SPA)
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(frontendDist, 'index.html'));
-  });
-}
-
-app.get('/', (req, res) => {
-  res.json({ message: 'npgolf API - Node + MySQL backend' });
-});
-
+// Register API routes FIRST before static files
 app.use('/api/players', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', coursesRouter);
@@ -50,6 +36,16 @@ app.use('/api/tournaments', tournamentPlayersRouter);
 app.use('/api/scores', scoresRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/settings', settingsRouter);
+
+// Serve frontend static files AFTER API routes
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  // For any non-API route, serve index.html (SPA)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // If this file is run directly, start the server. This makes it safe to require
 // the app in tests without starting a listener.

@@ -1,0 +1,3 @@
+-- Change quota columns from DECIMAL to INT
+ALTER TABLE players MODIFY COLUMN quota INT DEFAULT NULL;
+ALTER TABLE scores MODIFY COLUMN quota INT DEFAULT NULL;
