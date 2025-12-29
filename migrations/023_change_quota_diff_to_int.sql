@@ -1,0 +1,9 @@
+-- Change quota_diff fields to INT in quota table
+ALTER TABLE quota 
+  MODIFY COLUMN quota_diff_1 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_2 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_3 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_4 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_5 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_6 INT DEFAULT NULL,
+  MODIFY COLUMN quota_diff_7 INT DEFAULT NULL;

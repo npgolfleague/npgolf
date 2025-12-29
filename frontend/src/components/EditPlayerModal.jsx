@@ -16,7 +16,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     prize_money: '',
     active: 1,
     role: 'player',
-    password: ''
+    password: '',
+    sms_allowed: 0
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -47,7 +48,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
         tournaments_played: player.tournaments_played || '',
         prize_money: player.prize_money || '',
         active: player.active !== undefined ? player.active : 1,
-        role: player.role || 'player'
+        role: player.role || 'player',
+        sms_allowed: player.sms_allowed !== undefined ? player.sms_allowed : 0
       })
     }
   }, [player])
@@ -88,7 +90,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
           prize_money: formData.prize_money ? Number(formData.prize_money) : null,
           active: formData.active,
           role: formData.role,
-          password: formData.password || null
+          password: formData.password || null,
+          sms_allowed: formData.sms_allowed
         }
         
         console.log('Creating player with data:', dataToCreate)
@@ -110,7 +113,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
             tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
             prize_money: formData.prize_money ? Number(formData.prize_money) : null,
             active: formData.active,
-            role: formData.role
+            role: formData.role,
+            sms_allowed: formData.sms_allowed
           }
         } else {
           // Regular player can only update their own name, email, phone, sex
@@ -305,7 +309,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
 
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2">
-                    Prize Money
+                    Total Prize Money YTD
                   </label>
                   <input
                     type="number"
@@ -342,6 +346,19 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                       className="mr-2 w-4 h-4"
                     />
                     <span className="text-gray-700 font-semibold">Active</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="sms_allowed"
+                      checked={formData.sms_allowed === 1}
+                      onChange={handleChange}
+                      className="mr-2 w-4 h-4"
+                    />
+                    <span className="text-gray-700 font-semibold">SMS Allowed</span>
                   </label>
                 </div>
               </>
