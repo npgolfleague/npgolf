@@ -42,6 +42,19 @@ export const Tournaments = () => {
     }
   }
 
+  const handleComplete = async (id) => {
+    if (!confirm('Are you sure you want to complete this tournament? This will update all players\' quota history.')) return
+
+    try {
+      const response = await tournamentsAPI.complete(id)
+      alert(`Tournament completed! ${response.data.playersUpdated} players updated.`)
+      await fetchTournaments()
+    } catch (err) {
+      console.error('Error completing tournament:', err)
+      setError(err.response?.data?.error || 'Failed to complete tournament')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -110,6 +123,12 @@ export const Tournaments = () => {
                                 className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
                               >
                                 ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => handleComplete(tournament.id)}
+                                className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                              >
+                                ✓ Complete
                               </button>
                               <button
                                 onClick={() => handleDelete(tournament.id)}

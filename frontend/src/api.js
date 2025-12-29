@@ -47,6 +47,7 @@ export const tournamentsAPI = {
   create: (date, course_id, number_of_holes) => apiClient.post('/tournaments', { date, course_id, number_of_holes }),
   update: (id, date, course_id, number_of_holes) => apiClient.put(`/tournaments/${id}`, { date, course_id, number_of_holes }),
   delete: (id) => apiClient.delete(`/tournaments/${id}`),
+  complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   addPlayer: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),

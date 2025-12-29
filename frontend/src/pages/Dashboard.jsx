@@ -157,7 +157,7 @@ export const Dashboard = () => {
                           Tournaments
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          Prize Money
+                          Total Prize Money YTD
                         </th>
                       </tr>
                     </thead>

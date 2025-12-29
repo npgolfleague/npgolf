@@ -6,7 +6,7 @@ const router = express.Router();
 // GET /api/users - list players
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, created_at FROM players WHERE active = 1 ORDER BY fedex_points DESC, name ASC');
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, sms_allowed, created_at FROM players WHERE active = 1 ORDER BY fedex_points DESC, name ASC');
     res.json(rows);
   } catch (err) {
     console.error('DB error', err);
@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
       [name, email, phone || null, sex || null, activeValue, quota || null, hashed]
     );
     const insertedId = result.insertId;
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota, created_at FROM players WHERE id = ?', [insertedId]);
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota, sms_allowed, created_at FROM players WHERE id = ?', [insertedId]);
     // Log successful creation for easier debugging (id and email only)
     try {
       console.log(`Player created id=${insertedId} email=${email}`);
@@ -78,6 +78,7 @@ router.put('/:id', async (req, res) => {
     if (prize_money !== undefined) { updates.push('prize_money = ?'); values.push(prize_money); }
     if (active !== undefined) { updates.push('active = ?'); values.push(active); }
     if (role !== undefined) { updates.push('role = ?'); values.push(role); }
+    if (req.body.sms_allowed !== undefined) { updates.push('sms_allowed = ?'); values.push(req.body.sms_allowed); }
     
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -87,7 +88,7 @@ router.put('/:id', async (req, res) => {
     const sql = `UPDATE players SET ${updates.join(', ')} WHERE id = ?`;
     
     await pool.execute(sql, values);
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, active, created_at FROM players WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, created_at FROM players WHERE id = ?', [id]);
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });

@@ -79,17 +79,18 @@ export const Users = () => {
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">SMS</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">FedEx Pts</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Prize Money</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {players.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-4 text-center text-gray-600">
+                    <td colSpan="9" className="px-6 py-4 text-center text-gray-600">
                       No players found
                     </td>
                   </tr>
@@ -99,6 +100,7 @@ export const Users = () => {
                       <td className="px-6 py-4 text-gray-900">{player.name}</td>
                       <td className="px-6 py-4 text-gray-900">{player.email}</td>
                       <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.quota || '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
