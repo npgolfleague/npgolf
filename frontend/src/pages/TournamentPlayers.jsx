@@ -15,6 +15,8 @@ export function TournamentPlayers() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [sendingSMS, setSendingSMS] = useState(false);
+  const [smsResult, setSmsResult] = useState(null);
   
   const isAdmin = user?.role === 'admin';
 
@@ -74,6 +76,22 @@ export function TournamentPlayers() {
     }
   };
 
+  const handleSendSMSInvites = async () => {
+    if (!confirm('Send SMS invites to all active players with SMS enabled?')) return;
+    
+    try {
+      setSendingSMS(true);
+      setSmsResult(null);
+      const response = await tournamentsAPI.sendInviteSMS(tournamentId);
+      setSmsResult(response.data);
+    } catch (err) {
+      console.error('Failed to send SMS invites:', err);
+      setError(err.response?.data?.error || 'Failed to send SMS invites');
+    } finally {
+      setSendingSMS(false);
+    }
+  };
+
   const handleTogglePaid = async (playerId, currentPaidStatus) => {
     try {
       setActionLoading(true);
@@ -114,18 +132,44 @@ export function TournamentPlayers() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          disabled={actionLoading || availablePlayers.length === 0}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          Add Player
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSendSMSInvites}
+            disabled={sendingSMS || actionLoading}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
+          >
+            {sendingSMS ? 'Sending...' : '📱 Send SMS Invites'}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            disabled={actionLoading || availablePlayers.length === 0}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Add Player
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {smsResult && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <p className="font-semibold">SMS Invites Sent Successfully!</p>
+          <p className="text-sm mt-1">✓ Sent: {smsResult.sent} messages</p>
+          {smsResult.failed && smsResult.failed.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-red-600">✗ Failed: {smsResult.failed.length} messages</p>
+              <ul className="text-xs mt-1 ml-4 list-disc">
+                {smsResult.failed.map((fail, idx) => (
+                  <li key={idx}>{fail.phone}: {fail.error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

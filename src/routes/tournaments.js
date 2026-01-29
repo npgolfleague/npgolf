@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { sendSMS } = require('../twilio');
 
 // GET /api/tournaments - List all tournaments
 router.get('/', async (req, res) => {
@@ -263,6 +264,210 @@ router.post('/:id/complete', async (req, res) => {
     res.status(500).json({ error: 'Failed to complete tournament' });
   } finally {
     connection.release();
+  }
+});
+
+// POST /api/tournaments/:id/invite-sms - Send SMS invite to all active players
+router.post('/:id/invite-sms', async (req, res) => {
+  const tournamentId = req.params.id;
+  try {
+    // Get tournament info
+    const [tournamentRows] = await pool.query('SELECT id, date FROM tournament WHERE id = ?', [tournamentId]);
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    // Get all active players with sms_allowed and phone
+    const [players] = await pool.query('SELECT id, name, phone FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""');
+    if (players.length === 0) {
+      return res.status(400).json({ error: 'No active players with SMS allowed and phone numbers' });
+    }
+    
+    // Send SMS to each player
+    let sent = 0, failed = [];
+    for (const player of players) {
+      // Generate unique link for each player
+      const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+      const joinUrl = `${baseUrl}/api/tournaments/join?playerId=${player.id}&tournamentId=${tournamentId}`;
+      const msg = `Hi ${player.name}, are you playing in the next tournament? Tap to join: ${joinUrl}`;
+      try {
+        await sendSMS(player.phone, msg);
+        sent++;
+      } catch (err) {
+        failed.push({ id: player.id, phone: player.phone, error: err.message });
+      }
+    }
+    res.json({ sent, failed });
+  } catch (err) {
+    console.error('Error sending SMS invites:', err);
+    res.status(500).json({ error: 'Failed to send SMS invites' });
+  }
+});
+
+// POST /api/tournaments/:id/send-sms - Send custom SMS announcement to all active players
+router.post('/:id/send-sms', async (req, res) => {
+  const tournamentId = req.params.id;
+  try {
+    // Get tournament info with course details
+    const [tournamentRows] = await pool.query(
+      `SELECT t.id, t.date, c.name as course_name 
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    const tournament = tournamentRows[0];
+    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Get all active players with sms_allowed and phone
+    const [players] = await pool.query(
+      'SELECT id, name, phone FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""'
+    );
+    if (players.length === 0) {
+      return res.status(400).json({ error: 'No active players with SMS allowed and phone numbers' });
+    }
+    
+    // Get base URL for RSVP links
+    const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
+    
+    // Send SMS to each player with personalized RSVP link
+    let sent = 0, failed = [];
+    
+    for (const player of players) {
+      try {
+        const rsvpLink = `${baseUrl}/api/tournaments/${tournamentId}/rsvp?playerId=${player.id}`;
+        const message = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${rsvpLink}`;
+        console.log(`Sending SMS to ${player.name} (${player.phone}): ${message}`);
+        await sendSMS(player.phone, message);
+        console.log(`✓ SMS sent successfully to ${player.name}`);
+        sent++;
+      } catch (err) {
+        console.error(`✗ Failed to send SMS to ${player.name} (${player.phone}): ${err.message}`);
+        failed.push({ id: player.id, phone: player.phone, error: err.message });
+      }
+    }
+    
+    const sampleMessage = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${baseUrl}/api/tournaments/${tournamentId}/rsvp?playerId={playerId}`;
+    res.json({ sent, failed, message: sampleMessage });
+  } catch (err) {
+    console.error('Error sending SMS announcement:', err);
+    res.status(500).json({ error: 'Failed to send SMS announcement' });
+  }
+});
+
+// GET /api/tournaments/:id/rsvp - RSVP to a tournament via SMS link
+router.get('/:id/rsvp', async (req, res) => {
+  const tournamentId = req.params.id;
+  const { playerId } = req.query;
+  
+  try {
+    if (!playerId) {
+      return res.status(400).send('<h1>Error: Missing player information</h1>');
+    }
+    
+    // Verify tournament exists
+    const [tournamentRows] = await pool.query(
+      `SELECT t.id, t.date, c.name as course_name 
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) {
+      return res.status(404).send('<h1>Tournament not found</h1>');
+    }
+    
+    const tournament = tournamentRows[0];
+    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Verify player exists
+    const [playerRows] = await pool.query('SELECT id, name FROM players WHERE id = ?', [playerId]);
+    if (playerRows.length === 0) {
+      return res.status(404).send('<h1>Player not found</h1>');
+    }
+    const player = playerRows[0];
+    
+    // Check if already registered
+    const [exists] = await pool.query(
+      'SELECT * FROM tournament_players WHERE player_id = ? AND tournament_id = ?',
+      [playerId, tournamentId]
+    );
+    
+    if (exists.length > 0) {
+      return res.send(`
+        <html>
+          <head><title>Already Registered</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>✓ Already Registered</h1>
+            <p><strong>${player.name}</strong>, you're already registered for:</p>
+            <p><strong>${tournament.course_name}</strong></p>
+            <p>${tournamentDate}</p>
+            <p style="margin-top: 30px; color: #666;">See you on the course!</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Add player to tournament
+    await pool.query(
+      'INSERT INTO tournament_players (player_id, tournament_id, paid) VALUES (?, ?, 0)',
+      [playerId, tournamentId]
+    );
+    
+    // Send success response
+    res.send(`
+      <html>
+        <head><title>Registration Confirmed</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>✓ Registration Confirmed!</h1>
+          <p>Thanks <strong>${player.name}</strong>!</p>
+          <p>You're registered for:</p>
+          <p><strong>${tournament.course_name}</strong></p>
+          <p>${tournamentDate}</p>
+          <p style="margin-top: 30px; color: #666;">See you on the course!</p>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error processing RSVP:', err);
+    res.status(500).send('<h1>Error processing your registration. Please contact the administrator.</h1>');
+  }
+});
+
+// GET /api/tournaments/join - Add player to tournament via link
+router.get('/join', async (req, res) => {
+  const { playerId, tournamentId } = req.query;
+  try {
+    if (!playerId || !tournamentId) {
+      return res.status(400).json({ error: 'Missing playerId or tournamentId' });
+    }
+    
+    // Check if already joined
+    const [exists] = await pool.query('SELECT * FROM tournament_players WHERE player_id = ? AND tournament_id = ?', [playerId, tournamentId]);
+    if (exists.length > 0) {
+      return res.json({ message: 'Already joined' });
+    }
+    
+    // Add to tournament_players
+    await pool.query('INSERT INTO tournament_players (player_id, tournament_id) VALUES (?, ?)', [playerId, tournamentId]);
+    res.json({ message: 'Joined tournament successfully' });
+  } catch (err) {
+    console.error('Error joining tournament:', err);
+    res.status(500).json({ error: 'Failed to join tournament' });
   }
 });
 
