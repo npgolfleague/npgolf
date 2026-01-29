@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
+const { sendSMS } = require('../twilio');
 const router = express.Router();
 
 // GET /api/users - list players
@@ -44,6 +45,22 @@ router.post('/', async (req, res) => {
     );
     const insertedId = result.insertId;
     const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota, sms_allowed, created_at FROM players WHERE id = ?', [insertedId]);
+    
+    // Send SMS opt-in message if phone number is provided
+    if (phone) {
+      try {
+        const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
+        const optInLink = `${baseUrl}/api/players/${insertedId}/sms-opt-in`;
+        const message = `Click on this link ${optInLink} to authorize receiving text messages - opt out anytime by replying with 'STOP' to any text message`;
+        console.log(`Sending SMS opt-in to new player ${name} (${phone}): ${message}`);
+        await sendSMS(phone, message);
+        console.log(`✓ SMS opt-in sent successfully to ${name}`);
+      } catch (smsErr) {
+        console.error(`✗ Failed to send SMS opt-in to ${name} (${phone}):`, smsErr.message);
+        // Don't fail player creation if SMS fails
+      }
+    }
+    
     // Log successful creation for easier debugging (id and email only)
     try {
       console.log(`Player created id=${insertedId} email=${email}`);
@@ -98,6 +115,58 @@ router.put('/:id', async (req, res) => {
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// GET /api/users/:id/sms-opt-in - Opt in to SMS notifications
+router.get('/:id/sms-opt-in', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    // Get player info
+    const [playerRows] = await pool.query('SELECT id, name, phone, sms_allowed FROM players WHERE id = ?', [id]);
+    if (playerRows.length === 0) {
+      return res.status(404).send('<h1>Player not found</h1>');
+    }
+    
+    const player = playerRows[0];
+    
+    // Check if already opted in
+    if (player.sms_allowed) {
+      return res.send(`
+        <html>
+          <head><title>Already Opted In</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>✓ Already Opted In</h1>
+            <p>Hi <strong>${player.name}</strong>,</p>
+            <p>You're already receiving text messages.</p>
+            <p style="margin-top: 30px; color: #666;">Reply 'STOP' to any message to opt out.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Update sms_allowed flag
+    await pool.execute('UPDATE players SET sms_allowed = 1 WHERE id = ?', [id]);
+    console.log(`Player ${player.name} (${id}) opted in to SMS notifications`);
+    
+    // Send confirmation
+    res.send(`
+      <html>
+        <head><title>SMS Opt-In Confirmed</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>✓ SMS Notifications Enabled!</h1>
+          <p>Thanks <strong>${player.name}</strong>!</p>
+          <p>You'll now receive tournament notifications and updates via text message.</p>
+          <p style="margin-top: 30px; color: #666;">
+            You can opt out at any time by replying 'STOP' to any message.
+          </p>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error processing SMS opt-in:', err);
+    res.status(500).send('<h1>Error processing your request. Please contact the administrator.</h1>');
   }
 });
 

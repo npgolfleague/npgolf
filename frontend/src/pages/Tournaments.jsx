@@ -9,6 +9,8 @@ export const Tournaments = () => {
   const [tournaments, setTournaments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [sendingSMS, setSendingSMS] = useState(null)
+  const [smsResult, setSmsResult] = useState(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -55,22 +57,52 @@ export const Tournaments = () => {
     }
   }
 
+  const handleSendSMS = async (tournamentId) => {
+    if (!confirm('Send SMS announcement to all active players with SMS enabled?')) return
+
+    try {
+      setSendingSMS(tournamentId)
+      setSmsResult(null)
+      const response = await tournamentsAPI.sendSMS(tournamentId)
+      setSmsResult({ tournamentId, ...response.data })
+      setTimeout(() => setSmsResult(null), 10000) // Clear after 10 seconds
+    } catch (err) {
+      console.error('Error sending SMS:', err)
+      setError(err.response?.data?.error || 'Failed to send SMS')
+    } finally {
+      setSendingSMS(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">🏆 Tournaments</h2>
           {isAdmin && (
-            <button
-              onClick={() => navigate('/tournaments/add')}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition"
-            >
-              + Add Tournament
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/tournaments/add')}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition"
+              >
+                + Add Tournament
+              </button>
+            </div>
           )}
         </div>
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+
+        {smsResult && (
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+            <p className="font-semibold">SMS Announcement Sent!</p>
+            <p className="text-sm mt-1">✓ Sent: {smsResult.sent} messages</p>
+            <p className="text-sm text-gray-600 italic">"{smsResult.message}"</p>
+            {smsResult.failed && smsResult.failed.length > 0 && (
+              <p className="text-sm text-red-600 mt-1">✗ Failed: {smsResult.failed.length} messages</p>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center text-gray-600">Loading tournaments...</div>
@@ -118,6 +150,13 @@ export const Tournaments = () => {
                           </button>
                           {isAdmin && (
                             <>
+                              <button
+                                onClick={() => handleSendSMS(tournament.id)}
+                                disabled={sendingSMS === tournament.id}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:text-gray-400"
+                              >
+                                {sendingSMS === tournament.id ? '📱 Sending...' : '📱 Send SMS'}
+                              </button>
                               <button
                                 onClick={() => navigate(`/tournaments/${tournament.id}/edit`)}
                                 className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
