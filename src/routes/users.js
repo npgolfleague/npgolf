@@ -170,4 +170,74 @@ router.get('/:id/sms-opt-in', async (req, res) => {
   }
 });
 
+// DELETE /api/users/:id - Delete player and all related data (admin only, permanent delete with cascade)
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    // Delete from all related tables in the correct order
+    // Delete scores first (references player_id, tournament_id, hole_id)
+    await connection.execute('DELETE FROM scores WHERE player_id = ?', [id]);
+    
+    // Delete tournament registrations
+    await connection.execute('DELETE FROM tournament_players WHERE player_id = ?', [id]);
+    
+    // Delete quota records
+    await connection.execute('DELETE FROM quota WHERE player_id = ?', [id]);
+    
+    // Delete skins_quota records
+    await connection.execute('DELETE FROM skins_quota WHERE player_id = ?', [id]);
+    
+    // Finally delete the player
+    const [result] = await connection.execute('DELETE FROM players WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    await connection.commit();
+    connection.release();
+    
+    console.log(`Player ${id} and all related data permanently deleted`);
+    res.json({ message: 'Player and all related data deleted successfully' });
+  } catch (err) {
+    await connection.rollback();
+    connection.release();
+    console.error('Error deleting player:', err);
+    res.status(500).json({ error: 'Failed to delete player' });
+  }
+});
+
+// POST /api/users/sms-webhook - Handle Twilio SMS status updates (opt-outs)
+router.post('/sms-webhook', async (req, res) => {
+  const { From, Body, MessageStatus } = req.body;
+  
+  try {
+    // Log the webhook for debugging
+    console.log('Twilio SMS webhook received:', { From, Body, MessageStatus });
+    
+    // Check if user opted out (STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT)
+    const optOutKeywords = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
+    if (Body && optOutKeywords.includes(Body.toUpperCase().trim())) {
+      // Find player by phone number and disable SMS
+      const [players] = await pool.query('SELECT id, name FROM players WHERE phone = ?', [From]);
+      if (players.length > 0) {
+        await pool.execute('UPDATE players SET sms_allowed = 0 WHERE phone = ?', [From]);
+        console.log(`Player ${players[0].name} (${From}) opted out of SMS`);
+      }
+    }
+    
+    // Respond to Twilio with 200 OK
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('Error processing SMS webhook:', err);
+    res.status(500).send('Error');
+  }
+});
+
 module.exports = router;
