@@ -18,8 +18,8 @@ services:
     image: crj001xx/npgolf:latest
     container_name: npgolf-app-pi
     restart: always
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - mysql
     environment:
@@ -35,7 +35,17 @@ services:
       TWILIO_API_KEY: ${TWILIO_API_KEY}
       TWILIO_API_SECRET: ${TWILIO_API_SECRET}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
-      APP_BASE_URL: http://192.168.4.111:3000
+      APP_BASE_URL: https://npgolf.net
+    networks:
+      - npgolf-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: npgolf-cloudflared
+    restart: always
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
     networks:
       - npgolf-network
 

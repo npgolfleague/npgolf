@@ -25,7 +25,8 @@ export const playersAPI = {
   list: () => apiClient.get('/players'),
   get: (id) => apiClient.get(`/players/${id}`),
   create: (data) => apiClient.post('/players', data),
-  update: (id, data) => apiClient.put(`/players/${id}`, data)
+  update: (id, data) => apiClient.put(`/players/${id}`, data),
+  delete: (id) => apiClient.delete(`/players/${id}`)
 }
 
 // Backward compatibility alias

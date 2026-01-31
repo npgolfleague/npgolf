@@ -46,6 +46,17 @@ export const Users = () => {
     setEditingPlayer(null)
   }
 
+  const handleDelete = async (player) => {
+    if (!confirm(`Are you sure you want to delete ${player.name}? This will deactivate the player.`)) return
+
+    try {
+      await playersAPI.delete(player.id)
+      setPlayers(prev => prev.filter(p => p.id !== player.id))
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete player')
+    }
+  }
+
   const canEditPlayer = (player) => {
     // Admin can edit all players, regular users can only edit themselves
     const isAdmin = user?.role === 'admin'
@@ -106,16 +117,26 @@ export const Users = () => {
                       <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-6 py-4">
-                        {canEditPlayer(player) ? (
-                          <button 
-                            onClick={() => handleEdit(player)}
-                            className="text-blue-600 hover:text-blue-800 font-semibold"
-                          >
-                            Edit
-                          </button>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <div className="flex gap-2">
+                          {canEditPlayer(player) ? (
+                            <button 
+                              onClick={() => handleEdit(player)}
+                              className="text-blue-600 hover:text-blue-800 font-semibold"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                          {user?.role === 'admin' && (
+                            <button 
+                              onClick={() => handleDelete(player)}
+                              className="text-red-600 hover:text-red-800 font-semibold ml-2"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
