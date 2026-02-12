@@ -18,7 +18,8 @@ export const MainLayout = () => {
     { path: '/scores', label: 'Score Entry', icon: '📝' },
     { path: '/users', label: 'Players', icon: '👥' },
     { path: '/tournaments', label: 'Tournaments', icon: '🏆' },
-    { path: '/courses', label: 'Courses', icon: '⛳' }
+    { path: '/courses', label: 'Courses', icon: '⛳' },
+    { path: '/rules', label: 'Rules', icon: '📋' }
   ]
 
   const adminMenuItems = [
