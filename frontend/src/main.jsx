@@ -19,6 +19,7 @@ import { Settings } from './pages/Settings'
 import { Tournaments } from './pages/Tournaments'
 import { AddTournament } from './pages/AddTournament'
 import { EditTournament } from './pages/EditTournament'
+import { Rules } from './pages/Rules'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -49,6 +50,7 @@ try {
               <Route path="/tournaments/:tournamentId/players" element={<TournamentPlayers />} />
               <Route path="/tournaments/:tournamentId/leaderboard" element={<Leaderboard />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/rules" element={<Rules />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
