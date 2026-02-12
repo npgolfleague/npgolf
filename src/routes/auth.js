@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendSMS } = require('../twilio');
 
 const router = express.Router();
 
@@ -34,11 +35,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register { email, password, name, sex?, quota? }
+// POST /api/auth/register { email, password, name, phone, sex?, quota? }
 router.post('/register', async (req, res) => {
-  const { email, password, name, sex, quota } = req.body || {};
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'email, password, and name are required' });
+  const { email, password, name, phone, sex, quota } = req.body || {};
+  if (!email || !password || !name || !phone) {
+    return res.status(400).json({ error: 'email, password, name, and phone are required' });
   }
 
   try {
@@ -54,11 +55,24 @@ router.post('/register', async (req, res) => {
 
     // Insert new player
     const [result] = await pool.query(
-      'INSERT INTO players (name, email, password, sex, quota, role) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, sex || 'M', quota || 18, 'player']
+      'INSERT INTO players (name, email, password, phone, sex, quota, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, phone, sex || 'M', quota || 18, 'player']
     );
 
     const userId = result.insertId;
+
+    // Send SMS opt-in message
+    const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+    const optInLink = `${appBaseUrl}/api/players/${userId}/sms-opt-in`;
+    const smsMessage = `Welcome to npgolf! Click this link to authorize receiving text messages: ${optInLink}`;
+    
+    try {
+      await sendSMS(phone, smsMessage);
+      console.log(`SMS opt-in sent to new player: ${name} (${phone})`);
+    } catch (smsErr) {
+      console.error('Failed to send SMS opt-in:', smsErr);
+      // Don't fail registration if SMS fails
+    }
 
     // Generate token
     const secret = process.env.JWT_SECRET;
@@ -72,7 +86,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: userId, name, email, sex: sex || 'M', quota: quota || 18, role: 'player' }
+      user: { id: userId, name, email, phone, sex: sex || 'M', quota: quota || 18, role: 'player' }
     });
   } catch (err) {
     console.error('Registration error', err);
