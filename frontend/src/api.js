@@ -18,7 +18,7 @@ apiClient.interceptors.request.use((config) => {
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password) => apiClient.post('/auth/register', { name, email, password })
+  register: (name, email, password, phone, sex) => apiClient.post('/auth/register', { name, email, password, phone, sex })
 }
 
 export const playersAPI = {
@@ -26,7 +26,9 @@ export const playersAPI = {
   get: (id) => apiClient.get(`/players/${id}`),
   create: (data) => apiClient.post('/players', data),
   update: (id, data) => apiClient.put(`/players/${id}`, data),
-  delete: (id) => apiClient.delete(`/players/${id}`)
+  delete: (id) => apiClient.delete(`/players/${id}`),
+  sendSMS: (id, message) => apiClient.post(`/players/${id}/send-sms`, { message }),
+  getQuotaHistory: (id) => apiClient.get(`/players/${id}/quota-history`)
 }
 
 // Backward compatibility alias
@@ -44,6 +46,7 @@ export const coursesAPI = {
 export const tournamentsAPI = {
   list: () => apiClient.get('/tournaments'),
   upcoming: () => apiClient.get('/tournaments/upcoming'),
+  next: () => apiClient.get('/tournaments/next'),
   get: (id) => apiClient.get(`/tournaments/${id}`),
   create: (date, course_id, number_of_holes) => apiClient.post('/tournaments', { date, course_id, number_of_holes }),
   update: (id, date, course_id, number_of_holes) => apiClient.put(`/tournaments/${id}`, { date, course_id, number_of_holes }),
@@ -64,7 +67,9 @@ export const scoresAPI = {
   getFoursomeGroups: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/groups`),
   saveScores: (scores) => apiClient.post('/scores', { scores }),
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
-  delete: (id) => apiClient.delete(`/scores/${id}`)
+  delete: (id) => apiClient.delete(`/scores/${id}`),
+  getCtpWinners: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/ctp-winners`),
+  getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`)
 }
 
 export const leaderboardAPI = {

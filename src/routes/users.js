@@ -213,6 +213,44 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// POST /api/users/:id/send-sms - Send SMS to a single player (admin only)
+router.post('/:id/send-sms', async (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body;
+  
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+  
+  try {
+    // Get player info
+    const [players] = await pool.query('SELECT name, phone, sms_allowed FROM players WHERE id = ?', [id]);
+    
+    if (players.length === 0) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+    
+    const player = players[0];
+    
+    if (!player.phone) {
+      return res.status(400).json({ error: 'Player has no phone number' });
+    }
+    
+    if (!player.sms_allowed) {
+      return res.status(400).json({ error: 'Player has not opted in to SMS' });
+    }
+    
+    // Send SMS
+    await sendSMS(player.phone, message);
+    console.log(`SMS sent to ${player.name} (${player.phone}): ${message}`);
+    
+    res.json({ message: 'SMS sent successfully' });
+  } catch (err) {
+    console.error('Error sending SMS:', err);
+    res.status(500).json({ error: 'Failed to send SMS' });
+  }
+});
+
 // POST /api/users/sms-webhook - Handle Twilio SMS status updates (opt-outs)
 router.post('/sms-webhook', async (req, res) => {
   const { From, Body, MessageStatus } = req.body;
@@ -237,6 +275,40 @@ router.post('/sms-webhook', async (req, res) => {
   } catch (err) {
     console.error('Error processing SMS webhook:', err);
     res.status(500).send('Error');
+  }
+});
+
+// GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
+router.get('/:id/quota-history', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT date_1, points_1, date_2, points_2, date_3, points_3, 
+              date_4, points_4, date_5, points_5, date_6, points_6, 
+              date_7, points_7
+       FROM quota WHERE player_id = ? LIMIT 1`,
+      [id]
+    );
+    
+    if (rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const data = rows[0];
+    const history = [];
+    for (let i = 1; i <= 7; i++) {
+      if (data[`date_${i}`] && data[`points_${i}`] !== null) {
+        history.push({
+          date: data[`date_${i}`],
+          points: data[`points_${i}`]
+        });
+      }
+    }
+    
+    res.json(history);
+  } catch (err) {
+    console.error('Error fetching quota history:', err);
+    res.status(500).json({ error: 'Failed to fetch quota history' });
   }
 });
 

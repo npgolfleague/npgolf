@@ -5,7 +5,9 @@ import { authAPI } from '../api'
 export const Register = () => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [sex, setSex] = useState('M')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -16,8 +18,8 @@ export const Register = () => {
     setLoading(true)
 
     try {
-      await authAPI.register(name, email, password)
-      navigate('/login', { state: { message: 'Registration successful! Please log in.' } })
+      await authAPI.register(name, email, password, phone, sex)
+      navigate('/login', { state: { message: 'Registration successful! Check your phone for SMS opt-in.' } })
     } catch (err) {
       console.error('Registration error:', err)
       const errorMsg = err.response?.data?.error || err.message || 'Registration failed'
@@ -52,6 +54,31 @@ export const Register = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               required
             />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 font-semibold mb-2">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              placeholder="+12025551234"
+              required
+            />
+            <p className="text-sm text-gray-600 mt-1">Include country code (e.g., +1 for US)</p>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 font-semibold mb-2">Gender</label>
+            <select
+              value={sex}
+              onChange={(e) => setSex(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+            </select>
           </div>
 
           <div className="mb-6">

@@ -13,6 +13,10 @@ export const ScoreEntry = () => {
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [ctpData, setCtpData] = useState({})
+  const [showCtpModal, setShowCtpModal] = useState(false)
+  const [ctpPlayerId, setCtpPlayerId] = useState(null)
+  const [ctpLeader, setCtpLeader] = useState(null)
 
   useEffect(() => {
     fetchTournaments()
@@ -32,6 +36,28 @@ export const ScoreEntry = () => {
       loadExistingScores()
     }
   }, [selectedTournament, foursomeGroup, selectedPlayers])
+
+  useEffect(() => {
+    if (selectedTournament && currentHole) {
+      loadCtpLeader()
+    }
+  }, [selectedTournament, currentHole])
+
+  const loadCtpLeader = async () => {
+    const hole = holes.find(h => h.hole_number === currentHole)
+    if (!hole || hole.mens_par !== 3) {
+      setCtpLeader(null)
+      return
+    }
+
+    try {
+      const response = await scoresAPI.getCtpLeader(selectedTournament.id, hole.id)
+      setCtpLeader(response.data)
+    } catch (err) {
+      console.error('Error loading CTP leader:', err)
+      setCtpLeader(null)
+    }
+  }
 
   const fetchTournaments = async () => {
     try {
@@ -228,6 +254,48 @@ export const ScoreEntry = () => {
     })
   }
 
+  const handleOpenCtpModal = (playerId) => {
+    setCtpPlayerId(playerId)
+    setShowCtpModal(true)
+  }
+
+  const handleCloseCtpModal = () => {
+    setShowCtpModal(false)
+    setCtpPlayerId(null)
+  }
+
+  const handleCtpChange = (field, value) => {
+    setCtpData(prev => ({
+      ...prev,
+      [ctpPlayerId]: {
+        ...prev[ctpPlayerId],
+        [field]: value
+      }
+    }))
+  }
+
+  const handleCtpImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setCtpData(prev => ({
+          ...prev,
+          [ctpPlayerId]: {
+            ...prev[ctpPlayerId],
+            imageFile: file,
+            imagePreview: reader.result
+          }
+        }))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSaveCtp = () => {
+    handleCloseCtpModal()
+  }
+
   const saveCurrentHole = async () => {
     if (selectedPlayers.length === 0 || !selectedTournament || !foursomeGroup) {
       alert('Please select tournament, players, and enter foursome group')
@@ -243,6 +311,7 @@ export const ScoreEntry = () => {
     const scoresToSave = selectedPlayers.map(playerId => {
       const scoreValue = scores[`${currentHole}-${playerId}-score`]
       const quotaValue = scores[`${currentHole}-${playerId}-quota`]
+      const playerCtp = ctpData[playerId]
       if (!scoreValue) return null
 
       return {
@@ -251,7 +320,10 @@ export const ScoreEntry = () => {
         hole_id: currentHoleData.id,
         score: parseInt(scoreValue),
         quota: quotaValue ? parseInt(quotaValue) : null,
-        foursome_group: foursomeGroup
+        foursome_group: foursomeGroup,
+        ctp_feet: playerCtp?.feet ? parseInt(playerCtp.feet) : null,
+        ctp_inches: playerCtp?.inches ? parseFloat(playerCtp.inches) : null,
+        ctp_image_url: playerCtp?.imagePreview || null
       }
     }).filter(Boolean)
 
@@ -263,6 +335,13 @@ export const ScoreEntry = () => {
     try {
       setSaving(true)
       await scoresAPI.saveScores(scoresToSave)
+      
+      // Clear CTP data for saved players
+      setCtpData(prev => {
+        const newData = { ...prev }
+        selectedPlayers.forEach(playerId => delete newData[playerId])
+        return newData
+      })
       
       // Move to next hole
       if (currentHole < holes.length) {
@@ -452,16 +531,39 @@ export const ScoreEntry = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Hole {currentHole} of {holes.length}
-              </h2>
-              <div className="text-right">
-                <div className="text-sm text-gray-600">Par</div>
-                <div className="text-2xl font-bold text-blue-600">
-                  {holeData.mens_par}
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Hole {currentHole} of {holes.length}
+                </h2>
+                <div className="text-right">
+                  <div className="text-sm text-gray-600">Par</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {holeData.mens_par}
+                  </div>
                 </div>
               </div>
+              {holeData.mens_par === 3 && ctpLeader && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-green-800">📍 Current CTP Leader</div>
+                      <div className="text-lg font-bold text-green-900">{ctpLeader.player_name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {ctpLeader.ctp_feet}' {ctpLeader.ctp_inches}"
+                      </div>
+                      <div className="text-xs text-gray-600">to beat</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {holeData.mens_par === 3 && !ctpLeader && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-sm font-semibold text-blue-800">📍 No CTP recorded yet - be the first!</div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -493,11 +595,31 @@ export const ScoreEntry = () => {
                           inputMode="numeric"
                           className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-green-500 focus:outline-none"
                           placeholder="#"
-                          value={scores[`${currentHole}-${playerId}-quota`] || ''}
+                          value={scores[`${currentHole}-${playerId}-quota`] ?? ''}
                           onChange={(e) => handleScoreChange(playerId, 'quota', e.target.value)}
                         />
                       </div>
                     </div>
+                    {holeData.mens_par === 3 && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCtpModal(playerId)}
+                          className={`w-full py-2 px-3 rounded-lg font-semibold text-sm transition ${
+                            ctpData[playerId] 
+                              ? 'bg-green-100 text-green-800 border-2 border-green-500' 
+                              : 'bg-gray-100 text-gray-700 border-2 border-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          {ctpData[playerId] ? '✓ CTP Recorded' : '📍 Set Closest to Pin'}
+                        </button>
+                        {ctpData[playerId] && (
+                          <div className="text-xs text-gray-600 mt-1 text-center">
+                            {ctpData[playerId].feet}' {ctpData[playerId].inches}"
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -540,6 +662,81 @@ export const ScoreEntry = () => {
                   {hole.hole_number}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTP Modal */}
+        {showCtpModal && ctpPlayerId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold mb-4">Closest to Pin - {players.find(p => p.id === ctpPlayerId)?.name}</h3>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 font-semibold mb-2">Distance</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Feet</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="0"
+                      value={ctpData[ctpPlayerId]?.feet || ''}
+                      onChange={(e) => handleCtpChange('feet', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Inches</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max="11.9"
+                      step="0.1"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="0.0"
+                      value={ctpData[ctpPlayerId]?.inches || ''}
+                      onChange={(e) => handleCtpChange('inches', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-gray-700 font-semibold mb-2">Photo (Optional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCtpImageChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+                {ctpData[ctpPlayerId]?.imagePreview && (
+                  <div className="mt-2">
+                    <img 
+                      src={ctpData[ctpPlayerId].imagePreview} 
+                      alt="CTP measurement" 
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveCtp}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={handleCloseCtpModal}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}

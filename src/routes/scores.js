@@ -99,8 +99,9 @@ router.post('/', async (req, res) => {
       
       const results = [];
       for (const score of scores) {
-        const { tournament_id, player_id, hole_id, score: scoreValue, quota, foursome_group } = score;
+        const { tournament_id, player_id, hole_id, score: scoreValue, quota, foursome_group, ctp_feet, ctp_inches, ctp_image_url } = score;
         
+        // First, always save the score and quota (without CTP data initially)
         const [result] = await connection.query(
           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
            VALUES (?, ?, ?, ?, ?, ?)
@@ -111,6 +112,58 @@ router.post('/', async (req, res) => {
              entered_at = CURRENT_TIMESTAMP`,
           [tournament_id, player_id, hole_id, scoreValue, quota, foursome_group]
         );
+        
+        // Now handle CTP data separately if provided
+        if (ctp_feet !== null && ctp_feet !== undefined) {
+          const newDistance = (parseInt(ctp_feet) * 12) + parseFloat(ctp_inches || 0);
+          console.log(`New CTP submission: Player ${player_id}, Hole ${hole_id}, Distance: ${ctp_feet}' ${ctp_inches}" (${newDistance} inches)`);
+          
+          // Get all CTPs for this hole in this tournament (excluding this player)
+          const [existingCtps] = await connection.query(
+            `SELECT s.player_id, s.ctp_feet, s.ctp_inches, p.name
+             FROM scores s 
+             JOIN players p ON s.player_id = p.id
+             WHERE s.tournament_id = ? AND s.hole_id = ? AND s.player_id != ? AND s.ctp_feet IS NOT NULL`,
+            [tournament_id, hole_id, player_id]
+          );
+          
+          console.log(`Found ${existingCtps.length} existing CTP(s) for this hole`);
+          
+          // Check if there's a closer CTP
+          let hasCloser = false;
+          for (const existingCtp of existingCtps) {
+            const existingDistance = (parseInt(existingCtp.ctp_feet) * 12) + parseFloat(existingCtp.ctp_inches || 0);
+            console.log(`Comparing with ${existingCtp.name}: ${existingCtp.ctp_feet}' ${existingCtp.ctp_inches}" (${existingDistance} inches)`);
+            if (existingDistance <= newDistance) {
+              console.log(`Existing CTP is closer or equal. Rejecting new CTP.`);
+              hasCloser = true;
+              break;
+            }
+          }
+          
+          // Only update CTP if this is the closest
+          if (!hasCloser) {
+            console.log(`New CTP is closest! Saving and clearing other CTPs.`);
+            // This is the closest - save this CTP and clear others
+            await connection.query(
+              `UPDATE scores 
+               SET ctp_feet = ?, ctp_inches = ?, ctp_image_url = ?
+               WHERE tournament_id = ? AND hole_id = ? AND player_id = ?`,
+              [ctp_feet, ctp_inches, ctp_image_url, tournament_id, hole_id, player_id]
+            );
+            
+            // Clear CTP data from other players for this hole
+            await connection.query(
+              `UPDATE scores 
+               SET ctp_feet = NULL, ctp_inches = NULL, ctp_image_url = NULL 
+               WHERE tournament_id = ? AND hole_id = ? AND player_id != ?`,
+              [tournament_id, hole_id, player_id]
+            );
+          } else {
+            console.log(`Not saving CTP as it's not the closest.`);
+          }
+        }
+        
         results.push({ id: result.insertId, ...score });
       }
       
@@ -151,6 +204,66 @@ router.delete('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting score:', err);
     res.status(500).json({ error: 'Failed to delete score' });
+  }
+});
+
+// GET /api/scores/tournament/:tournamentId/hole/:holeId/ctp-leader - Get current CTP leader for a hole
+router.get('/tournament/:tournamentId/hole/:holeId/ctp-leader', async (req, res) => {
+  try {
+    const { tournamentId, holeId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT s.ctp_feet, s.ctp_inches,
+              p.id as player_id, p.name as player_name
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       WHERE s.tournament_id = ? AND s.hole_id = ? AND s.ctp_feet IS NOT NULL
+       ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC
+       LIMIT 1`,
+      [tournamentId, holeId]
+    );
+    
+    if (rows.length === 0) {
+      return res.json(null);
+    }
+    
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching CTP leader:', err);
+    res.status(500).json({ error: 'Failed to fetch CTP leader' });
+  }
+});
+
+// GET /api/scores/tournament/:tournamentId/ctp-winners - Get CTP winners
+router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT s.ctp_feet, s.ctp_inches, s.ctp_image_url,
+              p.id as player_id, p.name as player_name,
+              h.hole_number, h.mens_par
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       JOIN hole h ON s.hole_id = h.id
+       WHERE s.tournament_id = ? 
+         AND h.mens_par = 3
+         AND s.ctp_feet IS NOT NULL
+       ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC, h.hole_number ASC`,
+      [tournamentId]
+    );
+    
+    // Group by hole and get the closest for each
+    const winners = {};
+    rows.forEach(row => {
+      if (!winners[row.hole_number] || 
+          (row.ctp_feet * 12 + row.ctp_inches) < (winners[row.hole_number].ctp_feet * 12 + winners[row.hole_number].ctp_inches)) {
+        winners[row.hole_number] = row;
+      }
+    });
+    
+    res.json(Object.values(winners));
+  } catch (err) {
+    console.error('Error fetching CTP winners:', err);
+    res.status(500).json({ error: 'Failed to fetch CTP winners' });
   }
 });
 

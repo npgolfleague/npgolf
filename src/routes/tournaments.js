@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
               c.id as course_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
-       ORDER BY t.date ASC`
+       ORDER BY t.date DESC`
     );
     res.json(rows);
   } catch (err) {
@@ -38,7 +38,27 @@ router.get('/upcoming', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch upcoming tournaments' });
   }
 });
-
+// GET /api/tournaments/next - Get next upcoming tournament
+router.get('/next', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT t.id, t.date, t.course_id, t.number_of_holes, t.first_tee_time, t.created_at,
+              c.name as course_name, c.address as course_address, c.phone as course_phone
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.date >= CURDATE()
+       ORDER BY t.date ASC
+       LIMIT 1`
+    );
+    if (rows.length === 0) {
+      return res.json(null);
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching next tournament:', err);
+    res.status(500).json({ error: 'Failed to fetch next tournament' });
+  }
+});
 // GET /api/tournaments/:id - Get single tournament
 router.get('/:id', async (req, res) => {
   try {
@@ -124,7 +144,7 @@ router.post('/:id/complete', async (req, res) => {
     
     // Get all players who participated in this tournament with their scores
     const [scoresRows] = await connection.query(
-      `SELECT s.player_id, p.quota, SUM(s.score - s.quota) as total_points
+      `SELECT s.player_id, p.quota, SUM(CAST(s.score AS SIGNED) - CAST(s.quota AS SIGNED)) as total_points
        FROM scores s
        JOIN players p ON s.player_id = p.id
        WHERE s.tournament_id = ?

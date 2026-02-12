@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { leaderboardAPI, tournamentsAPI } from '../api';
+import { leaderboardAPI, tournamentsAPI, scoresAPI } from '../api';
 
 export function Leaderboard() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [ctpWinners, setCtpWinners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -18,12 +21,14 @@ export function Leaderboard() {
     try {
       setLoading(true);
       setError('');
-      const [tournamentRes, leaderboardRes] = await Promise.all([
+      const [tournamentRes, leaderboardRes, ctpRes] = await Promise.all([
         tournamentsAPI.get(tournamentId),
-        leaderboardAPI.get(tournamentId)
+        leaderboardAPI.get(tournamentId),
+        scoresAPI.getCtpWinners(tournamentId)
       ]);
       setTournament(tournamentRes.data);
       setLeaderboard(leaderboardRes.data);
+      setCtpWinners(ctpRes.data);
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
       setError(err.response?.data?.error || 'Failed to load leaderboard data');
@@ -194,6 +199,76 @@ export function Leaderboard() {
         </div>
       )}
 
+      {/* CTP Winners */}
+      {ctpWinners.length > 0 && (
+        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-6">
+          <h2 className="text-2xl font-bold text-green-900 mb-4">📍 Closest to the Pin Winners</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ctpWinners.map((winner) => (
+              <div key={`hole-${winner.hole_number}`} className="bg-white rounded-lg p-4 shadow">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="text-lg font-bold text-gray-900">Hole {winner.hole_number}</div>
+                    <div className="text-sm text-gray-600">Par {winner.mens_par}</div>
+                  </div>
+                  <div className="text-3xl">🏌️</div>
+                </div>
+                <div className="text-xl font-bold text-green-700 mb-2">{winner.player_name}</div>
+                <div className="text-2xl font-bold text-blue-600 mb-3">
+                  {winner.ctp_feet}' {winner.ctp_inches}"
+                </div>
+                {winner.ctp_image_url && (
+                  <button
+                    onClick={() => {
+                      setSelectedImage({ url: winner.ctp_image_url, player: winner.player_name, hole: winner.hole_number, distance: `${winner.ctp_feet}' ${winner.ctp_inches}"` });
+                      setShowImageModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm"
+                  >
+                    📷 View Photo
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CTP Winners */}
+      {ctpWinners.length > 0 && (
+        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-6">
+          <h2 className="text-2xl font-bold text-green-900 mb-4">📍 Closest to the Pin Winners</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ctpWinners.map((winner) => (
+              <div key={`hole-${winner.hole_number}`} className="bg-white rounded-lg p-4 shadow">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="text-lg font-bold text-gray-900">Hole {winner.hole_number}</div>
+                    <div className="text-sm text-gray-600">Par {winner.mens_par}</div>
+                  </div>
+                  <div className="text-3xl">🏌️</div>
+                </div>
+                <div className="text-xl font-bold text-green-700 mb-2">{winner.player_name}</div>
+                <div className="text-2xl font-bold text-blue-600 mb-3">
+                  {winner.ctp_feet}' {winner.ctp_inches}"
+                </div>
+                {winner.ctp_image_url && (
+                  <button
+                    onClick={() => {
+                      setSelectedImage({ url: winner.ctp_image_url, player: winner.player_name, hole: winner.hole_number, distance: `${winner.ctp_feet}' ${winner.ctp_inches}"` });
+                      setShowImageModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm"
+                  >
+                    📷 View Photo
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       {leaderboard.length > 0 && (
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -206,6 +281,34 @@ export function Leaderboard() {
             <p><span className="font-semibold">Skins 🔥:</span> Number of holes where player had the best score alone</p>
             <p><span className="font-semibold">Skin Prize:</span> Prize money earned from skins (30% of total pot divided by total skins)</p>
             <p className="mt-2"><span className="text-green-600 font-bold">Green = Over Quota</span> | <span className="text-red-600 font-bold">Red = Under Quota</span></p>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div className="bg-white rounded-lg p-4 max-w-4xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{selectedImage.player}</h3>
+                <p className="text-gray-600">Hole {selectedImage.hole} - {selectedImage.distance}</p>
+              </div>
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <img 
+              src={selectedImage.url} 
+              alt={`CTP measurement by ${selectedImage.player}`}
+              className="w-full h-auto rounded-lg"
+            />
           </div>
         </div>
       )}
