@@ -279,6 +279,79 @@ router.post('/sms-webhook', async (req, res) => {
 });
 
 // GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
+// GET /api/users/:id/quota - Get player's full quota row
+router.get('/:id/quota', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM quota WHERE player_id = ? LIMIT 1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.json({ player_id: Number(id) });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching quota row:', err);
+    res.status(500).json({ error: 'Failed to fetch quota row' });
+  }
+});
+
+// PUT /api/users/:id/quota - Update player's quota row
+router.put('/:id/quota', async (req, res) => {
+  const { id } = req.params;
+  const allowedFields = [
+    'date_1', 'points_1', 'quota_diff_1',
+    'date_2', 'points_2', 'quota_diff_2',
+    'date_3', 'points_3', 'quota_diff_3',
+    'date_4', 'points_4', 'quota_diff_4',
+    'date_5', 'points_5', 'quota_diff_5',
+    'date_6', 'points_6', 'quota_diff_6',
+    'date_7', 'points_7', 'quota_diff_7'
+  ];
+
+  const updates = [];
+  const values = [];
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+      updates.push(`${field} = ?`);
+      values.push(req.body[field]);
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  try {
+    const [existing] = await pool.query('SELECT id FROM quota WHERE player_id = ? LIMIT 1', [id]);
+    if (existing.length === 0) {
+      const columns = ['player_id', ...updates.map(u => u.split(' = ')[0])];
+      const placeholders = columns.map(() => '?').join(', ');
+      const insertValues = [Number(id), ...values];
+      await pool.execute(
+        `INSERT INTO quota (${columns.join(', ')}) VALUES (${placeholders})`,
+        insertValues
+      );
+    } else {
+      values.push(id);
+      await pool.execute(
+        `UPDATE quota SET ${updates.join(', ')} WHERE player_id = ?`,
+        values
+      );
+    }
+
+    const [rows] = await pool.query('SELECT * FROM quota WHERE player_id = ? LIMIT 1', [id]);
+    res.json(rows[0] || { player_id: Number(id) });
+  } catch (err) {
+    console.error('Error updating quota row:', err);
+    res.status(500).json({ error: 'Failed to update quota row' });
+  }
+});
+
+// GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
 router.get('/:id/quota-history', async (req, res) => {
   const { id } = req.params;
   try {
