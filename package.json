@@ -20,7 +20,7 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.0",
     "mysql2": "^3.3.0",
-    "twilio": "^5.12.0"
+    "twilio": "^5.3.5"
   },
   "devDependencies": {
     "jest": "^29.6.1",
