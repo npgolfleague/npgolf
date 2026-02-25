@@ -115,39 +115,6 @@ export const Rules = () => {
           )}
         </section>
 
-        {/* Skins Handicap */}
-        <section className="mb-8">
-          <button
-            onClick={() => toggleSection('skins')}
-            className="w-full flex justify-between items-center text-left text-2xl font-semibold text-gray-900 mb-4 hover:text-blue-600 transition-colors"
-          >
-            <span>Skins Handicap System</span>
-            <span className="text-3xl">{expandedSection === 'skins' ? '−' : '+'}</span>
-          </button>
-          {expandedSection === 'skins' && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-4">
-              <p className="text-gray-700 mb-4">
-                The skins handicap uses 60% of the average of the best 10 of the last 20 league tournaments you have played.
-              </p>
-              <p className="text-gray-700 mb-2">
-                <strong>If you haven't played 20 rounds:</strong>
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-                <li>Best 2 of 5 played</li>
-                <li>Best 3 of 6 or 7 played</li>
-                <li>Best 4 of 8 or 9 played</li>
-                <li>Best 5 of 10 or 11 played</li>
-                <li>Best 6 of 12 or 13 played</li>
-                <li>Best 7 of 14 or 15 played</li>
-                <li>Best 8 of 16 or 17 played</li>
-                <li>Best 9 of 18 or 19 played</li>
-              </ul>
-              <p className="text-gray-700 text-sm italic">
-                Note: Anti-sandbagging rule applies - plus rounds are entered twice when setting skins quota.
-              </p>
-            </div>
-          )}
-        </section>
 
         {/* Paradise Cup Points */}
         <section className="mb-8">

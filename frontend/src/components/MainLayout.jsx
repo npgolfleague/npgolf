@@ -23,6 +23,7 @@ export const MainLayout = () => {
   ]
 
   const adminMenuItems = [
+    { path: '/quota', label: 'Quota', icon: '🎯' },
     { path: '/settings', label: 'Settings', icon: '⚙️' }
   ]
 
