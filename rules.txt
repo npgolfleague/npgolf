@@ -22,10 +22,6 @@ Returning players will use their quota from last season; if you are new you esta
 
 Your quota is the average of the your last 7 quota scores with the caveat of Quota scores will only post 2 points lower than your quota from the prior week (for example if your quota is 7 and you score a 4 for purposes of setting your quota it will go in as a score of 5). Also new this year the limit will be +2 points if you are over your quota (for example if your quota is 7 and you score an 11 for purposes of setting your quota it will go in as a 9). If you are new you set your quota after 3 rounds. If you have played less than 7 rounds and have a plus round (you shoot over your quota) that round will be entered twice as it relates to setting your quota (this helps prevent sandbagging).
 
-The skins handicap will continue to use 60 % of the average of the best 10 of the last 20 league tournaments you have played. If you haven't played 20 rounds it is as follows:
-
-Best 2 of 5 played; best 3 of 6 or 7 played; best 4 of 8 or 9 played; best 5 of 10 or 11 played; best 6 of 12 or 13 played; best 7 of 14 or 15 played; best 8 of 16 or 17 played; and best 9 of 18 or 19 played. If you have played less than 20 rounds and have a plus round (you shoot over your quota) that round will be entered twice as it relates to setting your skins quota (this helps prevent sandbagging).
-
 Once you have a quota you can start earning Paradise cup points.
 
 Paradise Cup points are earned as follows:
