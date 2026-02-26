@@ -20,7 +20,11 @@ import { Tournaments } from './pages/Tournaments'
 import { AddTournament } from './pages/AddTournament'
 import { EditTournament } from './pages/EditTournament'
 import { Rules } from './pages/Rules'
+<<<<<<< Updated upstream
 import { Quota } from './pages/Quota'
+=======
+import { SMSConsent } from './pages/SMSConsent'
+>>>>>>> Stashed changes
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -30,6 +34,7 @@ try {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/sms-consent" element={<SMSConsent />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               element={
