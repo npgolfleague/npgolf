@@ -20,11 +20,8 @@ import { Tournaments } from './pages/Tournaments'
 import { AddTournament } from './pages/AddTournament'
 import { EditTournament } from './pages/EditTournament'
 import { Rules } from './pages/Rules'
-<<<<<<< Updated upstream
 import { Quota } from './pages/Quota'
-=======
 import { SMSConsent } from './pages/SMSConsent'
->>>>>>> Stashed changes
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
