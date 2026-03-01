@@ -83,4 +83,11 @@ export const settingsAPI = {
   update: (data) => apiClient.put('/settings', data)
 }
 
+export const emailsAPI = {
+  list: () => apiClient.get('/emails'),
+  get: (id) => apiClient.get(`/emails/${id}`),
+  markRead: (id, isRead) => apiClient.put(`/emails/${id}/read`, { is_read: isRead }),
+  delete: (id) => apiClient.delete(`/emails/${id}`)
+}
+
 export default apiClient

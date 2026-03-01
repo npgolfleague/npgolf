@@ -22,6 +22,7 @@ import { EditTournament } from './pages/EditTournament'
 import { Rules } from './pages/Rules'
 import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
+import { Inbox } from './pages/Inbox'
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -55,6 +56,7 @@ try {
               <Route path="/settings" element={<Settings />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/quota" element={<Quota />} />
+              <Route path="/inbox" element={<Inbox />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
