@@ -60,7 +60,9 @@ export const tournamentsAPI = {
   getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
   updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid }),
   sendInviteSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/invite-sms`),
-  sendSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/send-sms`)
+  sendSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/send-sms`),
+  sendInvitations: (tournamentId, method) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, { method }),
+  getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`)
 }
 
 export const scoresAPI = {

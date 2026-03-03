@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { sendSMS } = require('../twilio');
+const { sendEmail } = require('../email');
 
 // GET /api/tournaments - List all tournaments
 router.get('/', async (req, res) => {
@@ -384,6 +385,277 @@ router.post('/:id/send-sms', async (req, res) => {
   }
 });
 
+// POST /api/tournaments/:id/send-invitations - Send tournament invitations via SMS and/or Email
+router.post('/:id/send-invitations', async (req, res) => {
+  const tournamentId = req.params.id;
+  const { method } = req.body; // 'sms', 'email', or 'both'
+  
+  try {
+    // Get tournament info with course details
+    const [tournamentRows] = await pool.query(
+      `SELECT t.id, t.date, c.name as course_name, c.address as course_address
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    const tournament = tournamentRows[0];
+    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Get base URL for RSVP links
+    const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
+    
+    // Query players based on method
+    let playersQuery = '';
+    if (method === 'sms' || !method) {
+      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""';
+    } else if (method === 'email') {
+      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND email_allowed = 1 AND email IS NOT NULL AND email != ""';
+    } else if (method === 'both') {
+      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND ((sms_allowed = 1 AND phone IS NOT NULL AND phone != "") OR (email_allowed = 1 AND email IS NOT NULL AND email != ""))';
+    } else {
+      return res.status(400).json({ error: 'Invalid method. Use "sms", "email", or "both"' });
+    }
+    
+    const [players] = await pool.query(playersQuery);
+    if (players.length === 0) {
+      return res.status(400).json({ error: 'No active players found with the selected contact method' });
+    }
+    
+    let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
+    
+    for (const player of players) {
+      const yesUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=yes`;
+      const noUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=no`;
+      
+      // Send SMS if applicable
+      if ((method === 'sms' || method === 'both') && player.phone) {
+        try {
+          const smsMessage = `Hi ${player.name}! Are you playing ${tournament.course_name} on ${tournamentDate}?\n\nYes: ${yesUrl}\nNo: ${noUrl}`;
+          console.log(`Sending SMS to ${player.name} (${player.phone})`);
+          await sendSMS(player.phone, smsMessage);
+          console.log(`✓ SMS sent successfully to ${player.name}`);
+          smsSent++;
+        } catch (err) {
+          console.error(`✗ Failed to send SMS to ${player.name}: ${err.message}`);
+          smsFailed.push({ id: player.id, name: player.name, phone: player.phone, error: err.message });
+        }
+      }
+      
+      // Send Email if applicable
+      if ((method === 'email' || method === 'both') && player.email) {
+        try {
+          const subject = `Tournament Invitation - ${tournament.course_name}`;
+          const html = `
+            <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+                  .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+                  .button { display: inline-block; padding: 12px 30px; margin: 10px 5px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+                  .btn-yes { background-color: #4CAF50; color: white; }
+                  .btn-no { background-color: #f44336; color: white; }
+                  .details { background-color: white; padding: 15px; margin: 20px 0; border-left: 4px solid #4CAF50; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>🏌️ Tournament Invitation</h1>
+                  </div>
+                  <div class="content">
+                    <p>Hi ${player.name},</p>
+                    <p>We're organizing a tournament and would like to know if you'll be joining us!</p>
+                    
+                    <div class="details">
+                      <strong>📍 Course:</strong> ${tournament.course_name}<br>
+                      <strong>📅 Date:</strong> ${tournamentDate}<br>
+                      ${tournament.course_address ? `<strong>🗺️ Location:</strong> ${tournament.course_address}<br>` : ''}
+                    </div>
+                    
+                    <p><strong>Will you be playing?</strong></p>
+                    <p style="text-align: center;">
+                      <a href="${yesUrl}" class="button btn-yes">✓ Yes, I'll Play</a>
+                      <a href="${noUrl}" class="button btn-no">✗ Can't Make It</a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                      Looking forward to seeing you on the course!
+                    </p>
+                  </div>
+                </div>
+              </body>
+            </html>
+          `;
+          
+          console.log(`Sending Email to ${player.name} (${player.email})`);
+          await sendEmail(player.email, subject, html);
+          console.log(`✓ Email sent successfully to ${player.name}`);
+          emailSent++;
+        } catch (err) {
+          console.error(`✗ Failed to send Email to ${player.name}: ${err.message}`);
+          emailFailed.push({ id: player.id, name: player.name, email: player.email, error: err.message });
+        }
+      }
+    }
+    
+    res.json({ 
+      sms: { sent: smsSent, failed: smsFailed },
+      email: { sent: emailSent, failed: emailFailed },
+      total: players.length
+    });
+  } catch (err) {
+    console.error('Error sending tournament invitations:', err);
+    res.status(500).json({ error: 'Failed to send tournament invitations' });
+  }
+});
+
+// GET /api/tournaments/:id/confirm - Confirm attendance (yes/no) via link
+router.get('/:id/confirm', async (req, res) => {
+  const tournamentId = req.params.id;
+  const { playerId, response } = req.query;
+  
+  console.log(`Confirmation request received: tournamentId=${tournamentId}, playerId=${playerId}, response=${response}`);
+  
+  try {
+    if (!playerId || !response) {
+      console.log('Error: Missing playerId or response');
+      return res.status(400).send('<h1>Error: Missing information</h1>');
+    }
+    
+    if (response !== 'yes' && response !== 'no') {
+      console.log('Error: Invalid response value');
+      return res.status(400).send('<h1>Error: Invalid response</h1>');
+    }
+    
+    // Verify tournament exists
+    const [tournamentRows] = await pool.query(
+      `SELECT t.id, t.date, c.name as course_name 
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) {
+      return res.status(404).send('<h1>Tournament not found</h1>');
+    }
+    
+    const tournament = tournamentRows[0];
+    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Verify player exists
+    const [playerRows] = await pool.query('SELECT id, name FROM players WHERE id = ?', [playerId]);
+    if (playerRows.length === 0) {
+      return res.status(404).send('<h1>Player not found</h1>');
+    }
+    const player = playerRows[0];
+    
+    // Check if player is already registered
+    const [exists] = await pool.query(
+      'SELECT * FROM tournament_players WHERE player_id = ? AND tournament_id = ?',
+      [playerId, tournamentId]
+    );
+    
+    if (response === 'yes') {
+      // Add player to tournament if not already registered
+      if (exists.length === 0) {
+        await pool.query(
+          'INSERT INTO tournament_players (player_id, tournament_id, attending_status, response_date) VALUES (?, ?, ?, NOW())',
+          [playerId, tournamentId, 'yes']
+        );
+        console.log(`Inserted new tournament_players record: player ${playerId} ATTENDING tournament ${tournamentId}`);
+      } else {
+        // Update attending status
+        await pool.query(
+          'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
+          ['yes', playerId, tournamentId]
+        );
+        console.log(`Updated tournament_players: player ${playerId} ATTENDING tournament ${tournamentId}`);
+      }
+      
+      // Send success response
+      res.send(`
+        <html>
+          <head>
+            <title>Confirmed - See You There!</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #4CAF50;">✓ You're In!</h1>
+              <p style="font-size: 18px;">Thanks <strong>${player.name}</strong>!</p>
+              <p style="font-size: 16px;">You're registered for:</p>
+              <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4CAF50;">
+                <p style="margin: 5px 0;"><strong>${tournament.course_name}</strong></p>
+                <p style="margin: 5px 0;">${tournamentDate}</p>
+              </div>
+              <p style="margin-top: 30px; color: #666;">See you on the course! 🏌️</p>
+            </div>
+          </body>
+        </html>
+      `);
+    } else {
+      // response === 'no'
+      if (exists.length === 0) {
+        // Add record with 'no' status
+        await pool.query(
+          'INSERT INTO tournament_players (player_id, tournament_id, attending_status, response_date) VALUES (?, ?, ?, NOW())',
+          [playerId, tournamentId, 'no']
+        );
+        console.log(`Inserted new tournament_players record: player ${playerId} NOT ATTENDING tournament ${tournamentId}`);
+      } else {
+        // Update status to 'no'
+        await pool.query(
+          'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
+          ['no', playerId, tournamentId]
+        );
+        console.log(`Updated tournament_players: player ${playerId} NOT ATTENDING tournament ${tournamentId}`);
+      }
+      
+      // Send acknowledgment response
+      res.send(`
+        <html>
+          <head>
+            <title>Response Recorded</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #fff5f5;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #666;">Thanks for Letting Us Know</h1>
+              <p style="font-size: 18px;">Hi <strong>${player.name}</strong>,</p>
+              <p style="font-size: 16px;">We've recorded that you won't be able to make it to:</p>
+              <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #999;">
+                <p style="margin: 5px 0;"><strong>${tournament.course_name}</strong></p>
+                <p style="margin: 5px 0;">${tournamentDate}</p>
+              </div>
+              <p style="margin-top: 30px; color: #666;">Hope to see you at the next one!</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+  } catch (err) {
+    console.error('Error processing confirmation:', err);
+    res.status(500).send('<h1>Error processing your response. Please contact the administrator.</h1>');
+  }
+});
+
 // GET /api/tournaments/:id/rsvp - RSVP to a tournament via SMS link
 router.get('/:id/rsvp', async (req, res) => {
   const tournamentId = req.params.id;
@@ -428,6 +700,12 @@ router.get('/:id/rsvp', async (req, res) => {
     );
     
     if (exists.length > 0) {
+      // Update attending status if already exists
+      await pool.query(
+        'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
+        ['yes', playerId, tournamentId]
+      );
+      
       return res.send(`
         <html>
           <head><title>Already Registered</title></head>
@@ -444,8 +722,8 @@ router.get('/:id/rsvp', async (req, res) => {
     
     // Add player to tournament
     await pool.query(
-      'INSERT INTO tournament_players (player_id, tournament_id, paid) VALUES (?, ?, 0)',
-      [playerId, tournamentId]
+      'INSERT INTO tournament_players (player_id, tournament_id, paid, attending_status, response_date) VALUES (?, ?, 0, ?, NOW())',
+      [playerId, tournamentId, 'yes']
     );
     
     // Send success response
@@ -465,6 +743,78 @@ router.get('/:id/rsvp', async (req, res) => {
   } catch (err) {
     console.error('Error processing RSVP:', err);
     res.status(500).send('<h1>Error processing your registration. Please contact the administrator.</h1>');
+  }
+});
+
+// GET /api/tournaments/:id/attendance - Get attendance statistics for a tournament
+router.get('/:id/attendance', async (req, res) => {
+  const tournamentId = req.params.id;
+  
+  try {
+    // Get tournament info
+    const [tournamentRows] = await pool.query(
+      `SELECT t.id, t.date, c.name as course_name 
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    // Get attendance summary
+    const [summary] = await pool.query(
+      `SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN attending_status = 'yes' THEN 1 ELSE 0 END) as confirmed_yes,
+        SUM(CASE WHEN attending_status = 'no' THEN 1 ELSE 0 END) as confirmed_no,
+        SUM(CASE WHEN attending_status = 'pending' THEN 1 ELSE 0 END) as pending
+       FROM tournament_players
+       WHERE tournament_id = ?`,
+      [tournamentId]
+    );
+    
+    // Get player details grouped by response
+    const [playersYes] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.phone, tp.response_date
+       FROM players p
+       JOIN tournament_players tp ON p.id = tp.player_id
+       WHERE tp.tournament_id = ? AND tp.attending_status = 'yes'
+       ORDER BY tp.response_date DESC`,
+      [tournamentId]
+    );
+    
+    const [playersNo] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.phone, tp.response_date
+       FROM players p
+       JOIN tournament_players tp ON p.id = tp.player_id
+       WHERE tp.tournament_id = ? AND tp.attending_status = 'no'
+       ORDER BY tp.response_date DESC`,
+      [tournamentId]
+    );
+    
+    const [playersPending] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.phone
+       FROM players p
+       JOIN tournament_players tp ON p.id = tp.player_id
+       WHERE tp.tournament_id = ? AND tp.attending_status = 'pending'
+       ORDER BY p.name ASC`,
+      [tournamentId]
+    );
+    
+    res.json({
+      tournament: tournamentRows[0],
+      summary: summary[0],
+      players: {
+        confirmed_yes: playersYes,
+        confirmed_no: playersNo,
+        pending: playersPending
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching attendance:', err);
+    res.status(500).json({ error: 'Failed to fetch attendance data' });
   }
 });
 

@@ -10,14 +10,16 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     email: '',
     phone: '',
     sex: '',
-    quota: '',
+    quota_18: '',
+    quota_9: '',
     fedex_points: '',
     tournaments_played: '',
     prize_money: '',
     active: 1,
     role: 'player',
     password: '',
-    sms_allowed: 0
+    sms_allowed: 0,
+    email_allowed: 1
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -26,6 +28,9 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
   // Determine if current user is admin and if they can edit this player
   const isAdmin = user?.role === 'admin'
   const canEdit = isAdmin || (user?.id === player?.id)
+
+  console.log('EditPlayerModal - isAdmin:', isAdmin, 'user:', user)
+  console.log('EditPlayerModal - formData.email_allowed:', formData.email_allowed)
 
   // Debug logging
   useEffect(() => {
@@ -43,13 +48,15 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
         email: player.email || '',
         phone: player.phone || '',
         sex: player.sex || '',
-        quota: player.quota || '',
+        quota_18: player.quota_18 || '',
+        quota_9: player.quota_9 || '',
         fedex_points: player.fedex_points || '',
         tournaments_played: player.tournaments_played || '',
         prize_money: player.prize_money || '',
         active: player.active !== undefined ? player.active : 1,
         role: player.role || 'player',
-        sms_allowed: player.sms_allowed !== undefined ? player.sms_allowed : 0
+        sms_allowed: player.sms_allowed !== undefined ? player.sms_allowed : 0,
+        email_allowed: player.email_allowed !== undefined ? player.email_allowed : 1
       })
     }
   }, [player])
@@ -84,14 +91,16 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
           email: formData.email,
           phone: formData.phone || null,
           sex: formData.sex || null,
-          quota: formData.quota ? Number(formData.quota) : null,
+          quota_18: formData.quota_18 ? Number(formData.quota_18) : null,
+          quota_9: formData.quota_9 ? Number(formData.quota_9) : null,
           fedex_points: formData.fedex_points ? Number(formData.fedex_points) : null,
           tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
           prize_money: formData.prize_money ? Number(formData.prize_money) : null,
           active: formData.active,
           role: formData.role,
           password: formData.password || null,
-          sms_allowed: formData.sms_allowed
+          sms_allowed: formData.sms_allowed,
+          email_allowed: formData.email_allowed
         }
         
         console.log('Creating player with data:', dataToCreate)
@@ -108,13 +117,15 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
             email: formData.email,
             phone: formData.phone || null,
             sex: formData.sex || null,
-            quota: formData.quota ? Number(formData.quota) : null,
+            quota_18: formData.quota_18 ? Number(formData.quota_18) : null,
+            quota_9: formData.quota_9 ? Number(formData.quota_9) : null,
             fedex_points: formData.fedex_points ? Number(formData.fedex_points) : null,
             tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
             prize_money: formData.prize_money ? Number(formData.prize_money) : null,
             active: formData.active,
             role: formData.role,
-            sms_allowed: formData.sms_allowed
+            sms_allowed: formData.sms_allowed,
+            email_allowed: formData.email_allowed
           }
         } else {
           // Regular player can only update their own name, email, phone, sex
@@ -270,12 +281,25 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
               <>
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2">
-                    Quota
+                    18-Hole Quota
                   </label>
                   <input
                     type="number"
-                    name="quota"
-                    value={formData.quota}
+                    name="quota_18"
+                    value={formData.quota_18}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    9-Hole Quota
+                  </label>
+                  <input
+                    type="number"
+                    name="quota_9"
+                    value={formData.quota_9}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -336,6 +360,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                   </select>
                 </div>
 
+                {/* Active Checkbox */}
                 <div className="flex items-center">
                   <label className="flex items-center cursor-pointer">
                     <input
@@ -349,6 +374,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                   </label>
                 </div>
 
+                {/* SMS Allowed Checkbox */}
                 <div className="flex items-center">
                   <label className="flex items-center cursor-pointer">
                     <input
@@ -359,6 +385,20 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                       className="mr-2 w-4 h-4"
                     />
                     <span className="text-gray-700 font-semibold">SMS Allowed</span>
+                  </label>
+                </div>
+
+                {/* Email Allowed Checkbox */}
+                <div className="flex items-center">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="email_allowed"
+                      checked={formData.email_allowed === 1}
+                      onChange={handleChange}
+                      className="mr-2 w-4 h-4"
+                    />
+                    <span className="text-gray-700 font-semibold">Email Allowed</span>
                   </label>
                 </div>
               </>

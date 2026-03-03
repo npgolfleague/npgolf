@@ -9,8 +9,10 @@ export const Tournaments = () => {
   const [tournaments, setTournaments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [sendingSMS, setSendingSMS] = useState(null)
-  const [smsResult, setSmsResult] = useState(null)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteModalTournamentId, setInviteModalTournamentId] = useState(null)
+  const [inviteResult, setInviteResult] = useState(null)
+  const [sendingInvitations, setSendingInvitations] = useState(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -57,20 +59,24 @@ export const Tournaments = () => {
     }
   }
 
-  const handleSendSMS = async (tournamentId) => {
-    if (!confirm('Send SMS announcement to all active players with SMS enabled?')) return
+  const openInviteModal = (tournamentId) => {
+    setInviteModalTournamentId(tournamentId)
+    setShowInviteModal(true)
+  }
 
+  const handleSendInvitations = async (method) => {
     try {
-      setSendingSMS(tournamentId)
-      setSmsResult(null)
-      const response = await tournamentsAPI.sendSMS(tournamentId)
-      setSmsResult({ tournamentId, ...response.data })
-      setTimeout(() => setSmsResult(null), 10000) // Clear after 10 seconds
+      setSendingInvitations(inviteModalTournamentId)
+      setInviteResult(null)
+      const response = await tournamentsAPI.sendInvitations(inviteModalTournamentId, method)
+      setInviteResult({ tournamentId: inviteModalTournamentId, ...response.data })
+      setShowInviteModal(false)
+      setTimeout(() => setInviteResult(null), 15000) // Clear after 15 seconds
     } catch (err) {
-      console.error('Error sending SMS:', err)
-      setError(err.response?.data?.error || 'Failed to send SMS')
+      console.error('Error sending invitations:', err)
+      setError(err.response?.data?.error || 'Failed to send invitations')
     } finally {
-      setSendingSMS(null)
+      setSendingInvitations(null)
     }
   }
 
@@ -93,14 +99,31 @@ export const Tournaments = () => {
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
-        {smsResult && (
-          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-            <p className="font-semibold">SMS Announcement Sent!</p>
-            <p className="text-sm mt-1">✓ Sent: {smsResult.sent} messages</p>
-            <p className="text-sm text-gray-600 italic">"{smsResult.message}"</p>
-            {smsResult.failed && smsResult.failed.length > 0 && (
-              <p className="text-sm text-red-600 mt-1">✗ Failed: {smsResult.failed.length} messages</p>
-            )}
+        {inviteResult && (
+          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+            <p className="font-semibold">✓ Invitations Sent Successfully!</p>
+            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+              <div>
+                <p className="font-medium">📱 SMS:</p>
+                <p>✓ Sent: {inviteResult.sms?.sent || 0}</p>
+                {inviteResult.sms?.failed?.length > 0 && (
+                  <p className="text-red-600">✗ Failed: {inviteResult.sms.failed.length}</p>
+                )}
+              </div>
+              <div>
+                <p className="font-medium">📧 Email:</p>
+                <p>✓ Sent: {inviteResult.email?.sent || 0}</p>
+                {inviteResult.email?.failed?.length > 0 && (
+                  <p className="text-red-600">✗ Failed: {inviteResult.email.failed.length}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setInviteResult(null)}
+              className="mt-2 text-xs text-green-800 underline"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -151,11 +174,11 @@ export const Tournaments = () => {
                           {isAdmin && (
                             <>
                               <button
-                                onClick={() => handleSendSMS(tournament.id)}
-                                disabled={sendingSMS === tournament.id}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:text-gray-400"
+                                onClick={() => openInviteModal(tournament.id)}
+                                disabled={sendingInvitations === tournament.id}
+                                className="text-purple-600 hover:text-purple-800 text-sm font-medium disabled:text-gray-400"
                               >
-                                {sendingSMS === tournament.id ? '📱 Sending...' : '📱 Send SMS'}
+                                {sendingInvitations === tournament.id ? '📧 Sending...' : '📧 Invitations'}
                               </button>
                               <button
                                 onClick={() => navigate(`/tournaments/${tournament.id}/edit`)}
@@ -184,6 +207,58 @@ export const Tournaments = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Invite Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h2 className="text-xl font-bold mb-4">Send Tournament Invitations</h2>
+              
+              <p className="text-gray-600 mb-4">
+                Choose how you'd like to invite players to confirm their participation:
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleSendInvitations('sms')}
+                  disabled={sendingInvitations}
+                  className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  <span>📱</span>
+                  <span>Send SMS Only</span>
+                </button>
+
+                <button
+                  onClick={() => handleSendInvitations('email')}
+                  disabled={sendingInvitations}
+                  className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  <span>📧</span>
+                  <span>Send Email Only</span>
+                </button>
+
+                <button
+                  onClick={() => handleSendInvitations('both')}
+                  disabled={sendingInvitations}
+                  className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  <span>📱📧</span>
+                  <span>Send Both SMS & Email</span>
+                </button>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  disabled={sendingInvitations}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

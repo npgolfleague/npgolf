@@ -8,7 +8,8 @@ router.get('/:tournamentId/players', async (req, res) => {
   
   try {
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota, p.role, tp.registration_date, tp.paid
+      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, 
+             tp.registration_date, tp.paid, tp.attending_status, tp.response_date
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       WHERE tp.tournament_id = ?
@@ -114,7 +115,7 @@ router.get('/:tournamentId/available-players', async (req, res) => {
   
   try {
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota, p.role
+      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role
       FROM players p
       WHERE p.active = 1
         AND p.id NOT IN (

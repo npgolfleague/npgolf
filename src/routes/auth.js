@@ -12,7 +12,7 @@ router.post('/login', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
   try {
-    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota, role, password FROM players WHERE email = ? LIMIT 1', [email]);
+    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota_18, quota_9, role, password FROM players WHERE email = ? LIMIT 1', [email]);
     const user = rows && rows[0];
     if (!user || !user.password) return res.status(401).json({ error: 'invalid credentials' });
 
@@ -28,16 +28,16 @@ router.post('/login', async (req, res) => {
     const payload = { sub: user.id, email: user.email };
     const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, sex: user.sex, active: user.active, quota: user.quota, role: user.role } });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, sex: user.sex, active: user.active, quota_18: user.quota_18, quota_9: user.quota_9, role: user.role } });
   } catch (err) {
     console.error('Auth error', err);
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
-// POST /api/auth/register { email, password, name, phone, sex?, quota? }
+// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9? }
 router.post('/register', async (req, res) => {
-  const { email, password, name, phone, sex, quota } = req.body || {};
+  const { email, password, name, phone, sex, quota_18, quota_9 } = req.body || {};
   if (!email || !password || !name || !phone) {
     return res.status(400).json({ error: 'email, password, name, and phone are required' });
   }
@@ -55,8 +55,8 @@ router.post('/register', async (req, res) => {
 
     // Insert new player
     const [result] = await pool.query(
-      'INSERT INTO players (name, email, password, phone, sex, quota, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, phone, sex || 'M', quota || 18, 'player']
+      'INSERT INTO players (name, email, password, phone, sex, quota_18, quota_9, role, email_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, phone, sex || 'M', quota_18 || 18, quota_9 || 9, 'player', 1]
     );
 
     const userId = result.insertId;
@@ -86,7 +86,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: userId, name, email, phone, sex: sex || 'M', quota: quota || 18, role: 'player' }
+      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: quota_18 || 18, quota_9: quota_9 || 9, role: 'player' }
     });
   } catch (err) {
     console.error('Registration error', err);
