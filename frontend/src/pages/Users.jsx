@@ -164,8 +164,11 @@ export const Users = () => {
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">SMS</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota</th>
+                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Active</th>
+                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">SMS</th>
+                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">18H Quota</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">9H Quota</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">FedEx Pts</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
@@ -175,24 +178,26 @@ export const Users = () => {
               <tbody>
                 {players.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="px-6 py-4 text-center text-gray-600">
+                    <td colSpan="12" className="px-6 py-4 text-center text-gray-600">
                       No players found
                     </td>
                   </tr>
                 ) : (
                   players.map((player, index) => (
-                    <tr key={index} className="border-t hover:bg-gray-50">
+                    <tr key={index} className={`border-t hover:bg-gray-50 ${!player.active ? 'opacity-50' : ''}`}>
                       <td className="px-6 py-4 text-gray-900">{player.name}</td>
                       <td className="px-6 py-4 text-gray-900">{player.email}</td>
                       <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.active ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.email_allowed ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-gray-900 relative">
                         <div 
                           onMouseEnter={() => handleQuotaHover(player.id)}
                           onMouseLeave={handleQuotaLeave}
                           className="cursor-help inline-block"
                         >
-                          {player.quota || '-'}
+                          {player.quota_18 || '-'}
                           {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
                             <div className="absolute z-10 left-0 bottom-full mb-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
                               <div className="font-bold mb-2">Last 7 Rounds</div>
@@ -206,6 +211,7 @@ export const Users = () => {
                           )}
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-gray-900">{player.quota_9 || '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

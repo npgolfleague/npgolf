@@ -17,6 +17,8 @@ export function TournamentPlayers() {
   const [actionLoading, setActionLoading] = useState(false);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [smsResult, setSmsResult] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteResult, setInviteResult] = useState(null);
   
   const isAdmin = user?.role === 'admin';
 
@@ -92,6 +94,21 @@ export function TournamentPlayers() {
     }
   };
 
+  const handleSendInvitations = async (method) => {
+    try {
+      setSendingSMS(true);
+      setInviteResult(null);
+      const response = await tournamentsAPI.sendInvitations(tournamentId, method);
+      setInviteResult(response.data);
+      setShowInviteModal(false);
+    } catch (err) {
+      console.error('Failed to send invitations:', err);
+      setError(err.response?.data?.error || 'Failed to send invitations');
+    } finally {
+      setSendingSMS(false);
+    }
+  };
+
   const handleTogglePaid = async (playerId, currentPaidStatus) => {
     try {
       setActionLoading(true);
@@ -134,11 +151,11 @@ export function TournamentPlayers() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleSendSMSInvites}
+            onClick={() => setShowInviteModal(true)}
             disabled={sendingSMS || actionLoading}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
           >
-            {sendingSMS ? 'Sending...' : '📱 Send SMS Invites'}
+            {sendingSMS ? 'Sending...' : '📧 Send Invitations'}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -153,6 +170,34 @@ export function TournamentPlayers() {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {inviteResult && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <p className="font-semibold">✓ Invitations Sent Successfully!</p>
+          <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+            <div>
+              <p className="font-medium">📱 SMS:</p>
+              <p>✓ Sent: {inviteResult.sms?.sent || 0}</p>
+              {inviteResult.sms?.failed?.length > 0 && (
+                <p className="text-red-600">✗ Failed: {inviteResult.sms.failed.length}</p>
+              )}
+            </div>
+            <div>
+              <p className="font-medium">📧 Email:</p>
+              <p>✓ Sent: {inviteResult.email?.sent || 0}</p>
+              {inviteResult.email?.failed?.length > 0 && (
+                <p className="text-red-600">✗ Failed: {inviteResult.email.failed.length}</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setInviteResult(null)}
+            className="mt-2 text-xs text-green-800 underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -193,6 +238,9 @@ export function TournamentPlayers() {
                 Registered
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Paid
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -203,7 +251,7 @@ export function TournamentPlayers() {
           <tbody className="bg-white divide-y divide-gray-200">
             {players.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
                   No players registered for this tournament
                 </td>
               </tr>
@@ -220,12 +268,27 @@ export function TournamentPlayers() {
                     <div className="text-sm text-gray-500">{player.phone || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{player.quota || '-'}</div>
+                    <div className="text-sm text-gray-500">
+                      {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : player.quota_18 || '-'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {new Date(player.registration_date).toLocaleDateString()}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      player.attending_status === 'yes'
+                        ? 'bg-green-100 text-green-800'
+                        : player.attending_status === 'no'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {player.attending_status === 'yes' && '✓ Yes'}
+                      {player.attending_status === 'no' && '✗ No'}
+                      {player.attending_status === 'pending' && '⏱ Pending'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {isAdmin ? (
@@ -267,6 +330,58 @@ export function TournamentPlayers() {
           </tbody>
         </table>
       </div>
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Send Tournament Invitations</h2>
+            
+            <p className="text-gray-600 mb-4">
+              Choose how you'd like to invite players to confirm their participation:
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handleSendInvitations('sms')}
+                disabled={sendingSMS}
+                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+              >
+                <span>📱</span>
+                <span>Send SMS Only</span>
+              </button>
+
+              <button
+                onClick={() => handleSendInvitations('email')}
+                disabled={sendingSMS}
+                className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+              >
+                <span>📧</span>
+                <span>Send Email Only</span>
+              </button>
+
+              <button
+                onClick={() => handleSendInvitations('both')}
+                disabled={sendingSMS}
+                className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+              >
+                <span>📱📧</span>
+                <span>Send Both SMS & Email</span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                disabled={sendingSMS}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:bg-gray-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Player Modal */}
       {showAddModal && (

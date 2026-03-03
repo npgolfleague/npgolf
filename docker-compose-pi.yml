@@ -31,10 +31,13 @@ services:
       JWT_SECRET: your-secret-key-change-in-production
       JWT_EXPIRES_IN: 1h
       BCRYPT_ROUNDS: 10
+      SMS_ENABLED: ${SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_API_KEY: ${TWILIO_API_KEY}
       TWILIO_API_SECRET: ${TWILIO_API_SECRET}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL}
       APP_BASE_URL: https://npgolf.net
     networks:
       - npgolf-network

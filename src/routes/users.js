@@ -7,7 +7,7 @@ const router = express.Router();
 // GET /api/users - list players
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, sms_allowed, created_at FROM players WHERE active = 1 ORDER BY fedex_points DESC, name ASC');
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players ORDER BY fedex_points DESC, name ASC');
     res.json(rows);
   } catch (err) {
     console.error('DB error', err);
@@ -15,11 +15,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/users - create player { name, email, password?, phone?, sex?, active?, quota? }
+// POST /api/users - create player { name, email, password?, phone?, sex?, active?, quota_18?, quota_9? }
 // If `password` is provided it will be hashed before storing. Password is nullable
 // to preserve backwards compatibility.
 router.post('/', async (req, res) => {
-  const { name, email, password, phone, sex, active, quota } = req.body;
+  const { name, email, password, phone, sex, active, quota_18, quota_9 } = req.body;
   if (!name || !email) return res.status(400).json({ error: 'name and email are required' });
 
   try {
@@ -40,11 +40,11 @@ router.post('/', async (req, res) => {
 
     const activeValue = active !== undefined ? active : 1;
     const [result] = await pool.execute(
-      'INSERT INTO players (name, email, phone, sex, active, quota, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, email, phone || null, sex || null, activeValue, quota || null, hashed]
+      'INSERT INTO players (name, email, phone, sex, active, quota_18, quota_9, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, email, phone || null, sex || null, activeValue, quota_18 || null, quota_9 || null, hashed]
     );
     const insertedId = result.insertId;
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota, sms_allowed, created_at FROM players WHERE id = ?', [insertedId]);
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota_18, quota_9, sms_allowed, email_allowed, created_at FROM players WHERE id = ?', [insertedId]);
     
     // Send SMS opt-in message if phone number is provided
     if (phone) {
@@ -78,7 +78,7 @@ router.post('/', async (req, res) => {
 // PUT /api/users/:id - update player
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, active, role } = req.body;
+  const { name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, active, role } = req.body;
   
   try {
     // Build dynamic update query based on provided fields
@@ -89,13 +89,15 @@ router.put('/:id', async (req, res) => {
     if (email !== undefined) { updates.push('email = ?'); values.push(email); }
     if (phone !== undefined) { updates.push('phone = ?'); values.push(phone); }
     if (sex !== undefined) { updates.push('sex = ?'); values.push(sex); }
-    if (quota !== undefined) { updates.push('quota = ?'); values.push(quota); }
+    if (quota_18 !== undefined) { updates.push('quota_18 = ?'); values.push(quota_18); }
+    if (quota_9 !== undefined) { updates.push('quota_9 = ?'); values.push(quota_9); }
     if (fedex_points !== undefined) { updates.push('fedex_points = ?'); values.push(fedex_points); }
     if (tournaments_played !== undefined) { updates.push('tournaments_played = ?'); values.push(tournaments_played); }
     if (prize_money !== undefined) { updates.push('prize_money = ?'); values.push(prize_money); }
     if (active !== undefined) { updates.push('active = ?'); values.push(active); }
     if (role !== undefined) { updates.push('role = ?'); values.push(role); }
     if (req.body.sms_allowed !== undefined) { updates.push('sms_allowed = ?'); values.push(req.body.sms_allowed); }
+    if (req.body.email_allowed !== undefined) { updates.push('email_allowed = ?'); values.push(req.body.email_allowed); }
     
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -105,7 +107,7 @@ router.put('/:id', async (req, res) => {
     const sql = `UPDATE players SET ${updates.join(', ')} WHERE id = ?`;
     
     await pool.execute(sql, values);
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, created_at FROM players WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players WHERE id = ?', [id]);
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
@@ -166,6 +168,68 @@ router.get('/:id/sms-opt-in', async (req, res) => {
     `);
   } catch (err) {
     console.error('Error processing SMS opt-in:', err);
+    res.status(500).send('<h1>Error processing your request. Please contact the administrator.</h1>');
+  }
+});
+
+// GET /api/users/:id/email-opt-in - Opt in to email notifications
+router.get('/:id/email-opt-in', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    // Get player info
+    const [playerRows] = await pool.query('SELECT id, name, email, email_allowed FROM players WHERE id = ?', [id]);
+    if (playerRows.length === 0) {
+      return res.status(404).send('<h1>Player not found</h1>');
+    }
+    
+    const player = playerRows[0];
+    
+    // Check if already opted in
+    if (player.email_allowed) {
+      return res.send(`
+        <html>
+          <head>
+            <title>Already Opted In</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #4CAF50;">✓ Already Opted In</h1>
+              <p>Hi <strong>${player.name}</strong>,</p>
+              <p>You're already receiving email notifications.</p>
+              <p style="margin-top: 30px; color: #666;">Contact admin to opt out of emails.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Update email_allowed flag
+    await pool.execute('UPDATE players SET email_allowed = 1 WHERE id = ?', [id]);
+    console.log(`Player ${player.name} (${id}) opted in to email notifications`);
+    
+    // Send confirmation
+    res.send(`
+      <html>
+        <head>
+          <title>Email Opt-In Confirmed</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+        </head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
+          <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h1 style="color: #4CAF50;">✓ Email Notifications Enabled!</h1>
+            <p>Thanks <strong>${player.name}</strong>!</p>
+            <p>You'll now receive tournament notifications and updates via email.</p>
+            <p style="margin-top: 30px; color: #666;">
+              Contact the administrator if you wish to opt out of emails.
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error processing email opt-in:', err);
     res.status(500).send('<h1>Error processing your request. Please contact the administrator.</h1>');
   }
 });

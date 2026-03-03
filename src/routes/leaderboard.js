@@ -21,13 +21,16 @@ router.get('/:tournamentId', async (req, res) => {
     const tournament = tournamentInfo[0];
     const settings = settingsInfo[0];
     
+    // Determine which quota to use based on tournament holes
+    const quotaColumn = tournament.number_of_holes === 9 ? 'quota_9' : 'quota_18';
+    
     // Get all scores for the tournament with player info
     const [rows] = await pool.query(`
       SELECT 
         p.id,
         p.name,
         p.email,
-        p.quota as player_quota,
+        p.${quotaColumn} as player_quota,
         SUM(s.quota) as total_quota_points,
         COUNT(DISTINCT s.hole_id) as holes_played,
         SUM(s.score) as total_strokes
@@ -35,7 +38,7 @@ router.get('/:tournamentId', async (req, res) => {
       JOIN tournament_players tp ON p.id = tp.player_id
       LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?
       WHERE tp.tournament_id = ?
-      GROUP BY p.id, p.name, p.email, p.quota
+      GROUP BY p.id, p.name, p.email, p.${quotaColumn}
       HAVING holes_played > 0
       ORDER BY (total_quota_points - player_quota) DESC, p.name ASC
     `, [tournamentId, tournamentId]);
