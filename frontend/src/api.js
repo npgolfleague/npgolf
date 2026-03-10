@@ -18,7 +18,7 @@ apiClient.interceptors.request.use((config) => {
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password, phone, sex) => apiClient.post('/auth/register', { name, email, password, phone, sex })
+  register: (name, email, password, phone, sex, smsAllowed) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed })
 }
 
 export const playersAPI = {

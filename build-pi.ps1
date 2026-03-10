@@ -11,7 +11,7 @@ Write-Host "Building multi-platform Docker images..." -ForegroundColor Green
 
 # Build the application image for both AMD64 and ARM64
 Write-Host "`nBuilding npgolf application for AMD64 and ARM64..." -ForegroundColor Cyan
-& $docker buildx build --platform linux/amd64,linux/arm64 --tag crj001xx/npgolf:latest --file Dockerfile --push .
+& $docker buildx build --platform linux/amd64,linux/arm64 --tag crj001xx/npgolf:latest --file Dockerfile --cache-from type=registry,ref=crj001xx/npgolf:latest --push .
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Successfully built and pushed crj001xx/npgolf:latest (multi-platform)" -ForegroundColor Green

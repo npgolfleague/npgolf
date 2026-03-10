@@ -8,6 +8,7 @@ export const Register = () => {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [sex, setSex] = useState('M')
+  const [smsAllowed, setSmsAllowed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -18,8 +19,8 @@ export const Register = () => {
     setLoading(true)
 
     try {
-      await authAPI.register(name, email, password, phone, sex)
-      navigate('/login', { state: { message: 'Registration successful! Check your phone for SMS opt-in.' } })
+      await authAPI.register(name, email, password, phone, sex, smsAllowed)
+      navigate('/login', { state: { message: 'Registration successful! Check your email for further instructions.' } })
     } catch (err) {
       console.error('Registration error:', err)
       const errorMsg = err.response?.data?.error || err.message || 'Registration failed'
@@ -91,6 +92,23 @@ export const Register = () => {
               required
             />
             <p className="text-sm text-gray-600 mt-2">Min 8 chars, letters + numbers</p>
+          </div>
+
+          <div className="mb-6">
+            <label className="flex items-start">
+              <input
+                type="checkbox"
+                checked={smsAllowed}
+                onChange={(e) => setSmsAllowed(e.target.checked)}
+                className="mt-1 mr-3 h-4 w-4"
+              />
+              <span className="text-sm text-gray-700">
+                I agree to receive SMS text messages from NP Golf League at the phone number provided above. 
+                I understand I will receive tournament notifications and updates. Message and data rates may apply. 
+                I can reply STOP to opt out at any time. See our{' '}
+                <a href="/sms-consent" target="_blank" className="text-blue-600 hover:underline">SMS consent policy</a>.
+              </span>
+            </label>
           </div>
 
           {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
