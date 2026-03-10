@@ -35,9 +35,9 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9? }
+// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9?, sms_allowed? }
 router.post('/register', async (req, res) => {
-  const { email, password, name, phone, sex, quota_18, quota_9 } = req.body || {};
+  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed } = req.body || {};
   if (!email || !password || !name || !phone) {
     return res.status(400).json({ error: 'email, password, name, and phone are required' });
   }
@@ -55,23 +55,25 @@ router.post('/register', async (req, res) => {
 
     // Insert new player
     const [result] = await pool.query(
-      'INSERT INTO players (name, email, password, phone, sex, quota_18, quota_9, role, email_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, phone, sex || 'M', quota_18 || 18, quota_9 || 9, 'player', 1]
+      'INSERT INTO players (name, email, password, phone, sex, quota_18, quota_9, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, phone, sex || 'M', quota_18 || 18, quota_9 || 9, 'player', 1, sms_allowed ? 1 : 0]
     );
 
     const userId = result.insertId;
 
-    // Send SMS opt-in message
-    const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-    const optInLink = `${appBaseUrl}/api/players/${userId}/sms-opt-in`;
-    const smsMessage = `Welcome to npgolf! Click this link to authorize receiving text messages: ${optInLink}`;
-    
-    try {
-      await sendSMS(phone, smsMessage);
-      console.log(`SMS opt-in sent to new player: ${name} (${phone})`);
-    } catch (smsErr) {
-      console.error('Failed to send SMS opt-in:', smsErr);
-      // Don't fail registration if SMS fails
+    // Send SMS opt-in message (only if SMS is enabled and user opted in)
+    if (sms_allowed) {
+      const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+      const optInLink = `${appBaseUrl}/api/players/${userId}/sms-opt-in`;
+      const smsMessage = `Welcome to NP Golf League! Click this link to confirm SMS notifications: ${optInLink}`;
+      
+      try {
+        await sendSMS(phone, smsMessage);
+        console.log(`SMS opt-in confirmation sent to new player: ${name} (${phone})`);
+      } catch (smsErr) {
+        console.error('Failed to send SMS opt-in:', smsErr);
+        // Don't fail registration if SMS fails
+      }
     }
 
     // Generate token
