@@ -17,9 +17,14 @@ const PORT = process.env.PORT || 3000;
 
 // CORS middleware to allow frontend requests
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const allowedOrigins = ['https://npgolf.net', 'http://localhost:5173', 'http://localhost:3000'];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -48,71 +53,15 @@ app.use('/api/emails', emailsRouter);
 
 // Public pages for SMS compliance (Twilio verification)
 app.get('/', (req, res) => {
-  res.type('html').send(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NPGOLF</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; color: #1f2937; }
-      h1, h2 { color: #111827; }
-      .card { max-width: 840px; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; }
-      .actions { margin-top: 16px; }
-      a { color: #2563eb; text-decoration: none; }
-      a.button { display: inline-block; background: #10b981; color: white; padding: 10px 16px; border-radius: 6px; }
-      a.button:hover { background: #059669; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>NPGOLF</h1>
-      <p><strong>Business Address:</strong> 12302 Glenfield Ave, Tampa, FL 33626</p>
-      <p>NPGOLF is a golf tournament management app used to coordinate events and communicate with members.</p>
-      <div class="actions">
-        <a class="button" href="/login">Login</a>
-      </div>
-      <h2>SMS Program</h2>
-      <p>For SMS program details, see our <a href="/public/sms-compliance">SMS Compliance</a> page.</p>
-      <p>Read our <a href="/public/privacy">Privacy Policy</a>.</p>
-    </div>
-  </body>
-</html>`);
+  const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.status(503).send('Frontend not built yet');
 });
 
 app.get('/public/sms-compliance', (req, res) => {
-  res.type('html').send(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NPGOLF SMS Compliance</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; color: #1f2937; }
-      h1, h2 { color: #111827; }
-      .card { max-width: 840px; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; }
-      a { color: #2563eb; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>NPGOLF — SMS Program Information</h1>
-      <p><strong>Business Name:</strong> NPGOLF</p>
-      <p><strong>Business Address:</strong> 12302 Glenfield Ave, Tampa, FL 33626</p>
-      <p><strong>Contact:</strong> support@npgolf.com</p>
-      <h2>Messaging Purpose</h2>
-      <p>We send SMS messages to members regarding tournament participation, schedules, and event updates.</p>
-      <h2>Opt-In & Consent</h2>
-      <p>Members opt in to SMS messaging through the NPGOLF application. When they register to create an account a SMS text message will be sent to their phone number. Users can opt in by clicking the link provided in the text message. Once they click this link they will then be included in SMS messaging for upcoming tournaments. Consent is required before messages are sent.</p>
-      <h2>Opt-Out</h2>
-      <p>Reply STOP at any time to opt out. Reply HELP for assistance.</p>
-      <h2>Message Frequency</h2>
-      <p>Message frequency varies based on tournament activity. Typically it will be one text per week. Possibly 2 if there is a cancellation of a tournament due to weather.</p>
-      <h2>Terms & Privacy</h2>
-      <p>See our <a href="/public/privacy">Privacy Policy</a>.</p>
-    </div>
-  </body>
-</html>`);
+  res.redirect('/sms-consent');
 });
 
 app.get('/public/privacy', (req, res) => {
@@ -137,7 +86,7 @@ app.get('/public/privacy', (req, res) => {
       <h2>Data Sharing</h2>
       <p>We do not sell your personal information. We may share limited data with service providers (such as SMS carriers) to deliver messages.</p>
       <h2>Contact</h2>
-      <p>For privacy inquiries, contact support@npgolf.com.</p>
+      <p>For privacy inquiries, contact commish@npgolf.net.</p>
     </div>
   </body>
 </html>`);

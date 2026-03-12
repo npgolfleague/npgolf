@@ -28,7 +28,7 @@ services:
       DB_USER: root
       DB_PASS: root
       DB_NAME: npgolf
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: 5158d3897efe5c9c44d87bbcb0fc333b399a2c5291bc12976751f8b7c46cca9e
       JWT_EXPIRES_IN: 1h
       BCRYPT_ROUNDS: 10
       SMS_ENABLED: ${SMS_ENABLED:-false}

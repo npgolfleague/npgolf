@@ -9,7 +9,7 @@ router.get('/:tournamentId/players', async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, 
-             tp.registration_date, tp.paid, tp.attending_status, tp.response_date
+             tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       WHERE tp.tournament_id = ?
@@ -103,6 +103,32 @@ router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
     }
     
     res.json({ message: 'Paid status updated successfully' });
+  } catch (err) {
+    console.error('DB error', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/tournaments/:tournamentId/players/:playerId/skins-ctp-paid - Update skins/CTP paid status
+router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) => {
+  const { tournamentId, playerId } = req.params;
+  const { skins_ctp_paid } = req.body;
+  
+  if (skins_ctp_paid === undefined) {
+    return res.status(400).json({ error: 'skins_ctp_paid status is required' });
+  }
+  
+  try {
+    const [result] = await pool.query(
+      'UPDATE tournament_players SET skins_ctp_paid = ? WHERE tournament_id = ? AND player_id = ?',
+      [skins_ctp_paid ? 1 : 0, tournamentId, playerId]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Player not found in this tournament' });
+    }
+    
+    res.json({ message: 'Skins/CTP paid status updated successfully' });
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });

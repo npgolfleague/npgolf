@@ -169,7 +169,7 @@ export const Users = () => {
                   <th className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">18H Quota</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">9H Quota</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">FedEx Pts</th>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Paradise Pts</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>

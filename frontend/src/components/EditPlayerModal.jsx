@@ -307,7 +307,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
 
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2">
-                    FedEx Points
+                    Paradise Points
                   </label>
                   <input
                     type="number"

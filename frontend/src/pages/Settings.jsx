@@ -18,7 +18,7 @@ export const Settings = () => {
   // Redirect non-admin users
   useEffect(() => {
     if (user?.role !== 'admin') {
-      navigate('/dashboard')
+      navigate('/app/dashboard')
     }
   }, [user, navigate])
 
@@ -89,7 +89,7 @@ export const Settings = () => {
     <div className="max-w-2xl mx-auto p-6">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/app/dashboard')}
           className="text-blue-600 hover:text-blue-800 mb-2"
         >
           ← Back to Dashboard
@@ -161,7 +161,7 @@ export const Settings = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/app/dashboard')}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
           >
             Cancel
