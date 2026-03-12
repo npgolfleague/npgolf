@@ -2,7 +2,9 @@ import './index.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useContext } from 'react'
 import { AuthProvider } from './context/AuthContext'
+import { AuthContext } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { MainLayout } from './components/MainLayout'
 import { Login } from './pages/Login'
@@ -23,6 +25,15 @@ import { Rules } from './pages/Rules'
 import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
 import { Inbox } from './pages/Inbox'
+import { About } from './pages/About'
+
+const HomeEntry = () => {
+  const { token } = useContext(AuthContext)
+  if (token) {
+    return <Navigate to="/app/dashboard" replace />
+  }
+  return <Dashboard />
+}
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
@@ -30,10 +41,12 @@ try {
       <AuthProvider>
         <Router>
           <Routes>
+            <Route path="/" element={<HomeEntry />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/sms-consent" element={<SMSConsent />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               element={
                 <ProtectedRoute>
@@ -41,8 +54,7 @@ try {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/app/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/add" element={<AddCourse />} />
@@ -57,8 +69,9 @@ try {
               <Route path="/rules" element={<Rules />} />
               <Route path="/quota" element={<Quota />} />
               <Route path="/inbox" element={<Inbox />} />
+              <Route path="/app/about" element={<About />} />
             </Route>
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </AuthProvider>

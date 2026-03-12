@@ -62,7 +62,7 @@ export function Leaderboard() {
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/app/dashboard')}
           className="text-blue-600 hover:text-blue-800 mb-2"
         >
           ← Back to Dashboard

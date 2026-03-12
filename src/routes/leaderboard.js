@@ -11,18 +11,24 @@ router.get('/:tournamentId', async (req, res) => {
     // Get tournament details and settings
     const [tournamentInfo] = await pool.query(`
       SELECT t.number_of_holes,
-             (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND paid = 1) as paid_players
+             (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND paid = 1) as paid_players,
+             (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND skins_ctp_paid = 1) as skins_ctp_players
       FROM tournament t
       WHERE t.id = ?
-    `, [tournamentId, tournamentId]);
+    `, [tournamentId, tournamentId, tournamentId]);
     
-    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1');
+    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM settings LIMIT 1');
     
     const tournament = tournamentInfo[0];
     const settings = settingsInfo[0];
     
-    // Determine which quota to use based on tournament holes
+    // Determine which quota to use based on tournament holes (validated whitelist)
     const quotaColumn = tournament.number_of_holes === 9 ? 'quota_9' : 'quota_18';
+    
+    // Validate quota column to prevent SQL injection
+    if (quotaColumn !== 'quota_9' && quotaColumn !== 'quota_18') {
+      return res.status(400).json({ error: 'Invalid quota column' });
+    }
     
     // Get all scores for the tournament with player info
     const [rows] = await pool.query(`
@@ -37,7 +43,7 @@ router.get('/:tournamentId', async (req, res) => {
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?
-      WHERE tp.tournament_id = ?
+      WHERE tp.tournament_id = ? AND p.active = 1
       GROUP BY p.id, p.name, p.email, p.${quotaColumn}
       HAVING holes_played > 0
       ORDER BY (total_quota_points - player_quota) DESC, p.name ASC
@@ -54,7 +60,7 @@ router.get('/:tournamentId', async (req, res) => {
       FROM scores s
       JOIN hole h ON s.hole_id = h.id
       JOIN players p ON s.player_id = p.id
-      WHERE s.tournament_id = ?
+      WHERE s.tournament_id = ? AND p.active = 1
       ORDER BY s.hole_id, s.score ASC
     `, [tournamentId]);
     
@@ -101,17 +107,72 @@ router.get('/:tournamentId', async (req, res) => {
       }
     });
     
-    // Calculate prize money
+    // Calculate CTP (Closest to Pin) winners for par 3 holes
+    const [ctpWinners] = await pool.query(`
+      SELECT 
+        h.id as hole_id,
+        h.hole_number,
+        s.player_id,
+        p.name as player_name,
+        s.ctp_feet,
+        s.ctp_inches,
+        (s.ctp_feet * 12 + s.ctp_inches) as total_inches
+      FROM scores s
+      JOIN hole h ON s.hole_id = h.id
+      JOIN players p ON s.player_id = p.id
+      WHERE s.tournament_id = ? 
+        AND h.mens_par = 3 
+        AND s.ctp_feet IS NOT NULL
+        AND p.active = 1
+      ORDER BY h.hole_number, total_inches ASC
+    `, [tournamentId]);
+    
+    // Group CTP entries by hole and find winner (closest distance)
+    const ctpByHole = {};
+    ctpWinners.forEach(ctp => {
+      if (!ctpByHole[ctp.hole_number]) {
+        ctpByHole[ctp.hole_number] = ctp; // First one is closest due to ORDER BY
+      }
+    });
+    
+    // Calculate CTP prize per winner
+    const ctpWinnerCount = Object.keys(ctpByHole).length;
+    const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
+    
+    // Map CTP prizes to players
+    const ctpPrizes = {};
+    Object.values(ctpByHole).forEach(winner => {
+      if (!ctpPrizes[winner.player_id]) {
+        ctpPrizes[winner.player_id] = {
+          count: 0,
+          prize: 0,
+          holes: []
+        };
+      }
+      ctpPrizes[winner.player_id].count++;
+      ctpPrizes[winner.player_id].prize += ctpPrizePerWinner;
+      ctpPrizes[winner.player_id].holes.push(winner.hole_number);
+    });
+    
+    // Calculate prize money with new structure
+    // Required fee goes 100% to quota prizes
     const tournamentFee = tournament.number_of_holes === 18 
       ? parseFloat(settings.tournament_fee_18_holes) 
       : parseFloat(settings.tournament_fee_9_holes);
     
-    const totalPot = tournament.paid_players * tournamentFee;
-    const quotaPrizePot = totalPot / 2; // Half for quota prizes
+    const skinsCTPFee = tournament.number_of_holes === 18
+      ? parseFloat(settings.skins_ctp_fee_18_holes)
+      : parseFloat(settings.skins_ctp_fee_9_holes);
+    
+    const quotaPrizePot = tournament.paid_players * tournamentFee; // All required fees go to quota
+    
+    // Optional skins/CTP fee split: 60% skins, 40% CTP
+    const skinsCTPTotalPot = tournament.skins_ctp_players * skinsCTPFee;
+    const skinPrizePot = skinsCTPTotalPot * 0.6; // 60% for skins ($3 of $5, or $6 of $10)
+    const ctpPrizePot = skinsCTPTotalPot * 0.4;  // 40% for CTP ($2 of $5, or $4 of $10)
     
     // Calculate total skins for the tournament
     const totalSkins = Object.values(skins).reduce((sum, skin) => sum + skin.count, 0);
-    const skinPrizePot = (totalPot / 2) * 0.6; // 60% of the other half (30% of total pot) for skins
     const skinPricePerSkin = totalSkins > 0 ? skinPrizePot / totalSkins : 0;
     
     // Calculate over/under for each player first
@@ -167,6 +228,9 @@ router.get('/:tournamentId', async (req, res) => {
       for (let i = 0; i < tiedCount; i++) {
         const player = playersWithOverUnder[currentPosition + i];
         const skinPrizeMoney = Math.floor(player.skins * skinPricePerSkin);
+        const ctpPrizeMoney = ctpPrizes[player.id]?.prize || 0;
+        const ctpWins = ctpPrizes[player.id]?.count || 0;
+        const ctpHoles = ctpPrizes[player.id]?.holes || [];
         
         leaderboard.push({
           rank: currentPosition + 1,
@@ -180,8 +244,11 @@ router.get('/:tournamentId', async (req, res) => {
           total_strokes: player.total_strokes,
           skins: player.skins,
           skin_holes: player.skin_holes,
+          ctp_wins: ctpWins,
+          ctp_holes: ctpHoles,
           quota_prize_money: quotaPrizeMoney,
-          skin_prize_money: skinPrizeMoney
+          skin_prize_money: skinPrizeMoney,
+          ctp_prize_money: ctpPrizeMoney
         });
       }
       

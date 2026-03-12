@@ -14,12 +14,13 @@ export const MainLayout = () => {
   }
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
+    { path: '/app/dashboard', label: 'Dashboard', icon: '🏠' },
     { path: '/scores', label: 'Score Entry', icon: '📝' },
     { path: '/users', label: 'Players', icon: '👥' },
     { path: '/tournaments', label: 'Tournaments', icon: '🏆' },
     { path: '/courses', label: 'Courses', icon: '⛳' },
-    { path: '/rules', label: 'Rules', icon: '📋' }
+    { path: '/rules', label: 'Rules', icon: '📋' },
+    { path: '/app/about', label: 'About', icon: 'ℹ️' }
   ]
 
   const adminMenuItems = [

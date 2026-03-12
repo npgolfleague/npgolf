@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
 
 export const Dashboard = () => {
   const navigate = useNavigate()
+  const { user } = useContext(AuthContext)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +48,16 @@ export const Dashboard = () => {
     { path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }
   ]
 
+  const publicMenuItems = [
+    { path: '/app/dashboard', label: 'Dashboard', icon: '🏠', enabled: false },
+    { path: '/scores', label: 'Score Entry', icon: '📝', enabled: false },
+    { path: '/users', label: 'Players', icon: '👥', enabled: false },
+    { path: '/tournaments', label: 'Tournaments', icon: '🏆', enabled: false },
+    { path: '/courses', label: 'Courses', icon: '⛳', enabled: false },
+    { path: '/rules', label: 'Rules', icon: '📋', enabled: false },
+    { path: '/about', label: 'About', icon: 'ℹ️', enabled: true }
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Menu */}
@@ -53,8 +65,26 @@ export const Dashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <h1 className="text-2xl font-bold text-gray-900">NPGolf League</h1>
-            <div className="flex gap-2">
-              {menuItems.map(item => (
+            <div className="flex gap-2 items-center">
+              {!user && (
+                <>
+                  <button
+                    onClick={() => navigate('/register')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition font-medium"
+                  >
+                    <span>➕</span>
+                    <span>Join</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition font-medium"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In</span>
+                  </button>
+                </>
+              )}
+              {user && menuItems.map(item => (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
@@ -74,6 +104,34 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Upcoming Tournaments */}
           <div className="lg:col-span-1">
+            {!user && (
+              <div className="bg-white rounded-lg shadow p-4 mb-4 sticky top-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Menu</h2>
+                <div className="space-y-2">
+                  {publicMenuItems.map((item) => (
+                    item.enabled ? (
+                      <button
+                        key={item.path}
+                        onClick={() => navigate(item.path)}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    ) : (
+                      <div
+                        key={item.path}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded bg-gray-100 text-gray-400 cursor-not-allowed"
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow p-4 sticky top-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Upcoming Tournaments</h2>
               
@@ -132,7 +190,7 @@ export const Dashboard = () => {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-800">FedEx Cup Standings</h2>
+                <h2 className="text-xl font-semibold text-gray-800">Paradise Cup Standings</h2>
               </div>
               
               {loading ? (
@@ -151,7 +209,7 @@ export const Dashboard = () => {
                           Player
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          FedEx Pts
+                          Paradise Pts
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                           Tournaments

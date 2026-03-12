@@ -33,7 +33,7 @@ export const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Sign Up</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">NPGOLF Sign Up</h1>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Name</label>
@@ -103,7 +103,7 @@ export const Register = () => {
                 className="mt-1 mr-3 h-4 w-4"
               />
               <span className="text-sm text-gray-700">
-                I agree to receive SMS text messages from NP Golf League at the phone number provided above. 
+                I agree to receive SMS text messages from NPGOLF at the phone number provided above. 
                 I understand I will receive tournament notifications and updates. Message and data rates may apply. 
                 I can reply STOP to opt out at any time. See our{' '}
                 <a href="/sms-consent" target="_blank" className="text-blue-600 hover:underline">SMS consent policy</a>.
