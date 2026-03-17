@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { formatDateOnly } from '../utils/date'
 
 export const Dashboard = () => {
   const navigate = useNavigate()
@@ -34,8 +35,7 @@ export const Dashboard = () => {
   }
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, 'en-US', {
       month: 'short', 
       day: 'numeric'
     })

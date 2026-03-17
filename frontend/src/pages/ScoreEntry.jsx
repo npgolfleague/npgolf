@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
+import { formatDateOnly } from '../utils/date'
 
 export const ScoreEntry = () => {
   const [tournaments, setTournaments] = useState([])
@@ -408,7 +409,7 @@ export const ScoreEntry = () => {
             <option value="">Choose a tournament...</option>
             {tournaments.map(t => (
               <option key={t.id} value={t.id}>
-                {new Date(t.date).toLocaleDateString()} - {t.course_name}
+                {formatDateOnly(t.date)} - {t.course_name}
               </option>
             ))}
           </select>

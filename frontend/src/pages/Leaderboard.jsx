@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { leaderboardAPI, tournamentsAPI, scoresAPI } from '../api';
+import { formatDateOnly } from '../utils/date';
 
 export function Leaderboard() {
   const { tournamentId } = useParams();
@@ -70,7 +71,7 @@ export function Leaderboard() {
         <h1 className="text-3xl font-bold">🏆 Tournament Leaderboard</h1>
         {tournament && (
           <p className="text-gray-600 mt-2">
-            Date: {new Date(tournament.date).toLocaleDateString()} | 
+            Date: {formatDateOnly(tournament.date)} | 
             Course: {tournament.course_name} | 
             Holes: {tournament.number_of_holes}
           </p>

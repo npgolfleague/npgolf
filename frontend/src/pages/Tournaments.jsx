@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { formatDateOnly } from '../utils/date'
 
 export const Tournaments = () => {
   const navigate = useNavigate()
@@ -152,7 +153,7 @@ export const Tournaments = () => {
                   tournaments.map((tournament) => (
                     <tr key={tournament.id} className="border-t hover:bg-gray-50">
                       <td className="px-6 py-4 text-gray-900">
-                        {new Date(tournament.date).toLocaleDateString()}
+                        {formatDateOnly(tournament.date)}
                       </td>
                       <td className="px-6 py-4 text-gray-900">{tournament.course_name}</td>
                       <td className="px-6 py-4 text-gray-900">{tournament.number_of_holes}</td>

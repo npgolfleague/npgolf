@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { playersAPI, tournamentsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { EditPlayerModal } from '../components/EditPlayerModal'
+import { formatDateOnly } from '../utils/date'
 
 export const Users = () => {
   const { user } = useContext(AuthContext)
@@ -73,7 +74,7 @@ export const Users = () => {
       const tournament = response.data
       
       if (tournament) {
-        const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+        const tournamentDate = formatDateOnly(tournament.date, 'en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
@@ -203,7 +204,7 @@ export const Users = () => {
                               <div className="font-bold mb-2">Last 7 Rounds</div>
                               {quotaTooltip.data.map((round, idx) => (
                                 <div key={idx} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
-                                  <span>{new Date(round.date).toLocaleDateString()}</span>
+                                  <span>{formatDateOnly(round.date)}</span>
                                   <span className="font-semibold">{round.points} pts</span>
                                 </div>
                               ))}
