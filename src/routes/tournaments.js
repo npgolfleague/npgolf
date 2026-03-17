@@ -4,6 +4,27 @@ const pool = require('../db');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 
+const formatDateOnly = (value, locale = 'en-US', options = {}) => {
+  if (!value) {
+    return '';
+  }
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString(locale, options);
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toLocaleDateString(locale, options);
+};
+
 // GET /api/tournaments - List all tournaments
 router.get('/', async (req, res) => {
   try {
@@ -342,7 +363,7 @@ router.post('/:id/send-sms', async (req, res) => {
     }
     
     const tournament = tournamentRows[0];
-    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+    const tournamentDate = formatDateOnly(tournament.date, 'en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -404,7 +425,7 @@ router.post('/:id/send-invitations', async (req, res) => {
     }
     
     const tournament = tournamentRows[0];
-    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+    const tournamentDate = formatDateOnly(tournament.date, 'en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -552,7 +573,7 @@ router.get('/:id/confirm', async (req, res) => {
     }
     
     const tournament = tournamentRows[0];
-    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+    const tournamentDate = formatDateOnly(tournament.date, 'en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -679,7 +700,7 @@ router.get('/:id/rsvp', async (req, res) => {
     }
     
     const tournament = tournamentRows[0];
-    const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
+    const tournamentDate = formatDateOnly(tournament.date, 'en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

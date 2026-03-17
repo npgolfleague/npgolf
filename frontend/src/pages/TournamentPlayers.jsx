@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tournamentsAPI } from '../api';
 import { AuthContext } from '../context/AuthContext';
+import { formatDateOnly } from '../utils/date';
 
 export function TournamentPlayers() {
   const { tournamentId } = useParams();
@@ -143,7 +144,7 @@ export function TournamentPlayers() {
           <h1 className="text-3xl font-bold">Tournament Players</h1>
           {tournament && (
             <p className="text-gray-600 mt-2">
-              Date: {new Date(tournament.date).toLocaleDateString()} | 
+              Date: {formatDateOnly(tournament.date)} | 
               Course ID: {tournament.course_id} | 
               Holes: {tournament.number_of_holes}
             </p>
