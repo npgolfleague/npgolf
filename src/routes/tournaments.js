@@ -29,7 +29,7 @@ const formatDateOnly = (value, locale = 'en-US', options = {}) => {
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
               c.id as course_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
@@ -46,7 +46,7 @@ router.get('/', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
               c.id as course_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
@@ -64,7 +64,7 @@ router.get('/upcoming', async (req, res) => {
 router.get('/next', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.course_id, t.number_of_holes, t.first_tee_time, t.created_at,
+      `SELECT t.id, t.date, t.course_id, t.number_of_holes, t.nine_hole_side, t.first_tee_time, t.created_at,
               c.name as course_name, c.address as course_address, c.phone as course_phone
        FROM tournament t
        JOIN course c ON t.course_id = c.id
@@ -85,7 +85,7 @@ router.get('/next', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone
        FROM tournament t
        JOIN course c ON t.course_id = c.id
@@ -105,12 +105,14 @@ router.get('/:id', async (req, res) => {
 // POST /api/tournaments - Create tournament
 router.post('/', async (req, res) => {
   try {
-    const { date, course_id, number_of_holes } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side } = req.body;
+    const holeCount = Number(number_of_holes || 18);
+    const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     const [result] = await pool.query(
-      'INSERT INTO tournament (date, course_id, number_of_holes) VALUES (?, ?, ?)',
-      [date, course_id, number_of_holes || 18]
+      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side) VALUES (?, ?, ?, ?)',
+      [date, course_id, holeCount, side]
     );
-    res.status(201).json({ id: result.insertId, date, course_id, number_of_holes: number_of_holes || 18 });
+    res.status(201).json({ id: result.insertId, date, course_id, number_of_holes: holeCount, nine_hole_side: side });
   } catch (err) {
     console.error('Error creating tournament:', err);
     res.status(500).json({ error: 'Failed to create tournament' });
@@ -120,12 +122,14 @@ router.post('/', async (req, res) => {
 // PUT /api/tournaments/:id - Update tournament
 router.put('/:id', async (req, res) => {
   try {
-    const { date, course_id, number_of_holes } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side } = req.body;
+    const holeCount = Number(number_of_holes || 18);
+    const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     await pool.query(
-      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ? WHERE id = ?',
-      [date, course_id, number_of_holes, req.params.id]
+      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ? WHERE id = ?',
+      [date, course_id, holeCount, side, req.params.id]
     );
-    res.json({ id: req.params.id, date, course_id, number_of_holes });
+    res.json({ id: req.params.id, date, course_id, number_of_holes: holeCount, nine_hole_side: side });
   } catch (err) {
     console.error('Error updating tournament:', err);
     res.status(500).json({ error: 'Failed to update tournament' });

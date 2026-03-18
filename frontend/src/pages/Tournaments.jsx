@@ -81,6 +81,14 @@ export const Tournaments = () => {
     }
   }
 
+  const formatHolesLabel = (tournament) => {
+    if (tournament.number_of_holes === 9) {
+      const side = tournament.nine_hole_side === 'back' ? 'back' : 'front'
+      return `${tournament.number_of_holes} (${side})`
+    }
+    return String(tournament.number_of_holes)
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -156,7 +164,7 @@ export const Tournaments = () => {
                         {formatDateOnly(tournament.date)}
                       </td>
                       <td className="px-6 py-4 text-gray-900">{tournament.course_name}</td>
-                      <td className="px-6 py-4 text-gray-900">{tournament.number_of_holes}</td>
+                      <td className="px-6 py-4 text-gray-900">{formatHolesLabel(tournament)}</td>
                       <td className="px-6 py-4 text-gray-900">{tournament.course_address}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">

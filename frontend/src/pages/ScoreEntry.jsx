@@ -19,6 +19,24 @@ export const ScoreEntry = () => {
   const [ctpPlayerId, setCtpPlayerId] = useState(null)
   const [ctpLeader, setCtpLeader] = useState(null)
 
+  const getPlayableHoles = () => {
+    if (!selectedTournament) return holes
+
+    if (selectedTournament.number_of_holes === 9) {
+      const side = selectedTournament.nine_hole_side || 'front'
+      if (side === 'back') {
+        return holes.filter(h => h.hole_number >= 10 && h.hole_number <= 18)
+      }
+      return holes.filter(h => h.hole_number >= 1 && h.hole_number <= 9)
+    }
+
+    return holes
+  }
+
+  const playableHoles = getPlayableHoles()
+
+  const getCurrentHoleIndex = () => playableHoles.findIndex(h => h.hole_number === currentHole)
+
   useEffect(() => {
     fetchTournaments()
     fetchPlayers()
@@ -45,7 +63,7 @@ export const ScoreEntry = () => {
   }, [selectedTournament, currentHole])
 
   const loadCtpLeader = async () => {
-    const hole = holes.find(h => h.hole_number === currentHole)
+    const hole = playableHoles.find(h => h.hole_number === currentHole)
     if (!hole || hole.mens_par !== 3) {
       setCtpLeader(null)
       return
@@ -303,7 +321,7 @@ export const ScoreEntry = () => {
       return
     }
 
-    const currentHoleData = holes.find(h => h.hole_number === currentHole)
+    const currentHoleData = playableHoles.find(h => h.hole_number === currentHole)
     if (!currentHoleData) {
       alert('Hole data not found')
       return
@@ -345,8 +363,9 @@ export const ScoreEntry = () => {
       })
       
       // Move to next hole
-      if (currentHole < holes.length) {
-        setCurrentHole(currentHole + 1)
+      const currentIndex = getCurrentHoleIndex()
+      if (currentIndex >= 0 && currentIndex < playableHoles.length - 1) {
+        setCurrentHole(playableHoles[currentIndex + 1].hole_number)
       } else {
         alert('All holes completed!')
       }
@@ -360,13 +379,15 @@ export const ScoreEntry = () => {
   }
 
   const getCurrentHoleData = () => {
-    return holes.find(h => h.hole_number === currentHole)
+    return playableHoles.find(h => h.hole_number === currentHole)
   }
 
   const getPlayerTotal = (playerId) => {
     let total = 0
-    for (let hole = 1; hole <= currentHole; hole++) {
-      const scoreValue = scores[`${hole}-${playerId}-score`]
+    const currentIndex = getCurrentHoleIndex()
+    const holesToCount = currentIndex >= 0 ? playableHoles.slice(0, currentIndex + 1) : []
+    for (const hole of holesToCount) {
+      const scoreValue = scores[`${hole.hole_number}-${playerId}-score`]
       if (scoreValue) {
         total += parseInt(scoreValue)
       }
@@ -376,8 +397,10 @@ export const ScoreEntry = () => {
 
   const getPlayerQuotaTotal = (playerId) => {
     let total = 0
-    for (let hole = 1; hole <= currentHole; hole++) {
-      const quotaValue = scores[`${hole}-${playerId}-quota`]
+    const currentIndex = getCurrentHoleIndex()
+    const holesToCount = currentIndex >= 0 ? playableHoles.slice(0, currentIndex + 1) : []
+    for (const hole of holesToCount) {
+      const quotaValue = scores[`${hole.hole_number}-${playerId}-quota`]
       if (quotaValue) {
         total += parseInt(quotaValue)
       }
@@ -403,13 +426,14 @@ export const ScoreEntry = () => {
             onChange={(e) => {
               const tournament = tournaments.find(t => t.id === parseInt(e.target.value))
               setSelectedTournament(tournament)
-              setCurrentHole(1) // Reset to first hole when changing tournament
+              const startHole = tournament?.number_of_holes === 9 && tournament?.nine_hole_side === 'back' ? 10 : 1
+              setCurrentHole(startHole)
             }}
           >
             <option value="">Choose a tournament...</option>
             {tournaments.map(t => (
               <option key={t.id} value={t.id}>
-                {formatDateOnly(t.date)} - {t.course_name}
+                {formatDateOnly(t.date)} - {t.course_name}{t.number_of_holes === 9 ? ` (${t.nine_hole_side === 'back' ? 'back' : 'front'})` : ''}
               </option>
             ))}
           </select>
@@ -535,7 +559,7 @@ export const ScoreEntry = () => {
             <div className="mb-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Hole {currentHole} of {holes.length}
+                  Hole {currentHole} of {playableHoles.length}
                 </h2>
                 <div className="text-right">
                   <div className="text-sm text-gray-600">Par</div>
@@ -628,8 +652,13 @@ export const ScoreEntry = () => {
 
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => setCurrentHole(Math.max(1, currentHole - 1))}
-                disabled={currentHole === 1}
+                onClick={() => {
+                  const currentIndex = getCurrentHoleIndex()
+                  if (currentIndex > 0) {
+                    setCurrentHole(playableHoles[currentIndex - 1].hole_number)
+                  }
+                }}
+                disabled={getCurrentHoleIndex() <= 0}
                 className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold disabled:opacity-50"
               >
                 ← Previous
@@ -639,18 +668,18 @@ export const ScoreEntry = () => {
                 disabled={saving}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50"
               >
-                {saving ? 'Saving...' : currentHole < holes.length ? 'Save & Next →' : 'Save & Finish'}
+                {saving ? 'Saving...' : getCurrentHoleIndex() < playableHoles.length - 1 ? 'Save & Next →' : 'Save & Finish'}
               </button>
             </div>
           </div>
         )}
 
         {/* Hole Navigation */}
-        {selectedPlayers.length > 0 && holes.length > 0 && (
+        {selectedPlayers.length > 0 && playableHoles.length > 0 && (
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-sm font-semibold text-gray-700 mb-2">Quick Navigation</div>
             <div className="grid grid-cols-6 gap-2">
-              {holes.map(hole => (
+              {playableHoles.map(hole => (
                 <button
                   key={hole.hole_number}
                   onClick={() => setCurrentHole(hole.hole_number)}

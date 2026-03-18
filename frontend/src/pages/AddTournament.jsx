@@ -7,6 +7,7 @@ export const AddTournament = () => {
   const [date, setDate] = useState('')
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
+  const [nineHoleSide, setNineHoleSide] = useState('front')
   const [courses, setCourses] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,7 +37,7 @@ export const AddTournament = () => {
 
     setLoading(true)
     try {
-      await tournamentsAPI.create(date, courseId, numberOfHoles)
+      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error creating tournament:', err)
@@ -107,7 +108,13 @@ export const AddTournament = () => {
                 </label>
                 <select
                   value={numberOfHoles}
-                  onChange={(e) => setNumberOfHoles(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const holes = parseInt(e.target.value)
+                    setNumberOfHoles(holes)
+                    if (holes !== 9) {
+                      setNineHoleSide('front')
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
@@ -115,6 +122,23 @@ export const AddTournament = () => {
                   <option value={18}>18 Holes</option>
                 </select>
               </div>
+
+              {numberOfHoles === 9 && (
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    9-Hole Side <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={nineHoleSide}
+                    onChange={(e) => setNineHoleSide(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="front">Front (Holes 1-9)</option>
+                    <option value="back">Back (Holes 10-18)</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
