@@ -34,7 +34,9 @@ export const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">NPGOLF</h1>
+        <div className="mb-6 flex justify-center">
+          <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-12 w-auto" />
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Email</label>
