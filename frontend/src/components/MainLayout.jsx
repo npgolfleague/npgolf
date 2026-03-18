@@ -50,7 +50,7 @@ export const MainLayout = () => {
         <div className="p-4 border-b border-blue-700">
           <div className="flex items-center justify-between">
             {sidebarOpen && (
-              <h1 className="text-2xl font-bold">npgolf</h1>
+              <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-8 w-auto" />
             )}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
