@@ -67,6 +67,12 @@ export const Login = () => {
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          <p className="mt-3 text-right text-sm">
+            <a href="/forgot-password" className="text-blue-500 hover:underline">
+              Forgot password?
+            </a>
+          </p>
         </form>
 
         <p className="mt-4 text-center text-gray-600">

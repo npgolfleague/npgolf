@@ -26,6 +26,8 @@ import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
 import { Inbox } from './pages/Inbox'
 import { About } from './pages/About'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
 
 const HomeEntry = () => {
   const { token } = useContext(AuthContext)
@@ -45,6 +47,8 @@ try {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/sms-consent" element={<SMSConsent />} />
             <Route
