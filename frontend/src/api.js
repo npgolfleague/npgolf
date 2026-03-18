@@ -18,7 +18,9 @@ apiClient.interceptors.request.use((config) => {
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password, phone, sex, smsAllowed) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed })
+  register: (name, email, password, phone, sex, smsAllowed) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed }),
+  forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password })
 }
 
 export const playersAPI = {
