@@ -46,9 +46,11 @@ router.post('/:tournamentId/players', async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
     
-    // Add player to tournament (unique constraint will prevent duplicates)
+    // Add player to tournament as actively playing (yes)
+    // so admin-added players appear in confirmed lists immediately
     await pool.query(
-      'INSERT INTO tournament_players (tournament_id, player_id) VALUES (?, ?)',
+      `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date)
+       VALUES (?, ?, 'yes', NOW())`,
       [tournamentId, playerId]
     );
     

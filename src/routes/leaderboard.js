@@ -134,25 +134,15 @@ router.get('/:tournamentId', async (req, res) => {
         ctpByHole[ctp.hole_number] = ctp; // First one is closest due to ORDER BY
       }
     });
-    
-    // Calculate CTP prize per winner
-    const ctpWinnerCount = Object.keys(ctpByHole).length;
-    const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
-    
-    // Map CTP prizes to players
-    const ctpPrizes = {};
-    Object.values(ctpByHole).forEach(winner => {
-      if (!ctpPrizes[winner.player_id]) {
-        ctpPrizes[winner.player_id] = {
-          count: 0,
-          prize: 0,
-          holes: []
-        };
-      }
-      ctpPrizes[winner.player_id].count++;
-      ctpPrizes[winner.player_id].prize += ctpPrizePerWinner;
-      ctpPrizes[winner.player_id].holes.push(winner.hole_number);
-    });
+
+    // For 9-hole tournaments, only count 2 CTP holes
+    let ctpWinningHoles = Object.keys(ctpByHole)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    if (tournament.number_of_holes === 9) {
+      ctpWinningHoles = ctpWinningHoles.slice(0, 2);
+    }
     
     // Calculate prize money with new structure
     // Required fee goes 100% to quota prizes
@@ -170,6 +160,26 @@ router.get('/:tournamentId', async (req, res) => {
     const skinsCTPTotalPot = tournament.skins_ctp_players * skinsCTPFee;
     const skinPrizePot = skinsCTPTotalPot * 0.6; // 60% for skins ($3 of $5, or $6 of $10)
     const ctpPrizePot = skinsCTPTotalPot * 0.4;  // 40% for CTP ($2 of $5, or $4 of $10)
+
+    // Calculate CTP prize per winner
+    const ctpWinnerCount = ctpWinningHoles.length;
+    const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
+
+    // Map CTP prizes to players
+    const ctpPrizes = {};
+    ctpWinningHoles.forEach((holeNumber) => {
+      const winner = ctpByHole[holeNumber];
+      if (!ctpPrizes[winner.player_id]) {
+        ctpPrizes[winner.player_id] = {
+          count: 0,
+          prize: 0,
+          holes: []
+        };
+      }
+      ctpPrizes[winner.player_id].count++;
+      ctpPrizes[winner.player_id].prize += ctpPrizePerWinner;
+      ctpPrizes[winner.player_id].holes.push(winner.hole_number);
+    });
     
     // Calculate total skins for the tournament
     const totalSkins = Object.values(skins).reduce((sum, skin) => sum + skin.count, 0);

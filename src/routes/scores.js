@@ -237,6 +237,18 @@ router.get('/tournament/:tournamentId/hole/:holeId/ctp-leader', async (req, res)
 router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
   try {
     const { tournamentId } = req.params;
+
+    const [tournamentRows] = await pool.query(
+      'SELECT number_of_holes FROM tournament WHERE id = ? LIMIT 1',
+      [tournamentId]
+    );
+
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const tournament = tournamentRows[0];
+
     const [rows] = await pool.query(
       `SELECT s.ctp_feet, s.ctp_inches, s.ctp_image_url,
               p.id as player_id, p.name as player_name,
@@ -259,8 +271,15 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
         winners[row.hole_number] = row;
       }
     });
-    
-    res.json(Object.values(winners));
+
+    let result = Object.values(winners).sort((a, b) => a.hole_number - b.hole_number);
+
+    // For 9-hole tournaments, only return 2 CTP winners
+    if (tournament.number_of_holes === 9) {
+      result = result.slice(0, 2);
+    }
+
+    res.json(result);
   } catch (err) {
     console.error('Error fetching CTP winners:', err);
     res.status(500).json({ error: 'Failed to fetch CTP winners' });
