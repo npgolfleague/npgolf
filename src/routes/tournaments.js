@@ -157,7 +157,7 @@ router.post('/:id/complete', async (req, res) => {
     
     // Get tournament date
     const [tournamentRows] = await connection.query(
-      'SELECT date FROM tournament WHERE id = ?',
+      'SELECT date, number_of_holes FROM tournament WHERE id = ?',
       [tournamentId]
     );
     
@@ -167,20 +167,64 @@ router.post('/:id/complete', async (req, res) => {
     }
     
     const tournamentDate = tournamentRows[0].date;
+    const isNineHoleTournament = Number(tournamentRows[0].number_of_holes) === 9;
+    const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
+
+    const [scoreCountRows] = await connection.query(
+      'SELECT COUNT(*) AS score_count FROM scores WHERE tournament_id = ?',
+      [tournamentId]
+    );
+
+    if (scoreCountRows[0].score_count === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No scores found for this tournament' });
+    }
     
-    // Get all players who participated in this tournament with their scores
+    // Include all scored players in quota-game updates
     const [scoresRows] = await connection.query(
-      `SELECT s.player_id, p.quota, SUM(CAST(s.score AS SIGNED) - CAST(s.quota AS SIGNED)) as total_points
+      `SELECT s.player_id, ${quotaColumn} AS current_quota, SUM(CAST(COALESCE(s.quota, 0) AS SIGNED)) as total_points
        FROM scores s
        JOIN players p ON s.player_id = p.id
        WHERE s.tournament_id = ?
-       GROUP BY s.player_id, p.quota`,
+       GROUP BY s.player_id, ${quotaColumn}`,
       [tournamentId]
     );
-    
-    if (scoresRows.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'No scores found for this tournament' });
+
+    // Seed quota for players who played but do not yet have a current quota
+    const [newPlayerSeedRows] = await connection.query(
+      `SELECT
+         s.player_id,
+         SUM(
+           CASE
+             WHEN CAST(s.score AS SIGNED) = 1 THEN 8
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) <= -3 THEN 8
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -2 THEN 6
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -1 THEN 4
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 0 THEN 2
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 1 THEN 1
+             ELSE 0
+           END
+         ) AS seeded_quota
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       JOIN hole h ON s.hole_id = h.id
+       WHERE s.tournament_id = ?
+         AND ${quotaColumn} IS NULL
+       GROUP BY s.player_id`,
+      [tournamentId]
+    );
+
+    for (const seedRow of newPlayerSeedRows) {
+      const seededQuota = Number(seedRow.seeded_quota)
+      if (Number.isNaN(seededQuota)) continue
+
+      await connection.query(
+        `UPDATE players
+         SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ?
+         WHERE id = ?
+           AND ${isNineHoleTournament ? 'quota_9' : 'quota_18'} IS NULL`,
+        [Math.round(seededQuota), seedRow.player_id]
+      )
     }
     
     // For each player, shift quota history and add new result
@@ -302,7 +346,11 @@ router.post('/:id/complete', async (req, res) => {
     }
     
     await connection.commit();
-    res.json({ message: 'Tournament completed successfully', playersUpdated: scoresRows.length });
+    res.json({
+      message: 'Tournament completed successfully',
+      playersUpdated: scoresRows.length,
+      playersSeeded: newPlayerSeedRows.length
+    });
     
   } catch (err) {
     await connection.rollback();

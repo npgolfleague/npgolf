@@ -60,7 +60,8 @@ router.get('/:tournamentId', async (req, res) => {
       FROM scores s
       JOIN hole h ON s.hole_id = h.id
       JOIN players p ON s.player_id = p.id
-      WHERE s.tournament_id = ? AND p.active = 1
+      JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
+      WHERE s.tournament_id = ? AND p.active = 1 AND tp.skins_ctp_paid = 1
       ORDER BY s.hole_id, s.score ASC
     `, [tournamentId]);
     
@@ -120,10 +121,12 @@ router.get('/:tournamentId', async (req, res) => {
       FROM scores s
       JOIN hole h ON s.hole_id = h.id
       JOIN players p ON s.player_id = p.id
+      JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
       WHERE s.tournament_id = ? 
         AND h.mens_par = 3 
         AND s.ctp_feet IS NOT NULL
         AND p.active = 1
+        AND tp.skins_ctp_paid = 1
       ORDER BY h.hole_number, total_inches ASC
     `, [tournamentId]);
     
@@ -146,20 +149,27 @@ router.get('/:tournamentId', async (req, res) => {
     
     // Calculate prize money with new structure
     // Required fee goes 100% to quota prizes
-    const tournamentFee = tournament.number_of_holes === 18 
-      ? parseFloat(settings.tournament_fee_18_holes) 
-      : parseFloat(settings.tournament_fee_9_holes);
-    
-    const skinsCTPFee = tournament.number_of_holes === 18
-      ? parseFloat(settings.skins_ctp_fee_18_holes)
-      : parseFloat(settings.skins_ctp_fee_9_holes);
+    const tournamentFee = Number(
+      tournament.number_of_holes === 18
+        ? settings.tournament_fee_18_holes
+        : settings.tournament_fee_9_holes
+    ) || 0;
+
+    const skinsCTPFee = Number(
+      tournament.number_of_holes === 18
+        ? settings.skins_ctp_fee_18_holes
+        : settings.skins_ctp_fee_9_holes
+    ) || 0;
     
     const quotaPrizePot = tournament.paid_players * tournamentFee; // All required fees go to quota
     
-    // Optional skins/CTP fee split: 60% skins, 40% CTP
+    // Optional skins/pins fee split: 60% skins, 40% closest-to-pin
+    // Example for 9-hole with $5 optional fee: $3 skins, $2 CTP per paid player
     const skinsCTPTotalPot = tournament.skins_ctp_players * skinsCTPFee;
-    const skinPrizePot = skinsCTPTotalPot * 0.6; // 60% for skins ($3 of $5, or $6 of $10)
-    const ctpPrizePot = skinsCTPTotalPot * 0.4;  // 40% for CTP ($2 of $5, or $4 of $10)
+    const SKINS_PCT = 0.6;
+    const CTP_PCT = 0.4;
+    const skinPrizePot = skinsCTPTotalPot * SKINS_PCT;
+    const ctpPrizePot = skinsCTPTotalPot * CTP_PCT;
 
     // Calculate CTP prize per winner
     const ctpWinnerCount = ctpWinningHoles.length;
@@ -258,7 +268,12 @@ router.get('/:tournamentId', async (req, res) => {
           ctp_holes: ctpHoles,
           quota_prize_money: quotaPrizeMoney,
           skin_prize_money: skinPrizeMoney,
-          ctp_prize_money: ctpPrizeMoney
+          ctp_prize_money: ctpPrizeMoney,
+          skins_ctp_paid_players: Number(tournament.skins_ctp_players) || 0,
+          skins_ctp_fee: skinsCTPFee,
+          skins_ctp_total_pot: Number(skinsCTPTotalPot.toFixed(2)),
+          skin_prize_pot: Number(skinPrizePot.toFixed(2)),
+          ctp_prize_pot: Number(ctpPrizePot.toFixed(2))
         });
       }
       

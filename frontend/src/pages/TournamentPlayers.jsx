@@ -123,6 +123,19 @@ export function TournamentPlayers() {
     }
   };
 
+  const handleToggleSkinsCtpPaid = async (playerId, currentStatus) => {
+    try {
+      setActionLoading(true);
+      await tournamentsAPI.updateSkinsCtpPaidStatus(tournamentId, playerId, !currentStatus);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to update skins/CTP paid status:', err);
+      setError(err.response?.data?.error || 'Failed to update skins/CTP paid status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const confirmedPlayers = players.filter(
     (player) => String(player.attending_status || '').toLowerCase() === 'yes'
   );
@@ -248,6 +261,9 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Paid
               </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Skins/Pins
+              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -256,7 +272,7 @@ export function TournamentPlayers() {
           <tbody className="bg-white divide-y divide-gray-200">
             {confirmedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="9" className="px-6 py-4 text-center text-gray-500">
                   No players have confirmed they are playing yet
                 </td>
               </tr>
@@ -315,6 +331,29 @@ export function TournamentPlayers() {
                           : 'bg-red-100 text-red-800'
                       }`}>
                         {player.paid ? '✓ Paid' : '✗ Unpaid'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {isAdmin ? (
+                      <button
+                        onClick={() => handleToggleSkinsCtpPaid(player.id, player.skins_ctp_paid)}
+                        disabled={actionLoading}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          player.skins_ctp_paid
+                            ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        {player.skins_ctp_paid ? '✓ Qualified' : '✗ Not Qualified'}
+                      </button>
+                    ) : (
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        player.skins_ctp_paid
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {player.skins_ctp_paid ? '✓ Qualified' : '✗ Not Qualified'}
                       </span>
                     )}
                   </td>
