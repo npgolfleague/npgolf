@@ -123,6 +123,10 @@ export function TournamentPlayers() {
     }
   };
 
+  const confirmedPlayers = players.filter(
+    (player) => String(player.attending_status || '').toLowerCase() === 'yes'
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -133,7 +137,7 @@ export function TournamentPlayers() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
         <div>
           <button
             onClick={() => navigate('/tournaments')}
@@ -150,7 +154,7 @@ export function TournamentPlayers() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowInviteModal(true)}
             disabled={sendingSMS || actionLoading}
@@ -219,8 +223,8 @@ export function TournamentPlayers() {
         </div>
       )}
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+        <table className="min-w-[980px] divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -250,14 +254,14 @@ export function TournamentPlayers() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {players.length === 0 ? (
+            {confirmedPlayers.length === 0 ? (
               <tr>
                 <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
-                  No players registered for this tournament
+                  No players have confirmed they are playing yet
                 </td>
               </tr>
             ) : (
-              players.map((player) => (
+              confirmedPlayers.map((player) => (
                 <tr key={player.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
