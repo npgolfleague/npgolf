@@ -240,6 +240,23 @@ export const ScoreEntry = () => {
     return ''
   }
 
+  const getPlayerCurrentQuota = (player) => {
+    if (!player || !selectedTournament) return null
+
+    const quotaValue = selectedTournament.number_of_holes === 9
+      ? player.quota_9
+      : player.quota_18
+
+    if (quotaValue === null || quotaValue === undefined || quotaValue === '') {
+      return null
+    }
+
+    const parsed = Number(quotaValue)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+
+  const hasCurrentQuota = (player) => getPlayerCurrentQuota(player) !== null
+
   const handleScoreChange = (playerId, field, value) => {
     setScores(prev => {
       const newScores = {
@@ -338,7 +355,7 @@ export const ScoreEntry = () => {
         player_id: playerId,
         hole_id: currentHoleData.id,
         score: parseInt(scoreValue),
-        quota: quotaValue ? parseInt(quotaValue) : null,
+        quota: quotaValue !== '' && quotaValue !== null && quotaValue !== undefined ? parseInt(quotaValue) : null,
         foursome_group: foursomeGroup,
         ctp_feet: playerCtp?.feet ? parseInt(playerCtp.feet) : null,
         ctp_inches: playerCtp?.inches ? parseFloat(playerCtp.inches) : null,
@@ -515,7 +532,7 @@ export const ScoreEntry = () => {
                         <div className="absolute top-1 right-1 text-blue-600 text-xl">✓</div>
                       )}
                       <div className="font-semibold pr-6">{player.name}</div>
-                      <div className="text-xs text-gray-600">Quota: {player.quota || '-'}</div>
+                      <div className="text-xs text-gray-600">Quota: {getPlayerCurrentQuota(player) ?? '-'}</div>
                     </button>
                   ))}
                 </div>
@@ -594,6 +611,7 @@ export const ScoreEntry = () => {
             <div className="space-y-3">
               {selectedPlayers.map(playerId => {
                 const player = players.find(p => p.id === playerId)
+                const playerHasQuota = hasCurrentQuota(player)
                 return (
                   <div key={playerId} className="border border-gray-200 rounded-lg p-3">
                     <div className="text-sm font-semibold text-gray-700 mb-2">
@@ -623,6 +641,9 @@ export const ScoreEntry = () => {
                           value={scores[`${currentHole}-${playerId}-quota`] ?? ''}
                           onChange={(e) => handleScoreChange(playerId, 'quota', e.target.value)}
                         />
+                        {!playerHasQuota && (
+                          <div className="text-xs text-gray-500 mt-1 text-center">No quota</div>
+                        )}
                       </div>
                     </div>
                     {holeData.mens_par === 3 && (

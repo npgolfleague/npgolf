@@ -51,6 +51,16 @@ export function Leaderboard() {
     return 'text-gray-600 font-bold';
   };
 
+  const payoutSummary = leaderboard.length > 0
+    ? {
+        skinsPlayers: leaderboard[0].skins_ctp_paid_players || 0,
+        skinsFee: Number(leaderboard[0].skins_ctp_fee || 0),
+        totalPot: Number(leaderboard[0].skins_ctp_total_pot || 0),
+        skinsPot: Number(leaderboard[0].skin_prize_pot || 0),
+        pinsPot: Number(leaderboard[0].ctp_prize_pot || 0)
+      }
+    : null;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -89,6 +99,18 @@ export function Leaderboard() {
           <p className="text-yellow-800 text-lg">No scores recorded yet for this tournament.</p>
         </div>
       ) : (
+        <>
+        {payoutSummary && (
+          <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <h3 className="font-semibold text-indigo-900 mb-1">Pins &amp; Skins Split</h3>
+            <p className="text-sm text-indigo-800">
+              Paid players: {payoutSummary.skinsPlayers} × ${payoutSummary.skinsFee.toFixed(2)} = ${payoutSummary.totalPot.toFixed(2)} total
+            </p>
+            <p className="text-sm text-indigo-800">
+              Skins Pot (60%): <span className="font-semibold">${payoutSummary.skinsPot.toFixed(2)}</span> | Pins Pot (40%): <span className="font-semibold">${payoutSummary.pinsPot.toFixed(2)}</span>
+            </p>
+          </div>
+        )}
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -116,6 +138,9 @@ export function Leaderboard() {
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
                   Skin Prize
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                  CTP Prize
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
                   Holes
@@ -188,6 +213,15 @@ export function Leaderboard() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {player.ctp_prize_money > 0 ? (
+                      <div className="text-sm font-bold text-green-600">
+                        ${player.ctp_prize_money}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">-</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">{player.holes_played}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -198,41 +232,7 @@ export function Leaderboard() {
             </tbody>
           </table>
         </div>
-      )}
-
-      {/* CTP Winners */}
-      {ctpWinners.length > 0 && (
-        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-green-900 mb-4">📍 Closest to the Pin Winners</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ctpWinners.map((winner) => (
-              <div key={`hole-${winner.hole_number}`} className="bg-white rounded-lg p-4 shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="text-lg font-bold text-gray-900">Hole {winner.hole_number}</div>
-                    <div className="text-sm text-gray-600">Par {winner.mens_par}</div>
-                  </div>
-                  <div className="text-3xl">🏌️</div>
-                </div>
-                <div className="text-xl font-bold text-green-700 mb-2">{winner.player_name}</div>
-                <div className="text-2xl font-bold text-blue-600 mb-3">
-                  {winner.ctp_feet}' {winner.ctp_inches}"
-                </div>
-                {winner.ctp_image_url && (
-                  <button
-                    onClick={() => {
-                      setSelectedImage({ url: winner.ctp_image_url, player: winner.player_name, hole: winner.hole_number, distance: `${winner.ctp_feet}' ${winner.ctp_inches}"` });
-                      setShowImageModal(true);
-                    }}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm"
-                  >
-                    📷 View Photo
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
       {/* CTP Winners */}
@@ -278,9 +278,10 @@ export function Leaderboard() {
             <p><span className="font-semibold">Quota:</span> Player's handicap quota</p>
             <p><span className="font-semibold">Total Pts:</span> Sum of all quota points earned this tournament</p>
             <p><span className="font-semibold">Over/Under:</span> Total Pts minus Quota (positive is better)</p>
-            <p><span className="font-semibold">Quota Prize:</span> 1st place: 50%, 2nd: 30%, 3rd: 20% of quota pot (50% of total)</p>
+            <p><span className="font-semibold">Quota Prize:</span> 1st place 50%, 2nd 30%, 3rd 20% of the required-fee quota pot</p>
             <p><span className="font-semibold">Skins 🔥:</span> Number of holes where player had the best score alone</p>
-            <p><span className="font-semibold">Skin Prize:</span> Prize money earned from skins (30% of total pot divided by total skins)</p>
+            <p><span className="font-semibold">Skin Prize:</span> Prize money earned from the Skins Pot (60% of optional pins &amp; skins pot)</p>
+            <p><span className="font-semibold">Pins Pot:</span> Closest-to-pin prizes paid from the Pins Pot (40% of optional pins &amp; skins pot)</p>
             <p className="mt-2"><span className="text-green-600 font-bold">Green = Over Quota</span> | <span className="text-red-600 font-bold">Red = Under Quota</span></p>
           </div>
         </div>

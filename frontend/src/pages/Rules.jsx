@@ -305,8 +305,8 @@ export const Rules = () => {
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Optional Weekly Pools</h3>
               <ul className="space-y-2 text-gray-700">
-                <li><strong>$2 total ($1 each)</strong> - Closest to the pin (two par threes)</li>
-                <li><strong>$3</strong> - Net birdie/skins pool</li>
+                <li><strong>Pins & Skins pot is split 60/40</strong> - 60% skins, 40% closest-to-pin</li>
+                <li><strong>9-hole example:</strong> $5 optional fee = $3 skins + $2 closest-to-pin (from each paid player)</li>
               </ul>
               <p className="text-sm text-gray-600 mt-3 italic">
                 All optional pools collected before tee off - participation not required
