@@ -198,8 +198,8 @@ export const Dashboard = () => {
               ) : error ? (
                 <div className="text-center py-12 text-red-600">{error}</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full min-w-[920px]">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
