@@ -35,23 +35,29 @@ router.post('/:tournamentId/players', async (req, res) => {
   
   try {
     // Check if tournament exists
-    const [tournaments] = await pool.query('SELECT id FROM tournament WHERE id = ?', [tournamentId]);
+    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ?', [tournamentId]);
     if (tournaments.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
     // Check if player exists
-    const [players] = await pool.query('SELECT id FROM players WHERE id = ?', [playerId]);
+    const [players] = await pool.query('SELECT id, quota_18, quota_9 FROM players WHERE id = ?', [playerId]);
     if (players.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
     }
     
+    // Snapshot the player's current quota based on tournament hole count
+    const tournament = tournaments[0];
+    const player = players[0];
+    const holeCount = Number(tournament.number_of_holes);
+    const tournamentQuota = holeCount === 9 ? player.quota_9 : player.quota_18;
+
     // Add player to tournament as actively playing (yes)
     // so admin-added players appear in confirmed lists immediately
     await pool.query(
-      `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date)
-       VALUES (?, ?, 'yes', NOW())`,
-      [tournamentId, playerId]
+      `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota)
+       VALUES (?, ?, 'yes', NOW(), ?)`,
+      [tournamentId, playerId, tournamentQuota]
     );
     
     res.status(201).json({ message: 'Player added to tournament successfully' });

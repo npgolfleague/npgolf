@@ -7,10 +7,13 @@ import { formatDateOnly } from '../utils/date'
 export const Dashboard = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
+  const isAdmin = user?.role === 'admin'
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [refreshingQuotas, setRefreshingQuotas] = useState(false)
+  const [quotaRefreshMessage, setQuotaRefreshMessage] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -57,6 +60,29 @@ export const Dashboard = () => {
     { path: '/rules', label: 'Rules', icon: '📋', enabled: false },
     { path: '/about', label: 'About', icon: 'ℹ️', enabled: true }
   ]
+
+  const handleRefreshQuotas = async () => {
+    if (!confirm('Refresh quota values from stored quota history for all players?')) return
+
+    try {
+      setRefreshingQuotas(true)
+      setQuotaRefreshMessage('')
+      setError(null)
+
+      const response = await playersAPI.refreshQuotas()
+      const playersTouched = response.data?.playersTouched ?? 0
+      const updated18 = response.data?.updated18 ?? 0
+      const updated9 = response.data?.updated9 ?? 0
+
+      setQuotaRefreshMessage(`Quota values refreshed. Players: ${playersTouched}, 18-hole updated: ${updated18}, 9-hole updated: ${updated9}`)
+      await fetchData()
+    } catch (err) {
+      console.error('Error refreshing quota values:', err)
+      setError(err.response?.data?.error || 'Failed to refresh quota values')
+    } finally {
+      setRefreshingQuotas(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -190,8 +216,25 @@ export const Dashboard = () => {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-800">Paradise Cup Standings</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-gray-800">Paradise Cup Standings</h2>
+                  {isAdmin && (
+                    <button
+                      onClick={handleRefreshQuotas}
+                      disabled={refreshingQuotas}
+                      className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50"
+                    >
+                      {refreshingQuotas ? 'Refreshing...' : 'Refresh Quotas'}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {quotaRefreshMessage && (
+                <div className="mx-6 mt-4 p-3 bg-green-100 text-green-700 rounded text-sm">
+                  {quotaRefreshMessage}
+                </div>
+              )}
               
               {loading ? (
                 <div className="text-center py-12 text-gray-600">Loading players...</div>
@@ -245,7 +288,7 @@ export const Dashboard = () => {
                                   {player.name}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  Quota: {player.quota || '-'}
+                                  Quota 18: {player.quota_18 ?? '-'} | Quota 9: {player.quota_9 ?? '-'}
                                 </div>
                               </div>
                             </div>

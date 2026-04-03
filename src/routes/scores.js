@@ -238,6 +238,23 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
   try {
     const { tournamentId } = req.params;
 
+    const [savedRows] = await pool.query(
+      `SELECT w.ctp_feet, w.ctp_inches, w.ctp_image_url,
+              p.id as player_id, p.name as player_name,
+              w.hole_number, h.mens_par,
+              w.prize_money
+       FROM tournament_ctp_winners w
+       JOIN players p ON w.player_id = p.id
+       LEFT JOIN hole h ON w.hole_id = h.id
+       WHERE w.tournament_id = ?
+       ORDER BY w.hole_number ASC`,
+      [tournamentId]
+    );
+
+    if (savedRows.length > 0) {
+      return res.json(savedRows);
+    }
+
     const [tournamentRows] = await pool.query(
       'SELECT number_of_holes FROM tournament WHERE id = ? LIMIT 1',
       [tournamentId]

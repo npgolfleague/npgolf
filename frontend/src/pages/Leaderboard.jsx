@@ -7,8 +7,13 @@ export function Leaderboard() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState(null);
+  const [tournamentPlayers, setTournamentPlayers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [ctpWinners, setCtpWinners] = useState([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState('');
+  const [selectedPlayerScores, setSelectedPlayerScores] = useState([]);
+  const [loadingPlayerScores, setLoadingPlayerScores] = useState(false);
+  const [playerScoresError, setPlayerScoresError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
@@ -18,18 +23,33 @@ export function Leaderboard() {
     loadData();
   }, [tournamentId]);
 
+  useEffect(() => {
+    if (!selectedPlayerId || !tournamentId) {
+      setSelectedPlayerScores([]);
+      setPlayerScoresError('');
+      return;
+    }
+
+    loadSelectedPlayerScores(selectedPlayerId);
+  }, [selectedPlayerId, tournamentId]);
+
   const loadData = async () => {
     try {
       setLoading(true);
       setError('');
-      const [tournamentRes, leaderboardRes, ctpRes] = await Promise.all([
+      const [tournamentRes, playersRes, leaderboardRes, ctpRes] = await Promise.all([
         tournamentsAPI.get(tournamentId),
+        tournamentsAPI.getPlayers(tournamentId),
         leaderboardAPI.get(tournamentId),
         scoresAPI.getCtpWinners(tournamentId)
       ]);
       setTournament(tournamentRes.data);
+      setTournamentPlayers(playersRes.data || []);
       setLeaderboard(leaderboardRes.data);
       setCtpWinners(ctpRes.data);
+      setSelectedPlayerId('');
+      setSelectedPlayerScores([]);
+      setPlayerScoresError('');
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
       setError(err.response?.data?.error || 'Failed to load leaderboard data');
@@ -50,6 +70,36 @@ export function Leaderboard() {
     if (overUnder < 0) return 'text-red-600 font-bold';
     return 'text-gray-600 font-bold';
   };
+
+  const loadSelectedPlayerScores = async (playerId) => {
+    try {
+      setLoadingPlayerScores(true);
+      setPlayerScoresError('');
+
+      const response = await scoresAPI.list({
+        tournament_id: tournamentId,
+        player_id: playerId
+      });
+
+      const sortedScores = [...response.data].sort((a, b) => a.hole_number - b.hole_number);
+      setSelectedPlayerScores(sortedScores);
+    } catch (err) {
+      console.error('Failed to load selected player scores:', err);
+      setSelectedPlayerScores([]);
+      setPlayerScoresError(err.response?.data?.error || 'Failed to load player scores');
+    } finally {
+      setLoadingPlayerScores(false);
+    }
+  };
+
+  const selectedPlayerTotals = selectedPlayerScores.reduce(
+    (totals, scoreRow) => {
+      totals.strokes += Number(scoreRow.score || 0);
+      totals.quotaPoints += Number(scoreRow.quota || 0);
+      return totals;
+    },
+    { strokes: 0, quotaPoints: 0 }
+  );
 
   const payoutSummary = leaderboard.length > 0
     ? {
@@ -111,8 +161,8 @@ export function Leaderboard() {
             </p>
           </div>
         )}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
+          <table className="min-w-[1200px] w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
@@ -269,6 +319,86 @@ export function Leaderboard() {
           </div>
         </div>
       )}
+
+      {/* Selected Player Scores */}
+      <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Player Scores For This Tournament</h2>
+
+        <div className="max-w-md mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Select Player
+          </label>
+          <select
+            className="w-full p-3 border border-gray-300 rounded-lg"
+            value={selectedPlayerId}
+            onChange={(e) => setSelectedPlayerId(e.target.value)}
+            disabled={tournamentPlayers.length === 0}
+          >
+            <option value="">{tournamentPlayers.length === 0 ? 'No players in tournament' : 'Choose a player...'}</option>
+            {tournamentPlayers.map((player) => (
+              <option key={player.id} value={player.id}>
+                {player.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {loadingPlayerScores && (
+          <div className="text-sm text-gray-600">Loading player scores...</div>
+        )}
+
+        {playerScoresError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {playerScoresError}
+          </div>
+        )}
+
+        {!loadingPlayerScores && selectedPlayerId && !playerScoresError && selectedPlayerScores.length === 0 && (
+          <div className="text-sm text-gray-600">No scores recorded yet for this player in this tournament.</div>
+        )}
+
+        {!loadingPlayerScores && selectedPlayerScores.length > 0 && (
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-4 max-w-sm">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Total Strokes</div>
+                <div className="text-2xl font-bold text-blue-900">{selectedPlayerTotals.strokes}</div>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="text-xs text-green-700 font-semibold uppercase tracking-wide">Quota Points</div>
+                <div className="text-2xl font-bold text-green-900">{Math.round(selectedPlayerTotals.quotaPoints)}</div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-[620px] w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hole</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Par</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Quota</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Entered</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {selectedPlayerScores.map((scoreRow) => (
+                    <tr key={scoreRow.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{scoreRow.hole_number}</td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-700">{scoreRow.mens_par ?? '-'}</td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-900 font-semibold">{scoreRow.score ?? '-'}</td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-900">{scoreRow.quota ?? '-'}</td>
+                      <td className="px-4 py-3 text-xs text-center text-gray-500">
+                        {scoreRow.entered_at ? new Date(scoreRow.entered_at).toLocaleString() : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Legend */}
       {leaderboard.length > 0 && (

@@ -30,6 +30,7 @@ export const playersAPI = {
   update: (id, data) => apiClient.put(`/players/${id}`, data),
   getQuotaRow: (id) => apiClient.get(`/players/${id}/quota`),
   updateQuotaRow: (id, data) => apiClient.put(`/players/${id}/quota`, data),
+  refreshQuotas: () => apiClient.post('/players/refresh-quotas'),
   delete: (id) => apiClient.delete(`/players/${id}`),
   sendSMS: (id, message) => apiClient.post(`/players/${id}/send-sms`, { message }),
   getQuotaHistory: (id) => apiClient.get(`/players/${id}/quota-history`)
@@ -64,7 +65,10 @@ export const tournamentsAPI = {
   updateSkinsCtpPaidStatus: (tournamentId, playerId, skins_ctp_paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/skins-ctp-paid`, { skins_ctp_paid }),
   sendInviteSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/invite-sms`),
   sendSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/send-sms`),
-  sendInvitations: (tournamentId, method) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, { method }),
+  sendInvitations: (tournamentId, method, playerId) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, {
+    method,
+    ...(playerId !== undefined && playerId !== null ? { playerId } : {})
+  }),
   getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`)
 }
 

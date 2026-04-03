@@ -111,28 +111,39 @@ export function TournamentPlayers() {
   };
 
   const handleTogglePaid = async (playerId, currentPaidStatus) => {
+    const newStatus = !currentPaidStatus;
+    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, paid: newStatus } : p));
     try {
-      setActionLoading(true);
-      await tournamentsAPI.updatePaidStatus(tournamentId, playerId, !currentPaidStatus);
-      await loadData();
+      await tournamentsAPI.updatePaidStatus(tournamentId, playerId, newStatus);
     } catch (err) {
       console.error('Failed to update paid status:', err);
       setError(err.response?.data?.error || 'Failed to update paid status');
-    } finally {
-      setActionLoading(false);
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, paid: currentPaidStatus } : p));
     }
   };
 
   const handleToggleSkinsCtpPaid = async (playerId, currentStatus) => {
+    const newStatus = !currentStatus;
+    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, skins_ctp_paid: newStatus } : p));
     try {
-      setActionLoading(true);
-      await tournamentsAPI.updateSkinsCtpPaidStatus(tournamentId, playerId, !currentStatus);
-      await loadData();
+      await tournamentsAPI.updateSkinsCtpPaidStatus(tournamentId, playerId, newStatus);
     } catch (err) {
       console.error('Failed to update skins/CTP paid status:', err);
       setError(err.response?.data?.error || 'Failed to update skins/CTP paid status');
-    } finally {
-      setActionLoading(false);
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, skins_ctp_paid: currentStatus } : p));
+    }
+  };
+
+  const handleMarkAllPaid = async () => {
+    const unpaid = confirmedPlayers.filter(p => !p.paid);
+    if (unpaid.length === 0) return;
+    setPlayers(prev => prev.map(p => ({ ...p, paid: true })));
+    try {
+      await Promise.all(unpaid.map(p => tournamentsAPI.updatePaidStatus(tournamentId, p.id, true)));
+    } catch (err) {
+      console.error('Failed to mark all paid:', err);
+      setError(err.response?.data?.error || 'Failed to mark all paid');
+      await loadData();
     }
   };
 
@@ -174,6 +185,13 @@ export function TournamentPlayers() {
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
           >
             {sendingSMS ? 'Sending...' : '📧 Send Invitations'}
+          </button>
+          <button
+            onClick={handleMarkAllPaid}
+            disabled={confirmedPlayers.every(p => p.paid)}
+            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 disabled:bg-gray-400"
+          >
+            Mark All Paid
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -259,10 +277,10 @@ export function TournamentPlayers() {
                 Status
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Paid
+                Paid - Quota Game
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Skins/Pins
+                Paid - Pins/Skins Game
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -322,7 +340,7 @@ export function TournamentPlayers() {
                             : 'bg-red-100 text-red-800 hover:bg-red-200'
                         } disabled:opacity-50`}
                       >
-                        {player.paid ? '✓ Paid' : '✗ Unpaid'}
+                        {player.paid ? '✓ Quota Paid' : '✗ Not Paid'}
                       </button>
                     ) : (
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -330,7 +348,7 @@ export function TournamentPlayers() {
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {player.paid ? '✓ Paid' : '✗ Unpaid'}
+                        {player.paid ? '✓ Quota Paid' : '✗ Not Paid'}
                       </span>
                     )}
                   </td>
@@ -345,7 +363,7 @@ export function TournamentPlayers() {
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         } disabled:opacity-50`}
                       >
-                        {player.skins_ctp_paid ? '✓ Qualified' : '✗ Not Qualified'}
+                        {player.skins_ctp_paid ? '✓ Skins Paid' : '✗ Not Paid'}
                       </button>
                     ) : (
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -353,7 +371,7 @@ export function TournamentPlayers() {
                           ? 'bg-purple-100 text-purple-800'
                           : 'bg-gray-100 text-gray-700'
                       }`}>
-                        {player.skins_ctp_paid ? '✓ Qualified' : '✗ Not Qualified'}
+                        {player.skins_ctp_paid ? '✓ Skins Paid' : '✗ Not Paid'}
                       </span>
                     )}
                   </td>

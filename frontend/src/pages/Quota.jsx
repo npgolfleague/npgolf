@@ -41,6 +41,17 @@ export const Quota = () => {
     return date.toISOString().slice(0, 10)
   }
 
+  const buildFormFromRow = (row = {}) => {
+    const nextForm = {}
+    rounds.forEach((round) => {
+      nextForm[`date_${round}`] = normalizeDate(row[`date_${round}`])
+      nextForm[`points_${round}`] = row[`points_${round}`] ?? ''
+      nextForm[`quota_diff_${round}`] = row[`quota_diff_${round}`] ?? ''
+      nextForm[`holes_${round}`] = row[`holes_${round}`] ?? ''
+    })
+    return nextForm
+  }
+
   const loadQuotaRow = async (playerId) => {
     if (!playerId) return
     setLoadingRow(true)
@@ -50,13 +61,7 @@ export const Quota = () => {
       const response = await playersAPI.getQuotaRow(playerId)
       const row = response.data || {}
       setQuotaRow(row)
-      const nextForm = {}
-      rounds.forEach((round) => {
-        nextForm[`date_${round}`] = normalizeDate(row[`date_${round}`])
-        nextForm[`points_${round}`] = row[`points_${round}`] ?? ''
-        nextForm[`quota_diff_${round}`] = row[`quota_diff_${round}`] ?? ''
-      })
-      setForm(nextForm)
+      setForm(buildFormFromRow(row))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load quota row')
       setQuotaRow(null)
@@ -92,6 +97,7 @@ export const Quota = () => {
       payload[pointsKey] = form[pointsKey] === '' ? null : Number(form[pointsKey])
 
       payload[diffKey] = form[diffKey] === '' ? null : Number(form[diffKey])
+      payload[`holes_${round}`] = form[`holes_${round}`] === '' ? null : Number(form[`holes_${round}`])
     })
     return payload
   }
@@ -108,6 +114,63 @@ export const Quota = () => {
       setSuccess('Quota row updated')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update quota row')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteQuotaEntry = async (roundToDelete) => {
+    if (!selectedId) return
+
+    const hasEntry = Boolean(
+      form[`date_${roundToDelete}`] ||
+      form[`points_${roundToDelete}`] !== '' ||
+      form[`quota_diff_${roundToDelete}`] !== '' ||
+      form[`holes_${roundToDelete}`] !== ''
+    )
+
+    if (!hasEntry) {
+      setError('Selected round is already empty')
+      setSuccess('')
+      return
+    }
+
+    if (!confirm(`Delete round ${roundToDelete} entry and shift newer entries up?`)) return
+
+    setSaving(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const shiftedForm = { ...form }
+
+      for (let round = roundToDelete; round < 7; round++) {
+        shiftedForm[`date_${round}`] = shiftedForm[`date_${round + 1}`] ?? ''
+        shiftedForm[`points_${round}`] = shiftedForm[`points_${round + 1}`] ?? ''
+        shiftedForm[`quota_diff_${round}`] = shiftedForm[`quota_diff_${round + 1}`] ?? ''
+        shiftedForm[`holes_${round}`] = shiftedForm[`holes_${round + 1}`] ?? ''
+      }
+
+      shiftedForm.date_7 = ''
+      shiftedForm.points_7 = ''
+      shiftedForm.quota_diff_7 = ''
+      shiftedForm.holes_7 = ''
+
+      const payload = {}
+      rounds.forEach((round) => {
+        payload[`date_${round}`] = shiftedForm[`date_${round}`] === '' ? null : shiftedForm[`date_${round}`]
+        payload[`points_${round}`] = shiftedForm[`points_${round}`] === '' ? null : Number(shiftedForm[`points_${round}`])
+        payload[`quota_diff_${round}`] = shiftedForm[`quota_diff_${round}`] === '' ? null : Number(shiftedForm[`quota_diff_${round}`])
+        payload[`holes_${round}`] = shiftedForm[`holes_${round}`] === '' ? null : Number(shiftedForm[`holes_${round}`])
+      })
+
+      const response = await playersAPI.updateQuotaRow(selectedId, payload)
+      const updatedRow = response.data || {}
+      setQuotaRow(updatedRow)
+      setForm(buildFormFromRow(updatedRow))
+      setSuccess(`Deleted round ${roundToDelete} entry`) 
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete quota entry')
     } finally {
       setSaving(false)
     }
@@ -167,6 +230,8 @@ export const Quota = () => {
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Date</th>
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Points</th>
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota Diff</th>
+                    <th className="px-6 py-3 text-left text-gray-700 font-semibold">Holes</th>
+                    <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -196,6 +261,27 @@ export const Quota = () => {
                           value={form[`quota_diff_${round}`] ?? ''}
                           onChange={(e) => handleFieldChange(`quota_diff_${round}`, e.target.value)}
                         />
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          className="w-24 border rounded px-2 py-1"
+                          value={form[`holes_${round}`] ?? ''}
+                          onChange={(e) => handleFieldChange(`holes_${round}`, e.target.value)}
+                        >
+                          <option value="">--</option>
+                          <option value="9">9</option>
+                          <option value="18">18</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          type="button"
+                          onClick={() => deleteQuotaEntry(round)}
+                          disabled={saving}
+                          className="text-red-600 hover:text-red-800 text-sm font-semibold disabled:opacity-50"
+                        >
+                          Delete Entry
+                        </button>
                       </td>
                     </tr>
                   ))}
