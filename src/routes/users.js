@@ -31,9 +31,105 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
+const recalculateAllPlayersPrizeMoney = async (db) => {
+  const [settingsRows] = await db.query(
+    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1'
+  );
+  const settings = settingsRows[0] || {};
+
+  const [tournaments] = await db.query('SELECT id, number_of_holes FROM tournament');
+  const winningsByPlayer = new Map();
+  const addWinnings = (playerId, amount) => {
+    const numeric = Number(amount) || 0;
+    if (!playerId || numeric === 0) return;
+    winningsByPlayer.set(playerId, (winningsByPlayer.get(playerId) || 0) + numeric);
+  };
+
+  for (const tournament of tournaments) {
+    const tournamentId = tournament.id;
+    const holeCount = Number(tournament.number_of_holes) === 9 ? 9 : 18;
+    const tournamentFee = Number(
+      holeCount === 9 ? settings.tournament_fee_9_holes : settings.tournament_fee_18_holes
+    ) || 0;
+
+    const [paidRows] = await db.query(
+      'SELECT SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players FROM tournament_players WHERE tournament_id = ?',
+      [tournamentId]
+    );
+    const quotaPrizePot = (Number(paidRows[0]?.paid_players) || 0) * tournamentFee;
+
+    const [paradiseRows] = await db.query(
+      `SELECT player_id, over_under
+       FROM tournament_paradise_points
+       WHERE tournament_id = ?
+       ORDER BY over_under DESC, player_id ASC`,
+      [tournamentId]
+    );
+
+    const prizePercentages = [0.5, 0.3, 0.2];
+    let currentPosition = 0;
+    while (currentPosition < paradiseRows.length) {
+      const currentOverUnder = Number(paradiseRows[currentPosition].over_under);
+      let tiedCount = 1;
+
+      while (
+        currentPosition + tiedCount < paradiseRows.length &&
+        Number(paradiseRows[currentPosition + tiedCount].over_under) === currentOverUnder
+      ) {
+        tiedCount++;
+      }
+
+      let pooledPrizePercentage = 0;
+      for (let i = 0; i < tiedCount; i++) {
+        const prizePosition = currentPosition + i;
+        if (prizePosition < prizePercentages.length) {
+          pooledPrizePercentage += prizePercentages[prizePosition];
+        }
+      }
+
+      const prizePerPlayer = tiedCount > 0
+        ? Math.floor(quotaPrizePot * (pooledPrizePercentage / tiedCount))
+        : 0;
+
+      for (let i = 0; i < tiedCount; i++) {
+        const row = paradiseRows[currentPosition + i];
+        addWinnings(row.player_id, prizePerPlayer);
+      }
+
+      currentPosition += tiedCount;
+    }
+
+    const [skinRows] = await db.query(
+      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
+       FROM tournament_skin_winners
+       WHERE tournament_id = ?
+       GROUP BY player_id`,
+      [tournamentId]
+    );
+    skinRows.forEach((row) => addWinnings(row.player_id, row.total));
+
+    const [ctpRows] = await db.query(
+      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
+       FROM tournament_ctp_winners
+       WHERE tournament_id = ?
+       GROUP BY player_id`,
+      [tournamentId]
+    );
+    ctpRows.forEach((row) => addWinnings(row.player_id, row.total));
+  }
+
+  await db.query('UPDATE players SET prize_money = 0');
+  for (const [playerId, total] of winningsByPlayer.entries()) {
+    await db.query('UPDATE players SET prize_money = ? WHERE id = ?', [Number(total.toFixed(2)), playerId]);
+  }
+
+  return winningsByPlayer.size;
+};
+
 // GET /api/users - list players
 router.get('/', async (req, res) => {
   try {
+    await recalculateAllPlayersPrizeMoney(pool);
     const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players ORDER BY fedex_points DESC, name ASC');
     res.json(rows);
   } catch (err) {
@@ -169,11 +265,14 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
       playersTouched++;
     }
 
+    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool);
+
     res.json({
       message: 'Quota values refreshed successfully',
       playersTouched,
       updated18,
-      updated9
+      updated9,
+      prizePlayersTouched
     });
   } catch (err) {
     console.error('Error refreshing quota values:', err);
