@@ -30,6 +30,21 @@ const getTournamentQuotaColumn = (numberOfHoles) => (
   Number(numberOfHoles) === 9 ? 'quota_9' : 'quota_18'
 );
 
+const ensureTournamentResultsEmailTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tournament_results_email (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      tournament_id INT NOT NULL,
+      subject VARCHAR(500),
+      html MEDIUMTEXT,
+      generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      sent_at DATETIME DEFAULT NULL,
+      UNIQUE KEY uq_tournament (tournament_id),
+      INDEX idx_tournament_id (tournament_id)
+    )
+  `);
+};
+
 const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
   const [rows] = await db.query(
     `SELECT CASE
@@ -900,6 +915,7 @@ router.post('/:id/complete', async (req, res) => {
 
     // Generate and store results email (non-fatal)
     try {
+      await ensureTournamentResultsEmailTable(pool);
       const tournamentDate = formatDateOnly(tournamentRows[0].date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const courseName = tournamentRows[0].course_name || 'Unknown Course';
       const emailHTML = buildResultsEmailHTML({
@@ -948,6 +964,7 @@ router.post('/:id/complete', async (req, res) => {
 router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   try {
+    await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
       `SELECT t.date, t.number_of_holes, c.name AS course_name
        FROM tournament t
@@ -1039,11 +1056,24 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
 router.get('/:id/results-email', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   try {
+    await ensureTournamentResultsEmailTable(pool);
     const [rows] = await pool.query(
       'SELECT id, tournament_id, subject, html, generated_at, sent_at FROM tournament_results_email WHERE tournament_id = ?',
       [tournamentId]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'No results email found for this tournament' });
+    if (rows.length === 0) {
+      const [completionRows] = await pool.query(
+        'SELECT COUNT(*) AS completed_rows FROM tournament_paradise_points WHERE tournament_id = ?',
+        [tournamentId]
+      );
+      const isCompleted = Number(completionRows[0]?.completed_rows || 0) > 0;
+
+      if (!isCompleted) {
+        return res.status(400).json({ error: 'Tournament is not complete yet' });
+      }
+
+      return res.status(404).json({ error: 'No results email found for this tournament' });
+    }
     res.json(rows[0]);
   } catch (err) {
     console.error('Error fetching results email:', err);
@@ -1056,6 +1086,7 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   const { email: singleEmail } = req.body || {};
   try {
+    await ensureTournamentResultsEmailTable(pool);
     const [emailRows] = await pool.query(
       'SELECT subject, html FROM tournament_results_email WHERE tournament_id = ?',
       [tournamentId]

@@ -73,8 +73,9 @@ export const Dashboard = () => {
       const playersTouched = response.data?.playersTouched ?? 0
       const updated18 = response.data?.updated18 ?? 0
       const updated9 = response.data?.updated9 ?? 0
+      const prizePlayersTouched = response.data?.prizePlayersTouched ?? 0
 
-      setQuotaRefreshMessage(`Quota values refreshed. Players: ${playersTouched}, 18-hole updated: ${updated18}, 9-hole updated: ${updated9}`)
+      setQuotaRefreshMessage(`Quota values refreshed. Players: ${playersTouched}, 18-hole updated: ${updated18}, 9-hole updated: ${updated9}, prize money recalculated: ${prizePlayersTouched}`)
       await fetchData()
     } catch (err) {
       console.error('Error refreshing quota values:', err)
