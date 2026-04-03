@@ -14,6 +14,11 @@ export const Tournaments = () => {
   const [inviteModalTournamentId, setInviteModalTournamentId] = useState(null)
   const [inviteResult, setInviteResult] = useState(null)
   const [sendingInvitations, setSendingInvitations] = useState(null)
+  const [resultsEmailModal, setResultsEmailModal] = useState(null) // { subject, html, generated_at, sent_at, tournamentId }
+  const [sendingResultsEmail, setSendingResultsEmail] = useState(false)
+  const [resultsEmailSendResult, setResultsEmailSendResult] = useState(null)
+  const [individualEmail, setIndividualEmail] = useState('')
+  const [sendingIndividual, setSendingIndividual] = useState(false)
 
   const isAdmin = user?.role === 'admin'
 
@@ -63,6 +68,63 @@ export const Tournaments = () => {
   const openInviteModal = (tournamentId) => {
     setInviteModalTournamentId(tournamentId)
     setShowInviteModal(true)
+  }
+
+  const handleOpenResultsEmail = async (tournamentId) => {
+    try {
+      const response = await tournamentsAPI.getResultsEmail(tournamentId)
+      setResultsEmailSendResult(null)
+      setResultsEmailModal({ ...response.data, tournamentId })
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setResultsEmailSendResult(null)
+        setResultsEmailModal({ noEmail: true, tournamentId })
+      } else {
+        setError(err.response?.data?.error || 'Failed to load results email')
+      }
+    }
+  }
+
+  const handleSendResultsEmail = async () => {
+    if (!confirm('Send results email to all players with email notifications enabled?')) return
+    try {
+      setSendingResultsEmail(true)
+      setResultsEmailSendResult(null)
+      const response = await tournamentsAPI.sendResultsEmail(resultsEmailModal.tournamentId)
+      setResultsEmailSendResult(response.data)
+      setResultsEmailModal(prev => ({ ...prev, sent_at: new Date().toISOString() }))
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send results email')
+    } finally {
+      setSendingResultsEmail(false)
+    }
+  }
+
+  const handleSendIndividualEmail = async () => {
+    if (!individualEmail.trim()) return
+    try {
+      setSendingIndividual(true)
+      setResultsEmailSendResult(null)
+      const response = await tournamentsAPI.sendResultsEmail(resultsEmailModal.tournamentId, individualEmail.trim())
+      setResultsEmailSendResult({ sent: response.data.sent, failed: response.data.failed, individual: individualEmail.trim() })
+      setIndividualEmail('')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send results email')
+    } finally {
+      setSendingIndividual(false)
+    }
+  }
+
+  const handleGenerateResultsEmail = async () => {
+    try {
+      setSendingResultsEmail(true)
+      const response = await tournamentsAPI.generateResultsEmail(resultsEmailModal.tournamentId)
+      setResultsEmailModal({ ...response.data, tournamentId: resultsEmailModal.tournamentId })
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate results email')
+    } finally {
+      setSendingResultsEmail(false)
+    }
   }
 
   const handleSendInvitations = async (method) => {
@@ -196,6 +258,12 @@ export const Tournaments = () => {
                                 ✏️ Edit
                               </button>
                               <button
+                                onClick={() => handleOpenResultsEmail(tournament.id)}
+                                className="text-orange-600 hover:text-orange-800 text-sm font-medium"
+                              >
+                                📊 Results Email
+                              </button>
+                              <button
                                 onClick={() => handleComplete(tournament.id)}
                                 className="text-purple-600 hover:text-purple-800 text-sm font-medium"
                               >
@@ -216,6 +284,106 @@ export const Tournaments = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Results Email Modal */}
+        {resultsEmailModal && (
+          <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl flex flex-col" style={{ maxHeight: '90vh' }}>
+              <div className="flex justify-between items-start p-5 border-b">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">📊 Tournament Results Email</h2>
+                  {!resultsEmailModal.noEmail && <p className="text-sm text-gray-500 mt-1">{resultsEmailModal.subject}</p>}
+                  {resultsEmailModal.sent_at && (
+                    <p className="text-xs text-green-600 mt-1">✓ Last sent: {new Date(resultsEmailModal.sent_at).toLocaleString()}</p>
+                  )}
+                  {!resultsEmailModal.noEmail && !resultsEmailModal.sent_at && (
+                    <p className="text-xs text-yellow-600 mt-1">⚠ Not yet sent</p>
+                  )}
+                </div>
+                <button onClick={() => { setResultsEmailModal(null); setResultsEmailSendResult(null); setIndividualEmail('') }} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+              </div>
+
+              {resultsEmailModal.noEmail ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center gap-4">
+                  <p className="text-gray-600">No results email has been generated for this tournament yet.</p>
+                  <button
+                    onClick={handleGenerateResultsEmail}
+                    disabled={sendingResultsEmail}
+                    className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 font-semibold"
+                  >
+                    {sendingResultsEmail ? 'Generating...' : '✨ Generate Results Email'}
+                  </button>
+                  <button
+                    onClick={() => { setResultsEmailModal(null); setResultsEmailSendResult(null) }}
+                    className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+              <>
+              {resultsEmailSendResult && (
+                <div className="mx-5 mt-4 p-3 bg-green-100 border border-green-300 rounded text-sm text-green-800">
+                  {resultsEmailSendResult.individual
+                    ? `✓ Sent to ${resultsEmailSendResult.individual}`
+                    : `✓ Sent to ${resultsEmailSendResult.sent} player${resultsEmailSendResult.sent !== 1 ? 's' : ''}`
+                  }
+                  {resultsEmailSendResult.failed?.length > 0 && (
+                    <span className="text-red-600 ml-2">({resultsEmailSendResult.failed.length} failed)</span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex-1 overflow-auto p-5">
+                <iframe
+                  srcDoc={resultsEmailModal.html}
+                  title="Results Email Preview"
+                  className="w-full border border-gray-200 rounded"
+                  style={{ height: '450px' }}
+                  sandbox="allow-same-origin"
+                />
+              </div>
+
+              <div className="p-5 border-t bg-gray-50 rounded-b-lg space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={individualEmail}
+                    onChange={e => setIndividualEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSendIndividualEmail()}
+                    placeholder="Send to a specific email address..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400"
+                    disabled={sendingIndividual}
+                  />
+                  <button
+                    onClick={handleSendIndividualEmail}
+                    disabled={sendingIndividual || !individualEmail.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-semibold whitespace-nowrap"
+                  >
+                    {sendingIndividual ? 'Sending...' : '📧 Send'}
+                  </button>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => { setResultsEmailModal(null); setResultsEmailSendResult(null); setIndividualEmail('') }}
+                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleSendResultsEmail}
+                    disabled={sendingResultsEmail}
+                    className="px-5 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-400 font-semibold"
+                  >
+                    {sendingResultsEmail ? 'Sending...' : '📧 Send to All Players'}
+                  </button>
+                </div>
+              </div>
+              </>
+              )}
+            </div>
           </div>
         )}
 

@@ -69,7 +69,10 @@ export const tournamentsAPI = {
     method,
     ...(playerId !== undefined && playerId !== null ? { playerId } : {})
   }),
-  getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`)
+  getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`),
+  getResultsEmail: (id) => apiClient.get(`/tournaments/${id}/results-email`),
+    generateResultsEmail: (id) => apiClient.post(`/tournaments/${id}/results-email/generate`),
+  sendResultsEmail: (id, email) => apiClient.post(`/tournaments/${id}/results-email/send`, email ? { email } : {}),
 }
 
 export const scoresAPI = {

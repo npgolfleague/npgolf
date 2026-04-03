@@ -237,7 +237,7 @@ export const Users = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">Players</h2>
           {user?.role === 'admin' && (
@@ -260,6 +260,7 @@ export const Users = () => {
             <table className="w-full">
               <thead className="bg-gray-200">
                 <tr>
+                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
@@ -271,7 +272,6 @@ export const Users = () => {
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Paradise Pts</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -284,36 +284,6 @@ export const Users = () => {
                 ) : (
                   players.map((player, index) => (
                     <tr key={index} className={`border-t hover:bg-gray-50 ${!player.active ? 'opacity-50' : ''}`}>
-                      <td className="px-6 py-4 text-gray-900">{player.name}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.email}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
-                      <td className="px-6 py-4 text-center">{player.active ? '✓' : '-'}</td>
-                      <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
-                      <td className="px-6 py-4 text-center">{player.email_allowed ? '✓' : '-'}</td>
-                      <td className="px-6 py-4 text-gray-900 relative">
-                        <div 
-                          onMouseEnter={() => handleQuotaHover(player.id)}
-                          onMouseLeave={handleQuotaLeave}
-                          className="cursor-help inline-block"
-                        >
-                          {player.quota_18 || '-'}
-                          {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
-                            <div className="absolute z-10 left-0 bottom-full mb-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
-                              <div className="font-bold mb-2">Last 7 Rounds</div>
-                              {quotaTooltip.data.map((round, idx) => (
-                                <div key={idx} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
-                                  <span>{formatDateOnly(round.date)}</span>
-                                  <span className="font-semibold">{round.points} pts</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-900">{player.quota_9 || '-'}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
-                      <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
                           {canEditPlayer(player) ? (
@@ -355,6 +325,36 @@ export const Users = () => {
                           )}
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-gray-900">{player.name}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.email}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.active ? '✓' : '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
+                      <td className="px-6 py-4 text-center">{player.email_allowed ? '✓' : '-'}</td>
+                      <td className="px-6 py-4 text-gray-900 relative">
+                        <div 
+                          onMouseEnter={() => handleQuotaHover(player.id)}
+                          onMouseLeave={handleQuotaLeave}
+                          className="cursor-help inline-block"
+                        >
+                          {player.quota_18 || '-'}
+                          {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
+                            <div className="absolute z-10 left-0 bottom-full mb-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
+                              <div className="font-bold mb-2">Last 7 Rounds</div>
+                              {quotaTooltip.data.map((round, idx) => (
+                                <div key={idx} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
+                                  <span>{formatDateOnly(round.date)}</span>
+                                  <span className="font-semibold">{round.points} pts</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-900">{player.quota_9 || '-'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
+                      <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))
                 )}

@@ -147,6 +147,19 @@ export function TournamentPlayers() {
     }
   };
 
+  const handleMarkAllSkinsCtpPaid = async () => {
+    const unpaid = confirmedPlayers.filter(p => !p.skins_ctp_paid);
+    if (unpaid.length === 0) return;
+    setPlayers(prev => prev.map(p => ({ ...p, skins_ctp_paid: true })));
+    try {
+      await Promise.all(unpaid.map(p => tournamentsAPI.updateSkinsCtpPaidStatus(tournamentId, p.id, true)));
+    } catch (err) {
+      console.error('Failed to mark all skins/CTP paid:', err);
+      setError(err.response?.data?.error || 'Failed to mark all skins/CTP paid');
+      await loadData();
+    }
+  };
+
   const confirmedPlayers = players.filter(
     (player) => String(player.attending_status || '').toLowerCase() === 'yes'
   );
@@ -160,7 +173,7 @@ export function TournamentPlayers() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="w-full p-6">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
         <div>
           <button
@@ -191,7 +204,14 @@ export function TournamentPlayers() {
             disabled={confirmedPlayers.every(p => p.paid)}
             className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 disabled:bg-gray-400"
           >
-            Mark All Paid
+            Mark All Quota Paid
+          </button>
+          <button
+            onClick={handleMarkAllSkinsCtpPaid}
+            disabled={confirmedPlayers.every(p => p.skins_ctp_paid)}
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
+          >
+            Mark All Pins/Skins Paid
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -259,6 +279,9 @@ export function TournamentPlayers() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -282,9 +305,6 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Paid - Pins/Skins Game
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -297,6 +317,17 @@ export function TournamentPlayers() {
             ) : (
               confirmedPlayers.map((player) => (
                 <tr key={player.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleRemovePlayer(player.id)}
+                        disabled={actionLoading}
+                        className="text-red-600 hover:text-red-900 disabled:text-gray-400"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
                   </td>
@@ -373,17 +404,6 @@ export function TournamentPlayers() {
                       }`}>
                         {player.skins_ctp_paid ? '✓ Skins Paid' : '✗ Not Paid'}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleRemovePlayer(player.id)}
-                        disabled={actionLoading}
-                        className="text-red-600 hover:text-red-900 disabled:text-gray-400"
-                      >
-                        Remove
-                      </button>
                     )}
                   </td>
                 </tr>

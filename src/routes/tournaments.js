@@ -122,6 +122,110 @@ const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
   return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
 };
 
+const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot }) => {
+  const prizePercentages = [0.5, 0.3, 0.2];
+  const prizePlayers = [];
+  let i = 0;
+  while (i < rankedPlayers.length) {
+    const currentOverUnder = rankedPlayers[i].over_under;
+    let tiedCount = 1;
+    while (i + tiedCount < rankedPlayers.length && rankedPlayers[i + tiedCount].over_under === currentOverUnder) tiedCount++;
+    let pooledPct = 0;
+    for (let j = 0; j < tiedCount; j++) {
+      const pos = i + j;
+      if (pos < prizePercentages.length) pooledPct += prizePercentages[pos];
+    }
+    const prizePerPlayer = quotaPrizePot > 0 && pooledPct > 0 ? Math.floor(quotaPrizePot * (pooledPct / tiedCount)) : 0;
+    for (let j = 0; j < tiedCount; j++) {
+      prizePlayers.push({ ...rankedPlayers[i + j], rank: i + 1, quota_prize: prizePerPlayer });
+    }
+    i += tiedCount;
+  }
+
+  const leaderboardRows = prizePlayers.map((p, idx) => {
+    const overUnder = p.over_under > 0 ? `+${p.over_under}` : `${p.over_under}`;
+    const rankLabel = p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : p.rank;
+    const bold = p.rank <= 3 ? 'font-weight:bold;' : '';
+    const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
+    return `<tr style="background:${rowBg}">
+      <td style="padding:8px 12px;text-align:center;${bold}">${rankLabel}</td>
+      <td style="padding:8px 12px;${bold}">${p.name}</td>
+      <td style="padding:8px 12px;text-align:center;">${p.total_points}</td>
+      <td style="padding:8px 12px;text-align:center;color:${p.over_under >= 0 ? '#15803d' : '#dc2626'}">${overUnder}</td>
+      <td style="padding:8px 12px;text-align:right;">${p.quota_prize > 0 ? '$' + p.quota_prize.toLocaleString() : '-'}</td>
+    </tr>`;
+  }).join('');
+
+  const skinsSection = skinWinners.length > 0 ? `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">🎯 Skins Winners</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:8px 12px;text-align:left;color:#555;">Hole</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">Score</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Prize</th>
+        </tr></thead>
+        <tbody>${[...skinWinners].sort((a, b) => a.hole_number - b.hole_number).map((w, idx) =>
+          `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
+            <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
+            <td style="padding:8px 12px;">${w.player_name}</td>
+            <td style="padding:8px 12px;text-align:center;">${w.score}</td>
+            <td style="padding:8px 12px;text-align:right;">$${skinPrizePerSkin}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
+
+  const ctpSection = ctpWinners.length > 0 ? `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📍 Closest to Pin (CTP)</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:8px 12px;text-align:left;color:#555;">Hole</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">Distance</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Prize</th>
+        </tr></thead>
+        <tbody>${ctpWinners.map((w, idx) =>
+          `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
+            <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
+            <td style="padding:8px 12px;">${w.player_name}</td>
+            <td style="padding:8px 12px;text-align:center;">${w.ctp_feet}'${w.ctp_inches}"</td>
+            <td style="padding:8px 12px;text-align:right;">$${ctpPrizePerWinner}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:20px;background:#f3f4f6;font-family:Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;">
+  <div style="background:#1e3a5f;color:white;padding:24px 20px;border-radius:8px 8px 0 0;text-align:center;">
+    <h1 style="margin:0 0 8px 0;font-size:26px;">⛳ Tournament Results</h1>
+    <p style="margin:0;font-size:16px;">${tournamentDate} &bull; ${courseName}</p>
+    <p style="margin:4px 0 0 0;font-size:14px;opacity:0.85;">${numberOfHoles} Holes</p>
+  </div>
+  <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">
+    <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">🏆 Quota Game Leaderboard</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <thead><tr style="background:#f0f4f8;">
+        <th style="padding:8px 12px;text-align:center;color:#555;">Rank</th>
+        <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+        <th style="padding:8px 12px;text-align:center;color:#555;">Pts</th>
+        <th style="padding:8px 12px;text-align:center;color:#555;">+/-</th>
+        <th style="padding:8px 12px;text-align:right;color:#555;">Prize</th>
+      </tr></thead>
+      <tbody>${leaderboardRows}</tbody>
+    </table>
+  </div>
+  ${skinsSection}
+  ${ctpSection}
+  <div style="background:#1e3a5f;color:#cdd6e4;padding:14px 20px;border-radius:0 0 8px 8px;text-align:center;font-size:12px;">
+    NPGolf &bull; ${new Date().getFullYear()}
+  </div>
+</div>
+</body></html>`;
+};
+
 const insertRows = async (db, tableName, rows) => {
   if (!Array.isArray(rows) || rows.length === 0) {
     return;
@@ -388,9 +492,12 @@ router.post('/:id/complete', async (req, res) => {
   try {
     const tournamentId = req.params.id;
     
-    // Get tournament date
+    // Get tournament date and course
     const [tournamentRows] = await connection.query(
-      'SELECT date, number_of_holes FROM tournament WHERE id = ?',
+      `SELECT t.date, t.number_of_holes, c.name AS course_name
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
       [tournamentId]
     );
     
@@ -615,6 +722,11 @@ router.post('/:id/complete', async (req, res) => {
     const skinPrizePerSkin = skinWinners.length > 0 ? Math.floor(skinPrizePot / skinWinners.length) : 0;
     const ctpPrizePerWinner = ctpWinners.length > 0 ? Math.floor(ctpPrizePot / ctpWinners.length) : 0;
 
+    const tournamentFee = Number(
+      tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes
+    ) || 0;
+    const quotaPrizePot = (Number(paidCounts.paid_players) || 0) * tournamentFee;
+
     await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
 
@@ -786,6 +898,33 @@ router.post('/:id/complete', async (req, res) => {
     transactionStarted = false;
     console.log(`Tournament completion applied: tournamentId=${tournamentId}, backupId=${backupId}`);
 
+    // Generate and store results email (non-fatal)
+    try {
+      const tournamentDate = formatDateOnly(tournamentRows[0].date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const courseName = tournamentRows[0].course_name || 'Unknown Course';
+      const emailHTML = buildResultsEmailHTML({
+        tournamentDate,
+        courseName,
+        numberOfHoles: tournamentHoleCount,
+        rankedPlayers,
+        skinWinners,
+        ctpWinners,
+        skinPrizePerSkin,
+        ctpPrizePerWinner,
+        quotaPrizePot
+      });
+      const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
+      await pool.query(
+        `INSERT INTO tournament_results_email (tournament_id, subject, html, generated_at)
+         VALUES (?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE subject = VALUES(subject), html = VALUES(html), generated_at = NOW(), sent_at = NULL`,
+        [tournamentId, emailSubject, emailHTML]
+      );
+      console.log(`Results email generated for tournament ${tournamentId}`);
+    } catch (emailErr) {
+      console.error('Error generating results email (non-fatal):', emailErr);
+    }
+
     res.json({
       message: 'Tournament completed successfully',
       playersUpdated: scoresRowsWithSnapshot.length,
@@ -802,6 +941,160 @@ router.post('/:id/complete', async (req, res) => {
     res.status(500).json({ error: 'Failed to complete tournament' });
   } finally {
     connection.release();
+  }
+});
+
+// POST /api/tournaments/:id/results-email/generate - Build and store results email from existing completion data
+router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
+  const tournamentId = req.params.id;
+  try {
+    const [tournamentRows] = await pool.query(
+      `SELECT t.date, t.number_of_holes, c.name AS course_name
+       FROM tournament t
+       JOIN course c ON t.course_id = c.id
+       WHERE t.id = ?`,
+      [tournamentId]
+    );
+    if (tournamentRows.length === 0) return res.status(404).json({ error: 'Tournament not found' });
+    const { date, number_of_holes, course_name } = tournamentRows[0];
+    const tournamentHoleCount = Number(number_of_holes) === 9 ? 9 : 18;
+
+    const [paradiseRows] = await pool.query(
+      `SELECT pp.place, pp.over_under, pp.total_quota_points, pp.player_quota, p.name
+       FROM tournament_paradise_points pp
+       JOIN players p ON p.id = pp.player_id
+       WHERE pp.tournament_id = ?
+       ORDER BY pp.place ASC`,
+      [tournamentId]
+    );
+    if (paradiseRows.length === 0) return res.status(400).json({ error: 'No completion data found — complete the tournament first' });
+
+    const rankedPlayers = paradiseRows.map(r => ({
+      name: r.name,
+      total_points: Number(r.total_quota_points),
+      player_quota: Number(r.player_quota),
+      over_under: Number(r.over_under)
+    }));
+
+    const [skinRows] = await pool.query(
+      `SELECT sw.hole_number, sw.score, sw.prize_money, p.name AS player_name
+       FROM tournament_skin_winners sw
+       JOIN players p ON p.id = sw.player_id
+       WHERE sw.tournament_id = ?
+       ORDER BY sw.hole_number ASC`,
+      [tournamentId]
+    );
+    const skinPrizePerSkin = skinRows.length > 0 ? Number(skinRows[0].prize_money) : 0;
+
+    const [ctpRows] = await pool.query(
+      `SELECT cw.hole_number, cw.ctp_feet, cw.ctp_inches, cw.prize_money, p.name AS player_name
+       FROM tournament_ctp_winners cw
+       JOIN players p ON p.id = cw.player_id
+       WHERE cw.tournament_id = ?
+       ORDER BY cw.hole_number ASC`,
+      [tournamentId]
+    );
+    const ctpPrizePerWinner = ctpRows.length > 0 ? Number(ctpRows[0].prize_money) : 0;
+
+    const [paidCountsRows] = await pool.query(
+      `SELECT SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players FROM tournament_players WHERE tournament_id = ?`,
+      [tournamentId]
+    );
+    const [settingsRows] = await pool.query(
+      'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1'
+    );
+    const settings = settingsRows[0] || {};
+    const tournamentFee = Number(tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes) || 0;
+    const quotaPrizePot = (Number(paidCountsRows[0]?.paid_players) || 0) * tournamentFee;
+
+    const tournamentDate = formatDateOnly(date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const emailHTML = buildResultsEmailHTML({
+      tournamentDate,
+      courseName: course_name,
+      numberOfHoles: tournamentHoleCount,
+      rankedPlayers,
+      skinWinners: skinRows,
+      ctpWinners: ctpRows,
+      skinPrizePerSkin,
+      ctpPrizePerWinner,
+      quotaPrizePot
+    });
+    const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
+
+    await pool.query(
+      `INSERT INTO tournament_results_email (tournament_id, subject, html, generated_at)
+       VALUES (?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE subject = VALUES(subject), html = VALUES(html), generated_at = NOW(), sent_at = NULL`,
+      [tournamentId, emailSubject, emailHTML]
+    );
+
+    res.json({ subject: emailSubject, html: emailHTML, generated_at: new Date().toISOString(), sent_at: null });
+  } catch (err) {
+    console.error('Error generating results email:', err);
+    res.status(500).json({ error: 'Failed to generate results email' });
+  }
+});
+
+// GET /api/tournaments/:id/results-email - Retrieve stored results email
+router.get('/:id/results-email', requireAdmin, async (req, res) => {
+  const tournamentId = req.params.id;
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, tournament_id, subject, html, generated_at, sent_at FROM tournament_results_email WHERE tournament_id = ?',
+      [tournamentId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'No results email found for this tournament' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching results email:', err);
+    res.status(500).json({ error: 'Failed to fetch results email' });
+  }
+});
+
+// POST /api/tournaments/:id/results-email/send - Send stored results email to all eligible players (or one if email provided)
+router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
+  const tournamentId = req.params.id;
+  const { email: singleEmail } = req.body || {};
+  try {
+    const [emailRows] = await pool.query(
+      'SELECT subject, html FROM tournament_results_email WHERE tournament_id = ?',
+      [tournamentId]
+    );
+    if (emailRows.length === 0) return res.status(404).json({ error: 'No results email found for this tournament' });
+    const { subject, html } = emailRows[0];
+
+    let recipients;
+    if (singleEmail) {
+      recipients = [{ email: singleEmail }];
+    } else {
+      const [players] = await pool.query(
+        `SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1`
+      );
+      recipients = players;
+    }
+
+    let sent = 0;
+    const failed = [];
+    for (const player of recipients) {
+      try {
+        await sendEmail(player.email, subject, html);
+        sent++;
+      } catch (err) {
+        failed.push({ email: player.email, error: err.message });
+      }
+    }
+
+    if (!singleEmail) {
+      await pool.query(
+        'UPDATE tournament_results_email SET sent_at = NOW() WHERE tournament_id = ?',
+        [tournamentId]
+      );
+    }
+
+    res.json({ sent, failed, total: recipients.length });
+  } catch (err) {
+    console.error('Error sending results email:', err);
+    res.status(500).json({ error: 'Failed to send results email' });
   }
 });
 
