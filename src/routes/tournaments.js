@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 
@@ -23,6 +24,239 @@ const formatDateOnly = (value, locale = 'en-US', options = {}) => {
   }
 
   return parsed.toLocaleDateString(locale, options);
+};
+
+const getTournamentQuotaColumn = (numberOfHoles) => (
+  Number(numberOfHoles) === 9 ? 'quota_9' : 'quota_18'
+);
+
+const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
+  const [rows] = await db.query(
+    `SELECT CASE
+              WHEN t.number_of_holes = 9 THEN p.quota_9
+              ELSE p.quota_18
+            END AS tournament_quota
+     FROM tournament t
+     JOIN players p ON p.id = ?
+     WHERE t.id = ?
+     LIMIT 1`,
+    [playerId, tournamentId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const tournamentQuota = rows[0].tournament_quota;
+
+  await db.query(
+    `UPDATE tournament_players
+     SET tournament_quota = COALESCE(tournament_quota, ?)
+     WHERE player_id = ? AND tournament_id = ?`,
+    [tournamentQuota, playerId, tournamentId]
+  );
+
+  return tournamentQuota;
+};
+
+const calculateSkinsByHole = (rows) => {
+  const holeGroups = {};
+
+  rows.forEach((score) => {
+    if (!holeGroups[score.hole_id]) {
+      holeGroups[score.hole_id] = {
+        hole_id: score.hole_id,
+        hole_number: score.hole_number,
+        scores: []
+      };
+    }
+
+    holeGroups[score.hole_id].scores.push({
+      player_id: score.player_id,
+      player_name: score.player_name,
+      score: score.score
+    });
+  });
+
+  return Object.values(holeGroups).flatMap((hole) => {
+    const sortedScores = hole.scores.sort((a, b) => a.score - b.score);
+
+    if (sortedScores.length === 0) {
+      return [];
+    }
+
+    const bestScore = sortedScores[0].score;
+    const winners = sortedScores.filter((entry) => entry.score === bestScore);
+
+    if (winners.length !== 1) {
+      return [];
+    }
+
+    return [{
+      hole_id: hole.hole_id,
+      hole_number: hole.hole_number,
+      player_id: winners[0].player_id,
+      player_name: winners[0].player_name,
+      score: winners[0].score
+    }];
+  });
+};
+
+const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
+  const ctpByHole = {};
+
+  rows.forEach((ctp) => {
+    if (!ctpByHole[ctp.hole_number]) {
+      ctpByHole[ctp.hole_number] = ctp;
+    }
+  });
+
+  let winningHoles = Object.keys(ctpByHole)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  if (Number(numberOfHoles) === 9) {
+    winningHoles = winningHoles.slice(0, 2);
+  }
+
+  return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
+};
+
+const insertRows = async (db, tableName, rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  const columns = Object.keys(rows[0]);
+  if (columns.length === 0) {
+    return;
+  }
+
+  const rowPlaceholder = `(${columns.map(() => '?').join(', ')})`;
+  const placeholders = rows.map(() => rowPlaceholder).join(', ');
+  const values = [];
+
+  rows.forEach((row) => {
+    columns.forEach((column) => {
+      values.push(row[column] ?? null);
+    });
+  });
+
+  await db.query(
+    `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${placeholders}`,
+    values
+  );
+};
+
+const createPreCompleteBackup = async (db, tournamentId) => {
+  const [playerIdRows] = await db.query(
+    'SELECT DISTINCT player_id FROM scores WHERE tournament_id = ? ORDER BY player_id ASC',
+    [tournamentId]
+  );
+
+  const playerIds = playerIdRows.map((row) => Number(row.player_id)).filter((id) => Number.isInteger(id));
+  const playerIdPlaceholders = playerIds.length > 0 ? playerIds.map(() => '?').join(', ') : '';
+
+  const [tournamentRows] = await db.query(
+    'SELECT * FROM tournament WHERE id = ? LIMIT 1',
+    [tournamentId]
+  );
+
+  const [tournamentPlayersRows] = await db.query(
+    'SELECT * FROM tournament_players WHERE tournament_id = ? ORDER BY player_id ASC',
+    [tournamentId]
+  );
+
+  const [skinWinnerRows] = await db.query(
+    'SELECT * FROM tournament_skin_winners WHERE tournament_id = ? ORDER BY hole_number ASC',
+    [tournamentId]
+  );
+
+  const [ctpWinnerRows] = await db.query(
+    'SELECT * FROM tournament_ctp_winners WHERE tournament_id = ? ORDER BY hole_number ASC',
+    [tournamentId]
+  );
+
+  const [paradiseRows] = await db.query(
+    'SELECT * FROM tournament_paradise_points WHERE tournament_id = ? ORDER BY place ASC, player_id ASC',
+    [tournamentId]
+  );
+
+  let playerRows = [];
+  let quotaRows = [];
+  let skinsQuotaRows = [];
+
+  if (playerIds.length > 0) {
+    [playerRows] = await db.query(
+      `SELECT id, quota_18, quota_9, fedex_points, tournaments_played, prize_money
+       FROM players
+       WHERE id IN (${playerIdPlaceholders})
+       ORDER BY id ASC`,
+      playerIds
+    );
+
+    [quotaRows] = await db.query(
+      `SELECT *
+       FROM quota
+       WHERE player_id IN (${playerIdPlaceholders})
+       ORDER BY player_id ASC`,
+      playerIds
+    );
+
+    [skinsQuotaRows] = await db.query(
+      `SELECT *
+       FROM skins_quota
+       WHERE player_id IN (${playerIdPlaceholders})
+       ORDER BY player_id ASC`,
+      playerIds
+    );
+  }
+
+  const payload = {
+    tournament: tournamentRows[0] || null,
+    players: playerRows,
+    quota: quotaRows,
+    skins_quota: skinsQuotaRows,
+    tournament_players: tournamentPlayersRows,
+    tournament_skin_winners: skinWinnerRows,
+    tournament_ctp_winners: ctpWinnerRows,
+    tournament_paradise_points: paradiseRows
+  };
+
+  const [insertResult] = await db.query(
+    `INSERT INTO tournament_completion_backups (tournament_id, backup_data)
+     VALUES (?, ?)`,
+    [tournamentId, JSON.stringify(payload)]
+  );
+
+  return insertResult.insertId;
+};
+
+const requireAdmin = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.status(500).json({ error: 'Server misconfigured' });
+    }
+
+    const decoded = jwt.verify(token, secret);
+    const [rows] = await pool.query('SELECT role FROM players WHERE id = ?', [decoded.sub]);
+
+    if (!rows[0] || rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
 };
 
 // GET /api/tournaments - List all tournaments
@@ -150,9 +384,8 @@ router.delete('/:id', async (req, res) => {
 // POST /api/tournaments/:id/complete - Complete tournament and update quota history
 router.post('/:id/complete', async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
-    await connection.beginTransaction();
-    
     const tournamentId = req.params.id;
     
     // Get tournament date
@@ -167,7 +400,8 @@ router.post('/:id/complete', async (req, res) => {
     }
     
     const tournamentDate = tournamentRows[0].date;
-    const isNineHoleTournament = Number(tournamentRows[0].number_of_holes) === 9;
+    const tournamentHoleCount = Number(tournamentRows[0].number_of_holes) === 9 ? 9 : 18;
+    const isNineHoleTournament = tournamentHoleCount === 9;
     const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
 
     const [scoreCountRows] = await connection.query(
@@ -176,9 +410,14 @@ router.post('/:id/complete', async (req, res) => {
     );
 
     if (scoreCountRows[0].score_count === 0) {
-      await connection.rollback();
       return res.status(400).json({ error: 'No scores found for this tournament' });
     }
+
+    const backupId = await createPreCompleteBackup(connection, tournamentId);
+    console.log(`Tournament completion backup created: tournamentId=${tournamentId}, backupId=${backupId}`);
+
+    await connection.beginTransaction();
+    transactionStarted = true;
     
     // Include all scored players in quota-game updates
     const [scoresRows] = await connection.query(
@@ -226,58 +465,256 @@ router.post('/:id/complete', async (req, res) => {
         [Math.round(seededQuota), seedRow.player_id]
       )
     }
-    
-    // For each player, shift quota history and add new result
-    for (const player of scoresRows) {
+
+    await connection.query(
+      `UPDATE tournament_players tp
+       JOIN players p ON p.id = tp.player_id
+       SET tp.tournament_quota = CASE
+         WHEN ? = 9 THEN p.quota_9
+         ELSE p.quota_18
+       END
+       WHERE tp.tournament_id = ?
+         AND tp.tournament_quota IS NULL`,
+      [tournamentHoleCount, tournamentId]
+    );
+
+    const [scoresRowsWithSnapshot] = await connection.query(
+          `SELECT s.player_id,
+            p.name,
+              COALESCE(tp.tournament_quota, ${quotaColumn}) AS current_quota,
+              SUM(CAST(COALESCE(s.quota, 0) AS SIGNED)) AS total_points
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       LEFT JOIN tournament_players tp
+         ON tp.player_id = s.player_id
+        AND tp.tournament_id = s.tournament_id
+       WHERE s.tournament_id = ?
+       GROUP BY s.player_id, p.name, COALESCE(tp.tournament_quota, ${quotaColumn})`,
+      [tournamentId]
+    );
+
+    const rankedPlayers = scoresRowsWithSnapshot
+      .map((row) => {
+        const totalPoints = Number(row.total_points) || 0;
+        const playerQuota = Number(row.current_quota) || 0;
+        return {
+          player_id: row.player_id,
+          name: row.name,
+          total_points: totalPoints,
+          player_quota: playerQuota,
+          over_under: totalPoints - playerQuota
+        };
+      })
+      .sort((a, b) => {
+        if (b.over_under !== a.over_under) return b.over_under - a.over_under;
+        return String(a.name).localeCompare(String(b.name));
+      });
+
+    await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
+
+    for (let index = 0; index < rankedPlayers.length; index++) {
+      const player = rankedPlayers[index];
+      const place = index + 1;
+      const pointsAwarded = place <= 10 ? (110 - place * 10) : 1;
+
+      await connection.query(
+        `INSERT INTO tournament_paradise_points
+           (tournament_id, player_id, place, total_quota_points, player_quota, over_under, points_awarded)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tournamentId,
+          player.player_id,
+          place,
+          player.total_points,
+          player.player_quota,
+          player.over_under,
+          pointsAwarded
+        ]
+      );
+    }
+
+    await connection.query(
+      `UPDATE players p
+       LEFT JOIN (
+         SELECT
+           player_id,
+           SUM(points_awarded) AS total_points,
+           COUNT(*) AS total_tournaments
+         FROM tournament_paradise_points
+         GROUP BY player_id
+       ) awards ON awards.player_id = p.id
+       SET p.fedex_points = COALESCE(awards.total_points, 0),
+           p.tournaments_played = COALESCE(awards.total_tournaments, 0)`
+    );
+
+    const [skinScoreRows] = await connection.query(
+      `SELECT s.hole_id,
+              h.hole_number,
+              s.player_id,
+              s.score,
+              p.name AS player_name
+       FROM scores s
+       JOIN hole h ON s.hole_id = h.id
+       JOIN players p ON s.player_id = p.id
+       JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
+       WHERE s.tournament_id = ?
+         AND p.active = 1
+         AND tp.skins_ctp_paid = 1
+       ORDER BY s.hole_id, s.score ASC`,
+      [tournamentId]
+    );
+
+    const skinWinners = calculateSkinsByHole(skinScoreRows);
+
+    const [ctpRows] = await connection.query(
+      `SELECT h.id AS hole_id,
+              h.hole_number,
+              h.mens_par,
+              s.player_id,
+              p.name AS player_name,
+              s.ctp_feet,
+              s.ctp_inches,
+              s.ctp_image_url,
+              (s.ctp_feet * 12 + s.ctp_inches) AS total_inches
+       FROM scores s
+       JOIN hole h ON s.hole_id = h.id
+       JOIN players p ON s.player_id = p.id
+       JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
+       WHERE s.tournament_id = ?
+         AND h.mens_par = 3
+         AND s.ctp_feet IS NOT NULL
+         AND p.active = 1
+         AND tp.skins_ctp_paid = 1
+       ORDER BY h.hole_number, total_inches ASC`,
+      [tournamentId]
+    );
+
+    const ctpWinners = calculateCtpWinnersByHole(ctpRows, tournamentHoleCount);
+
+    const [paidCountsRows] = await connection.query(
+      `SELECT
+         SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players,
+         SUM(CASE WHEN skins_ctp_paid = 1 THEN 1 ELSE 0 END) AS skins_ctp_paid_players
+       FROM tournament_players
+       WHERE tournament_id = ?`,
+      [tournamentId]
+    );
+
+    const [settingsRows] = await connection.query(
+      'SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM settings LIMIT 1'
+    );
+
+    const paidCounts = paidCountsRows[0] || {};
+    const settings = settingsRows[0] || {};
+    const skinsCTPFee = Number(
+      tournamentHoleCount === 18 ? settings.skins_ctp_fee_18_holes : settings.skins_ctp_fee_9_holes
+    ) || 0;
+    const skinsCTPTotalPot = (Number(paidCounts.skins_ctp_paid_players) || 0) * skinsCTPFee;
+    const skinPrizePot = skinsCTPTotalPot * 0.6;
+    const ctpPrizePot = skinsCTPTotalPot * 0.4;
+    const skinPrizePerSkin = skinWinners.length > 0 ? Math.floor(skinPrizePot / skinWinners.length) : 0;
+    const ctpPrizePerWinner = ctpWinners.length > 0 ? Math.floor(ctpPrizePot / ctpWinners.length) : 0;
+
+    await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
+
+    for (const winner of skinWinners) {
+      await connection.query(
+        `INSERT INTO tournament_skin_winners (tournament_id, hole_id, hole_number, player_id, score, prize_money)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [tournamentId, winner.hole_id, winner.hole_number, winner.player_id, winner.score, skinPrizePerSkin]
+      );
+    }
+
+    for (const winner of ctpWinners) {
+      await connection.query(
+        `INSERT INTO tournament_ctp_winners (tournament_id, hole_id, hole_number, player_id, ctp_feet, ctp_inches, ctp_image_url, prize_money)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tournamentId,
+          winner.hole_id,
+          winner.hole_number,
+          winner.player_id,
+          winner.ctp_feet,
+          winner.ctp_inches,
+          winner.ctp_image_url,
+          ctpPrizePerWinner
+        ]
+      );
+    }
+
+    // For each player, shift quota history and add new result, then recalculate quota as floor average
+    for (const player of scoresRowsWithSnapshot) {
       const playerId = player.player_id;
       const totalPoints = player.total_points;
-      const quotaDiff = totalPoints; // positive = above quota, negative = below
-      
+      const currentQuota = Number(player.current_quota);
+      const quotaDiff = Number(totalPoints) - (Number.isNaN(currentQuota) ? 0 : currentQuota);
+
       // Get current quota record for this player
       const [quotaRows] = await connection.query(
         'SELECT * FROM quota WHERE player_id = ? LIMIT 1',
         [playerId]
       );
-      
+
       if (quotaRows.length === 0) {
         // Create new quota record with tournament result in slot 1
         await connection.query(
-          `INSERT INTO quota (player_id, date_1, points_1, quota_diff_1)
-           VALUES (?, ?, ?, ?)`,
-          [playerId, tournamentDate, totalPoints, quotaDiff]
+          `INSERT INTO quota (player_id, date_1, points_1, quota_diff_1, holes_1)
+           VALUES (?, ?, ?, ?, ?)`,
+          [playerId, tournamentDate, totalPoints, quotaDiff, tournamentHoleCount]
         );
       } else {
-        // Shift existing data and insert new tournament result
+        // Shift: 6→7, 5→6, 4→5, 3→4, 2→3, 1→2, new tournament→1
         const quota = quotaRows[0];
         await connection.query(
           `UPDATE quota SET
-            date_7 = ?, points_7 = ?, quota_diff_7 = ?,
-            date_6 = ?, points_6 = ?, quota_diff_6 = ?,
-            date_5 = ?, points_5 = ?, quota_diff_5 = ?,
-            date_4 = ?, points_4 = ?, quota_diff_4 = ?,
-            date_3 = ?, points_3 = ?, quota_diff_3 = ?,
-            date_2 = ?, points_2 = ?, quota_diff_2 = ?,
-            date_1 = ?, points_1 = ?, quota_diff_1 = ?
+            date_7 = ?, points_7 = ?, quota_diff_7 = ?, holes_7 = ?,
+            date_6 = ?, points_6 = ?, quota_diff_6 = ?, holes_6 = ?,
+            date_5 = ?, points_5 = ?, quota_diff_5 = ?, holes_5 = ?,
+            date_4 = ?, points_4 = ?, quota_diff_4 = ?, holes_4 = ?,
+            date_3 = ?, points_3 = ?, quota_diff_3 = ?, holes_3 = ?,
+            date_2 = ?, points_2 = ?, quota_diff_2 = ?, holes_2 = ?,
+            date_1 = ?, points_1 = ?, quota_diff_1 = ?, holes_1 = ?
            WHERE player_id = ?`,
           [
-            quota.date_6, quota.points_6, quota.quota_diff_6,
-            quota.date_5, quota.points_5, quota.quota_diff_5,
-            quota.date_4, quota.points_4, quota.quota_diff_4,
-            quota.date_3, quota.points_3, quota.quota_diff_3,
-            quota.date_2, quota.points_2, quota.quota_diff_2,
-            quota.date_1, quota.points_1, quota.quota_diff_1,
-            tournamentDate, totalPoints, quotaDiff,
+            quota.date_6, quota.points_6, quota.quota_diff_6, quota.holes_6,
+            quota.date_5, quota.points_5, quota.quota_diff_5, quota.holes_5,
+            quota.date_4, quota.points_4, quota.quota_diff_4, quota.holes_4,
+            quota.date_3, quota.points_3, quota.quota_diff_3, quota.holes_3,
+            quota.date_2, quota.points_2, quota.quota_diff_2, quota.holes_2,
+            quota.date_1, quota.points_1, quota.quota_diff_1, quota.holes_1,
+            tournamentDate, totalPoints, quotaDiff, tournamentHoleCount,
             playerId
           ]
         );
       }
+
+      // Recompute player quota = floor(average of all non-null points slots 1-7)
+      const [updatedQuotaRows] = await connection.query(
+        'SELECT points_1, points_2, points_3, points_4, points_5, points_6, points_7 FROM quota WHERE player_id = ? LIMIT 1',
+        [playerId]
+      );
+      if (updatedQuotaRows.length > 0) {
+        const q = updatedQuotaRows[0];
+        const values = [q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7]
+          .filter(v => v !== null && v !== undefined && !isNaN(Number(v)))
+          .map(v => Number(v));
+        if (values.length > 0) {
+          const newQuota = Math.floor(values.reduce((sum, v) => sum + v, 0) / values.length);
+          await connection.query(
+            `UPDATE players SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ? WHERE id = ?`,
+            [newQuota, playerId]
+          );
+        }
+      }
     }
     
     // Now do the same for skins_quota (20 slots instead of 7)
-    for (const player of scoresRows) {
+    for (const player of scoresRowsWithSnapshot) {
       const playerId = player.player_id;
       const totalPoints = player.total_points;
-      const quotaDiff = totalPoints;
+      const currentQuota = Number(player.current_quota);
+      const quotaDiff = Number(totalPoints) - (Number.isNaN(currentQuota) ? 0 : currentQuota);
       
       // Get current skins_quota record for this player
       const [skinsQuotaRows] = await connection.query(
@@ -346,16 +783,126 @@ router.post('/:id/complete', async (req, res) => {
     }
     
     await connection.commit();
+    transactionStarted = false;
+    console.log(`Tournament completion applied: tournamentId=${tournamentId}, backupId=${backupId}`);
+
     res.json({
       message: 'Tournament completed successfully',
-      playersUpdated: scoresRows.length,
-      playersSeeded: newPlayerSeedRows.length
+      playersUpdated: scoresRowsWithSnapshot.length,
+      playersSeeded: newPlayerSeedRows.length,
+      paradisePointsAwarded: rankedPlayers.length,
+      backupId
     });
     
   } catch (err) {
-    await connection.rollback();
+    if (transactionStarted) {
+      await connection.rollback();
+    }
     console.error('Error completing tournament:', err);
     res.status(500).json({ error: 'Failed to complete tournament' });
+  } finally {
+    connection.release();
+  }
+});
+
+// POST /api/tournaments/:id/restore-backup/:backupId - Restore tournament state from backup
+router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const tournamentId = Number(req.params.id);
+    const backupId = Number(req.params.backupId);
+
+    if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
+      return res.status(400).json({ error: 'Invalid tournament id' });
+    }
+
+    if (!Number.isInteger(backupId) || backupId <= 0) {
+      return res.status(400).json({ error: 'Invalid backup id' });
+    }
+
+    const [backupRows] = await connection.query(
+      `SELECT id, backup_data
+       FROM tournament_completion_backups
+       WHERE id = ? AND tournament_id = ?
+       LIMIT 1`,
+      [backupId, tournamentId]
+    );
+
+    if (backupRows.length === 0) {
+      return res.status(404).json({ error: 'Backup not found for this tournament' });
+    }
+
+    const backupData = typeof backupRows[0].backup_data === 'string'
+      ? JSON.parse(backupRows[0].backup_data)
+      : backupRows[0].backup_data;
+
+    const players = Array.isArray(backupData.players) ? backupData.players : [];
+    const quotaRows = Array.isArray(backupData.quota) ? backupData.quota : [];
+    const skinsQuotaRows = Array.isArray(backupData.skins_quota) ? backupData.skins_quota : [];
+    const tournamentPlayers = Array.isArray(backupData.tournament_players) ? backupData.tournament_players : [];
+    const skinWinners = Array.isArray(backupData.tournament_skin_winners) ? backupData.tournament_skin_winners : [];
+    const ctpWinners = Array.isArray(backupData.tournament_ctp_winners) ? backupData.tournament_ctp_winners : [];
+    const paradisePoints = Array.isArray(backupData.tournament_paradise_points) ? backupData.tournament_paradise_points : [];
+
+    const playerIds = players.map((row) => Number(row.id)).filter((id) => Number.isInteger(id));
+
+    await connection.beginTransaction();
+
+    for (const player of players) {
+      await connection.query(
+        `UPDATE players
+         SET quota_18 = ?, quota_9 = ?, fedex_points = ?, tournaments_played = ?, prize_money = ?
+         WHERE id = ?`,
+        [
+          player.quota_18 ?? null,
+          player.quota_9 ?? null,
+          player.fedex_points ?? 0,
+          player.tournaments_played ?? 0,
+          player.prize_money ?? 0,
+          player.id
+        ]
+      );
+    }
+
+    if (playerIds.length > 0) {
+      const placeholders = playerIds.map(() => '?').join(', ');
+      await connection.query(`DELETE FROM quota WHERE player_id IN (${placeholders})`, playerIds);
+      await connection.query(`DELETE FROM skins_quota WHERE player_id IN (${placeholders})`, playerIds);
+    }
+
+    await insertRows(connection, 'quota', quotaRows);
+    await insertRows(connection, 'skins_quota', skinsQuotaRows);
+
+    await connection.query('DELETE FROM tournament_players WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
+
+    await insertRows(connection, 'tournament_players', tournamentPlayers);
+    await insertRows(connection, 'tournament_skin_winners', skinWinners);
+    await insertRows(connection, 'tournament_ctp_winners', ctpWinners);
+    await insertRows(connection, 'tournament_paradise_points', paradisePoints);
+
+    await connection.query(
+      `UPDATE tournament_completion_backups
+       SET restored_at = NOW()
+       WHERE id = ?`,
+      [backupId]
+    );
+
+    await connection.commit();
+
+    console.log(`Tournament backup restored: tournamentId=${tournamentId}, backupId=${backupId}`);
+
+    res.json({
+      message: 'Tournament state restored from backup',
+      backupId,
+      tournamentId
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Error restoring tournament backup:', err);
+    res.status(500).json({ error: 'Failed to restore tournament backup' });
   } finally {
     connection.release();
   }
@@ -459,9 +1006,10 @@ router.post('/:id/send-sms', async (req, res) => {
 });
 
 // POST /api/tournaments/:id/send-invitations - Send tournament invitations via SMS and/or Email
-router.post('/:id/send-invitations', async (req, res) => {
+// Optional body field `playerId` limits sending to one player.
+router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
-  const { method } = req.body; // 'sms', 'email', or 'both'
+  const { method, playerId } = req.body; // method: 'sms' | 'email' | 'both', optional playerId
   
   try {
     // Get tournament info with course details
@@ -487,19 +1035,31 @@ router.post('/:id/send-invitations', async (req, res) => {
     // Get base URL for RSVP links
     const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
     
-    // Query players based on method
-    let playersQuery = '';
+    // Query players based on method (and optional single-player filter)
+    let playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1';
+    const playersParams = [];
+
     if (method === 'sms' || !method) {
-      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""';
+      playersQuery += ' AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""';
     } else if (method === 'email') {
-      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND email_allowed = 1 AND email IS NOT NULL AND email != ""';
+      playersQuery += ' AND email_allowed = 1 AND email IS NOT NULL AND email != ""';
     } else if (method === 'both') {
-      playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1 AND ((sms_allowed = 1 AND phone IS NOT NULL AND phone != "") OR (email_allowed = 1 AND email IS NOT NULL AND email != ""))';
+      playersQuery += ' AND ((sms_allowed = 1 AND phone IS NOT NULL AND phone != "") OR (email_allowed = 1 AND email IS NOT NULL AND email != ""))';
     } else {
       return res.status(400).json({ error: 'Invalid method. Use "sms", "email", or "both"' });
     }
+
+    if (playerId !== undefined && playerId !== null && playerId !== '') {
+      const parsedPlayerId = Number(playerId);
+      if (!Number.isInteger(parsedPlayerId) || parsedPlayerId <= 0) {
+        return res.status(400).json({ error: 'Invalid playerId' });
+      }
+
+      playersQuery += ' AND id = ?';
+      playersParams.push(parsedPlayerId);
+    }
     
-    const [players] = await pool.query(playersQuery);
+    const [players] = await pool.query(playersQuery, playersParams);
     if (players.length === 0) {
       return res.status(400).json({ error: 'No active players found with the selected contact method' });
     }
@@ -652,6 +1212,7 @@ router.get('/:id/confirm', async (req, res) => {
           'INSERT INTO tournament_players (player_id, tournament_id, attending_status, response_date) VALUES (?, ?, ?, NOW())',
           [playerId, tournamentId, 'yes']
         );
+        await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
         console.log(`Inserted new tournament_players record: player ${playerId} ATTENDING tournament ${tournamentId}`);
       } else {
         // Update attending status
@@ -659,6 +1220,7 @@ router.get('/:id/confirm', async (req, res) => {
           'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
           ['yes', playerId, tournamentId]
         );
+        await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
         console.log(`Updated tournament_players: player ${playerId} ATTENDING tournament ${tournamentId}`);
       }
       
@@ -691,6 +1253,7 @@ router.get('/:id/confirm', async (req, res) => {
           'INSERT INTO tournament_players (player_id, tournament_id, attending_status, response_date) VALUES (?, ?, ?, NOW())',
           [playerId, tournamentId, 'no']
         );
+        await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
         console.log(`Inserted new tournament_players record: player ${playerId} NOT ATTENDING tournament ${tournamentId}`);
       } else {
         // Update status to 'no'
@@ -698,6 +1261,7 @@ router.get('/:id/confirm', async (req, res) => {
           'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
           ['no', playerId, tournamentId]
         );
+        await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
         console.log(`Updated tournament_players: player ${playerId} NOT ATTENDING tournament ${tournamentId}`);
       }
       
@@ -778,6 +1342,7 @@ router.get('/:id/rsvp', async (req, res) => {
         'UPDATE tournament_players SET attending_status = ?, response_date = NOW() WHERE player_id = ? AND tournament_id = ?',
         ['yes', playerId, tournamentId]
       );
+      await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
       
       return res.send(`
         <html>
@@ -798,6 +1363,7 @@ router.get('/:id/rsvp', async (req, res) => {
       'INSERT INTO tournament_players (player_id, tournament_id, paid, attending_status, response_date) VALUES (?, ?, 0, ?, NOW())',
       [playerId, tournamentId, 'yes']
     );
+    await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
     
     // Send success response
     res.send(`
@@ -907,6 +1473,7 @@ router.get('/join', async (req, res) => {
     
     // Add to tournament_players
     await pool.query('INSERT INTO tournament_players (player_id, tournament_id) VALUES (?, ?)', [playerId, tournamentId]);
+    await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
     res.json({ message: 'Joined tournament successfully' });
   } catch (err) {
     console.error('Error joining tournament:', err);

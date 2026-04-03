@@ -1,8 +1,35 @@
 const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const router = express.Router();
+
+const requireAdmin = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.status(500).json({ error: 'Server misconfigured' });
+    }
+
+    const decoded = jwt.verify(token, secret);
+    const [rows] = await pool.query('SELECT role FROM players WHERE id = ?', [decoded.sub]);
+    if (!rows[0] || rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
 
 // GET /api/users - list players
 router.get('/', async (req, res) => {
@@ -72,6 +99,85 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/users/refresh-quotas - Refresh players quota_18/quota_9 from latest quota history (admin only)
+router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
+  try {
+    const [quotaRows] = await pool.query('SELECT * FROM quota');
+
+    let updated18 = 0;
+    let updated9 = 0;
+    let playersTouched = 0;
+
+    for (const quotaRow of quotaRows) {
+      let latest18 = null;
+      let latest9 = null;
+
+      for (let i = 1; i <= 7; i++) {
+        const holes = Number(quotaRow[`holes_${i}`]);
+        const pointsRaw = quotaRow[`points_${i}`];
+        if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
+          continue;
+        }
+
+        const points = Number(pointsRaw);
+        if (Number.isNaN(points)) {
+          continue;
+        }
+
+        if (holes === 18 && latest18 === null) {
+          latest18 = Math.round(points);
+        }
+
+        if (holes === 9 && latest9 === null) {
+          latest9 = Math.round(points);
+        }
+
+        if (latest18 !== null && latest9 !== null) {
+          break;
+        }
+      }
+
+      if (latest18 === null && latest9 === null) {
+        continue;
+      }
+
+      const updates = [];
+      const values = [];
+
+      if (latest18 !== null) {
+        updates.push('quota_18 = ?');
+        values.push(latest18);
+        updated18++;
+      }
+
+      if (latest9 !== null) {
+        updates.push('quota_9 = ?');
+        values.push(latest9);
+        updated9++;
+      }
+
+      values.push(quotaRow.player_id);
+
+      await pool.execute(
+        `UPDATE players SET ${updates.join(', ')} WHERE id = ?`,
+        values
+      );
+
+      playersTouched++;
+    }
+
+    res.json({
+      message: 'Quota values refreshed successfully',
+      playersTouched,
+      updated18,
+      updated9
+    });
+  } catch (err) {
+    console.error('Error refreshing quota values:', err);
+    res.status(500).json({ error: 'Failed to refresh quota values' });
   }
 });
 
@@ -367,13 +473,13 @@ router.get('/:id/quota', async (req, res) => {
 router.put('/:id/quota', async (req, res) => {
   const { id } = req.params;
   const allowedFields = [
-    'date_1', 'points_1', 'quota_diff_1',
-    'date_2', 'points_2', 'quota_diff_2',
-    'date_3', 'points_3', 'quota_diff_3',
-    'date_4', 'points_4', 'quota_diff_4',
-    'date_5', 'points_5', 'quota_diff_5',
-    'date_6', 'points_6', 'quota_diff_6',
-    'date_7', 'points_7', 'quota_diff_7'
+    'date_1', 'points_1', 'quota_diff_1', 'holes_1',
+    'date_2', 'points_2', 'quota_diff_2', 'holes_2',
+    'date_3', 'points_3', 'quota_diff_3', 'holes_3',
+    'date_4', 'points_4', 'quota_diff_4', 'holes_4',
+    'date_5', 'points_5', 'quota_diff_5', 'holes_5',
+    'date_6', 'points_6', 'quota_diff_6', 'holes_6',
+    'date_7', 'points_7', 'quota_diff_7', 'holes_7'
   ];
 
   const updates = [];

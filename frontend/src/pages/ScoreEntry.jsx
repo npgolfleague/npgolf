@@ -80,7 +80,7 @@ export const ScoreEntry = () => {
 
   const fetchTournaments = async () => {
     try {
-      const response = await tournamentsAPI.upcoming()
+      const response = await tournamentsAPI.list()
       setTournaments(response.data)
     } catch (err) {
       console.error('Error fetching tournaments:', err)

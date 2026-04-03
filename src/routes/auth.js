@@ -67,10 +67,17 @@ router.post('/register', async (req, res) => {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS || '10');
     const hashedPassword = await bcrypt.hash(password, rounds);
 
+    const normalizedQuota18 = quota_18 === undefined || quota_18 === null || quota_18 === ''
+      ? null
+      : Number(quota_18);
+    const normalizedQuota9 = quota_9 === undefined || quota_9 === null || quota_9 === ''
+      ? null
+      : Number(quota_9);
+
     // Insert new player
     const [result] = await pool.query(
       'INSERT INTO players (name, email, password, phone, sex, quota_18, quota_9, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, phone, sex || 'M', quota_18 || 18, quota_9 || 9, 'player', 1, sms_allowed ? 1 : 0]
+      [name, email, hashedPassword, phone, sex || 'M', normalizedQuota18, normalizedQuota9, 'player', 1, sms_allowed ? 1 : 0]
     );
 
     const userId = result.insertId;
@@ -102,7 +109,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: quota_18 || 18, quota_9: quota_9 || 9, role: 'player' }
+      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: normalizedQuota18, quota_9: normalizedQuota9, role: 'player' }
     });
   } catch (err) {
     console.error('Registration error', err);
