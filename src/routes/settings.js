@@ -47,10 +47,11 @@ router.get('/', async (req, res) => {
 
 // PUT /api/settings - Update settings (admin only)
 router.put('/', requireAdmin, async (req, res) => {
-  const { tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes } = req.body;
+  const { tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, golf_course_email } = req.body;
 
   if (tournament_fee_18_holes === undefined && tournament_fee_9_holes === undefined && 
-      skins_ctp_fee_18_holes === undefined && skins_ctp_fee_9_holes === undefined) {
+      skins_ctp_fee_18_holes === undefined && skins_ctp_fee_9_holes === undefined && 
+      golf_course_email === undefined) {
     return res.status(400).json({ error: 'No settings provided to update' });
   }
 
@@ -76,6 +77,11 @@ router.put('/', requireAdmin, async (req, res) => {
     if (skins_ctp_fee_9_holes !== undefined) {
       updates.push('skins_ctp_fee_9_holes = ?');
       values.push(skins_ctp_fee_9_holes);
+    }
+
+    if (golf_course_email !== undefined) {
+      updates.push('golf_course_email = ?');
+      values.push(golf_course_email);
     }
 
     await pool.query(

@@ -102,4 +102,9 @@ export const emailsAPI = {
   delete: (id) => apiClient.delete(`/emails/${id}`)
 }
 
+export const cartTagsAPI = {
+  generate: (tournamentId) => apiClient.get(`/cart-tags/tournament/${tournamentId}`),
+  send: (tournamentId) => apiClient.post(`/cart-tags/tournament/${tournamentId}/send`)
+}
+
 export default apiClient

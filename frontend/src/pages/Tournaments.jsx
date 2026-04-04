@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI } from '../api'
+import { tournamentsAPI, cartTagsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { formatDateOnly } from '../utils/date'
 
@@ -19,6 +19,8 @@ export const Tournaments = () => {
   const [resultsEmailSendResult, setResultsEmailSendResult] = useState(null)
   const [individualEmail, setIndividualEmail] = useState('')
   const [sendingIndividual, setSendingIndividual] = useState(false)
+  const [sendingCartTags, setSendingCartTags] = useState(false)
+  const [cartTagsResult, setCartTagsResult] = useState(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -143,6 +145,27 @@ export const Tournaments = () => {
     }
   }
 
+  const handleOpenCartTags = (tournamentId) => {
+    // Open cart tags in new window for printing
+    window.open(`/api/cart-tags/tournament/${tournamentId}`, '_blank')
+  }
+
+  const handleSendCartTags = async (tournamentId) => {
+    if (!confirm('Send cart tags and tee sheet to the golf course email configured in settings?')) return
+    try {
+      setSendingCartTags(true)
+      setCartTagsResult(null)
+      const response = await cartTagsAPI.send(tournamentId)
+      setCartTagsResult({ tournamentId, ...response.data })
+      setTimeout(() => setCartTagsResult(null), 10000) // Clear after 10 seconds
+    } catch (err) {
+      console.error('Error sending cart tags:', err)
+      setError(err.response?.data?.error || 'Failed to send cart tags')
+    } finally {
+      setSendingCartTags(false)
+    }
+  }
+
   const formatHolesLabel = (tournament) => {
     if (tournament.number_of_holes === 9) {
       const side = tournament.nine_hole_side === 'back' ? 'back' : 'front'
@@ -191,6 +214,20 @@ export const Tournaments = () => {
             </div>
             <button
               onClick={() => setInviteResult(null)}
+              className="mt-2 text-xs text-green-800 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {cartTagsResult && (
+          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+            <p className="font-semibold">✓ Cart Tags Sent Successfully!</p>
+            <p className="text-sm mt-1">{cartTagsResult.message}</p>
+            <p className="text-xs mt-1">📧 Groups: {cartTagsResult.groups}</p>
+            <button
+              onClick={() => setCartTagsResult(null)}
               className="mt-2 text-xs text-green-800 underline"
             >
               Dismiss
@@ -250,6 +287,21 @@ export const Tournaments = () => {
                                 className="text-purple-600 hover:text-purple-800 text-sm font-medium disabled:text-gray-400"
                               >
                                 {sendingInvitations === tournament.id ? '📧 Sending...' : '📧 Invitations'}
+                              </button>
+                              <button
+                                onClick={() => handleOpenCartTags(tournament.id)}
+                                className="text-cyan-600 hover:text-cyan-800 text-sm font-medium"
+                                title="View/Print Cart Tags"
+                              >
+                                🏷️ Cart Tags
+                              </button>
+                              <button
+                                onClick={() => handleSendCartTags(tournament.id)}
+                                disabled={sendingCartTags}
+                                className="text-teal-600 hover:text-teal-800 text-sm font-medium disabled:text-gray-400"
+                                title="Send Cart Tags to Golf Course"
+                              >
+                                {sendingCartTags ? '📧 Sending...' : '📧 Send Tags'}
                               </button>
                               <button
                                 onClick={() => navigate(`/tournaments/${tournament.id}/edit`)}

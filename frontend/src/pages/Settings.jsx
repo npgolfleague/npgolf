@@ -8,7 +8,8 @@ export const Settings = () => {
   const { user } = useContext(AuthContext)
   const [settings, setSettings] = useState({
     tournament_fee_18_holes: 0,
-    tournament_fee_9_holes: 0
+    tournament_fee_9_holes: 0,
+    golf_course_email: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -32,7 +33,8 @@ export const Settings = () => {
       const response = await settingsAPI.get()
       setSettings({
         tournament_fee_18_holes: response.data.tournament_fee_18_holes,
-        tournament_fee_9_holes: response.data.tournament_fee_9_holes
+        tournament_fee_9_holes: response.data.tournament_fee_9_holes,
+        golf_course_email: response.data.golf_course_email || ''
       })
       setError('')
     } catch (err) {
@@ -45,9 +47,11 @@ export const Settings = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target
+    // For numeric fields, parse as float; otherwise keep as string
+    const newValue = name.includes('fee') ? (parseFloat(value) || 0) : value
     setSettings(prev => ({
       ...prev,
-      [name]: parseFloat(value) || 0
+      [name]: newValue
     }))
   }
 
@@ -61,7 +65,8 @@ export const Settings = () => {
       const response = await settingsAPI.update(settings)
       setSettings({
         tournament_fee_18_holes: response.data.tournament_fee_18_holes,
-        tournament_fee_9_holes: response.data.tournament_fee_9_holes
+        tournament_fee_9_holes: response.data.tournament_fee_9_holes,
+        golf_course_email: response.data.golf_course_email || ''
       })
       setSuccess('Settings saved successfully!')
       setTimeout(() => setSuccess(''), 3000)
@@ -147,6 +152,23 @@ export const Settings = () => {
             />
             <p className="text-sm text-gray-500 mt-1">
               Fee charged for 9 hole tournaments
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Golf Course Email
+            </label>
+            <input
+              type="email"
+              name="golf_course_email"
+              value={settings.golf_course_email}
+              onChange={handleChange}
+              placeholder="course@example.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Email address to send cart tags and tee sheets to the golf course
             </p>
           </div>
         </div>

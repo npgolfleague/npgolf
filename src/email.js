@@ -11,9 +11,10 @@ const fromEmail = process.env.SENDGRID_FROM_EMAIL;
  * @param {string} subject - Email subject line
  * @param {string} html - HTML content of the email
  * @param {string} text - Plain text version (optional, will be auto-generated from html if not provided)
+ * @param {Array} attachments - Array of attachment objects (optional)
  * @returns {Promise} SendGrid response
  */
-async function sendEmail(to, subject, html, text = null) {
+async function sendEmail(to, subject, html, text = null, attachments = null) {
   const msg = {
     to,
     from: fromEmail,
@@ -21,6 +22,10 @@ async function sendEmail(to, subject, html, text = null) {
     html,
     text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
   };
+
+  if (attachments && attachments.length > 0) {
+    msg.attachments = attachments;
+  }
 
   try {
     const response = await sgMail.send(msg);
