@@ -11,6 +11,7 @@ const scoresRouter = require('./routes/scores');
 const leaderboardRouter = require('./routes/leaderboard');
 const settingsRouter = require('./routes/settings');
 const emailsRouter = require('./routes/emails');
+const cartTagsRouter = require('./routes/cart-tags');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -50,6 +51,7 @@ app.use('/api/scores', scoresRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/emails', emailsRouter);
+app.use('/api/cart-tags', cartTagsRouter);
 
 // Public pages for SMS compliance (Twilio verification)
 app.get('/', (req, res) => {
