@@ -21,6 +21,7 @@ import { Settings } from './pages/Settings'
 import { Tournaments } from './pages/Tournaments'
 import { AddTournament } from './pages/AddTournament'
 import { EditTournament } from './pages/EditTournament'
+import { TournamentHoleScores } from './pages/TournamentHoleScores'
 import { Rules } from './pages/Rules'
 import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
@@ -69,6 +70,7 @@ try {
               <Route path="/tournaments/:id/edit" element={<EditTournament />} />
               <Route path="/tournaments/:tournamentId/players" element={<TournamentPlayers />} />
               <Route path="/tournaments/:tournamentId/leaderboard" element={<Leaderboard />} />
+              <Route path="/tournaments/:tournamentId/hole-scores" element={<TournamentHoleScores />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/quota" element={<Quota />} />

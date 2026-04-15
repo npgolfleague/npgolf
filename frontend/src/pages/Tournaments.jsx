@@ -279,6 +279,14 @@ export const Tournaments = () => {
                           >
                             🏆 Leaderboard
                           </button>
+                          {Number(tournament.is_completed || 0) === 1 && (
+                            <button
+                              onClick={() => navigate(`/tournaments/${tournament.id}/hole-scores`)}
+                              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                            >
+                              ⛳ Hole Scores
+                            </button>
+                          )}
                           {isAdmin && (
                             <>
                               <button

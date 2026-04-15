@@ -495,7 +495,15 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
-              c.id as course_id, c.name as course_name, c.address as course_address
+              c.id as course_id, c.name as course_name, c.address as course_address,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM tournament_paradise_points tp
+                  WHERE tp.tournament_id = t.id
+                ) THEN 1
+                ELSE 0
+              END AS is_completed
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        ORDER BY t.date DESC`
@@ -551,7 +559,15 @@ router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
-              c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone
+              c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM tournament_paradise_points tp
+                  WHERE tp.tournament_id = t.id
+                ) THEN 1
+                ELSE 0
+              END AS is_completed
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
