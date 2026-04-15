@@ -191,10 +191,12 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const courseName = tournament.course_name;
     const firstTeeTime = tournament.first_tee_time;
     
-    // Get all foursome groups with players
-    const [groupRows] = await pool.query(
-      `SELECT s.foursome_group,
-              p.name as player_name
+    // Get all foursome groups with players from both scores and tournament_players
+    const groups = {};
+
+    // From scores table
+    const [scoreRows] = await pool.query(
+      `SELECT s.foursome_group, p.name as player_name
        FROM scores s
        JOIN players p ON s.player_id = p.id
        WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
@@ -202,26 +204,44 @@ router.get('/tournament/:tournamentId', async (req, res) => {
        ORDER BY s.foursome_group, p.name`,
       [tournamentId]
     );
-    
-    if (groupRows.length === 0) {
+
+    scoreRows.forEach(row => {
+      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
+      groups[row.foursome_group].add(row.player_name);
+    });
+
+    // From tournament_players table (allows assigning groups without scores)
+    const [tpRows] = await pool.query(
+      `SELECT tp.foursome_group, p.name as player_name
+       FROM tournament_players tp
+       JOIN players p ON tp.player_id = p.id
+       WHERE tp.tournament_id = ? AND tp.foursome_group IS NOT NULL
+       GROUP BY tp.foursome_group, p.id
+       ORDER BY tp.foursome_group, p.name`,
+      [tournamentId]
+    );
+
+    tpRows.forEach(row => {
+      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
+      groups[row.foursome_group].add(row.player_name);
+    });
+
+    // Convert sets to arrays and ensure we have at least one group
+    const groupKeys = Object.keys(groups);
+    if (groupKeys.length === 0) {
       return res.status(404).json({ error: 'No foursome groups found for this tournament' });
     }
-    
-    // Organize players by foursome group
-    const groups = {};
-    groupRows.forEach(row => {
-      if (!groups[row.foursome_group]) {
-        groups[row.foursome_group] = [];
-      }
-      groups[row.foursome_group].push(row.player_name);
-    });
+    // transform to plain object with arrays
+    const groupsArr = {};
+    groupKeys.forEach(g => { groupsArr[g] = Array.from(groups[g]); });
+    // use groupsArr going forward
     
     // Generate cart tags (2 players per cart typically)
     const tags = [];
-    const groupNames = Object.keys(groups).sort();
+    const groupNames = Object.keys(groupsArr).sort();
     
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groups[groupName];
+      const players = groupsArr[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8); // 8 minute intervals
       
       // Extract starting hole from group name (e.g., "1" -> 1)
@@ -280,10 +300,12 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       day: 'numeric'
     });
     
-    // Get all foursome groups with players
-    const [groupRows] = await pool.query(
-      `SELECT s.foursome_group,
-              p.name as player_name
+    // Get all foursome groups with players from both scores and tournament_players
+    const groups = {};
+
+    // From scores table
+    const [scoreRows2] = await pool.query(
+      `SELECT s.foursome_group, p.name as player_name
        FROM scores s
        JOIN players p ON s.player_id = p.id
        WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
@@ -291,26 +313,36 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
        ORDER BY s.foursome_group, p.name`,
       [tournamentId]
     );
-    
-    if (groupRows.length === 0) {
-      return res.status(404).json({ error: 'No foursome groups found for this tournament' });
-    }
-    
-    // Organize players by foursome group
-    const groups = {};
-    groupRows.forEach(row => {
-      if (!groups[row.foursome_group]) {
-        groups[row.foursome_group] = [];
-      }
-      groups[row.foursome_group].push(row.player_name);
+
+    scoreRows2.forEach(row => {
+      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
+      groups[row.foursome_group].add(row.player_name);
     });
-    
-    const groupNames = Object.keys(groups).sort();
+
+    // From tournament_players table
+    const [tpRows2] = await pool.query(
+      `SELECT tp.foursome_group, p.name as player_name
+       FROM tournament_players tp
+       JOIN players p ON tp.player_id = p.id
+       WHERE tp.tournament_id = ? AND tp.foursome_group IS NOT NULL
+       GROUP BY tp.foursome_group, p.id
+       ORDER BY tp.foursome_group, p.name`,
+      [tournamentId]
+    );
+
+    tpRows2.forEach(row => {
+      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
+      groups[row.foursome_group].add(row.player_name);
+    });
+
+    const groupsArr2 = {};
+    Object.keys(groups).forEach(g => { groupsArr2[g] = Array.from(groups[g]); });
+    const groupNames = Object.keys(groupsArr2).sort();
     
     // Build foursome list HTML
     let foursomeListHTML = '';
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groups[groupName];
+      const players = groupsArr2[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
       
       foursomeListHTML += `
@@ -326,7 +358,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const emailTags = [];
     const pdfTags = []; // For PDF generation
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groups[groupName];
+      const players = groupsArr2[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
       
       // Extract starting hole from group name (e.g., "1" -> 1)

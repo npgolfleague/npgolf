@@ -142,6 +142,23 @@ export const ScoreEntry = () => {
     }
   }
 
+  const assignGroupToSelectedPlayers = async () => {
+    if (!selectedTournament || !foursomeGroup || selectedPlayers.length === 0) {
+      alert('Please select tournament, players, and enter foursome group')
+      return
+    }
+
+    try {
+      const playerIds = selectedPlayers
+      await tournamentsAPI.assignFoursomeGroup(selectedTournament.id, foursomeGroup, playerIds)
+      await fetchFoursomeGroups(selectedTournament.id)
+      alert('Foursome group assigned to selected players')
+    } catch (err) {
+      console.error('Error assigning foursome group:', err)
+      alert('Failed to assign foursome group')
+    }
+  }
+
   const loadExistingScores = async () => {
     try {
       const response = await scoresAPI.getFoursomeScores(selectedTournament.id, foursomeGroup)
@@ -536,14 +553,22 @@ export const ScoreEntry = () => {
                     </button>
                   ))}
                 </div>
-                <div className="mt-2 flex justify-between items-center">
-                  <div className="text-sm text-gray-600">
-                    Selected: {selectedPlayers.length}/4
+                  <div className="mt-2 flex justify-between items-center">
+                    <div className="text-sm text-gray-600">
+                      Selected: {selectedPlayers.length}/4
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-gray-500 italic">Click players to add/remove</div>
+                      {foursomeGroup && selectedPlayers.length > 0 && (
+                        <button
+                          onClick={assignGroupToSelectedPlayers}
+                          className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-semibold"
+                        >
+                          Assign Group to Selected Players
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 italic">
-                    Click players to add/remove
-                  </div>
-                </div>
               </>
             )}
           </div>
