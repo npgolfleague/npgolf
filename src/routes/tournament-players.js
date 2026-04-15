@@ -91,6 +91,48 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
   }
 });
 
+// POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome group to one or more tournament players
+// Body: { group: string, playerIds: [int] }
+router.post('/:tournamentId/foursome-group', async (req, res) => {
+  const { tournamentId } = req.params;
+  const { group, playerIds } = req.body;
+
+  if (!group) {
+    return res.status(400).json({ error: 'group is required' });
+  }
+
+  if (!Array.isArray(playerIds) || playerIds.length === 0) {
+    return res.status(400).json({ error: 'playerIds must be a non-empty array' });
+  }
+
+  try {
+    // Ensure players exist in the tournament
+    const placeholders = playerIds.map(() => '?').join(',')
+    const params = [tournamentId, ...playerIds]
+    const [existing] = await pool.query(
+      `SELECT player_id FROM tournament_players WHERE tournament_id = ? AND player_id IN (${placeholders})`,
+      params
+    )
+
+    const existingIds = existing.map(r => r.player_id)
+    if (existingIds.length === 0) {
+      return res.status(404).json({ error: 'No matching players found in tournament' });
+    }
+
+    // Update the foursome_group for the provided players
+    const updateParams = [group, tournamentId, ...existingIds]
+    const [result] = await pool.query(
+      `UPDATE tournament_players SET foursome_group = ? WHERE tournament_id = ? AND player_id IN (${existingIds.map(() => '?').join(',')})`,
+      updateParams
+    )
+
+    res.json({ message: 'Foursome group assigned', affectedRows: result.affectedRows })
+  } catch (err) {
+    console.error('DB error assigning foursome group', err)
+    res.status(500).json({ error: 'Database error' })
+  }
+})
+
 // PUT /api/tournaments/:tournamentId/players/:playerId/paid - Update paid status
 router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
   const { tournamentId, playerId } = req.params;
