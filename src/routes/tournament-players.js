@@ -106,7 +106,14 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
   }
 
   try {
-    // Ensure players exist in the tournament
+    // Ensure tournament exists and get hole count
+    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ?', [tournamentId])
+    if (tournaments.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' })
+    }
+    const tournament = tournaments[0]
+
+    // Determine which player rows already exist in tournament_players
     const placeholders = playerIds.map(() => '?').join(',')
     const params = [tournamentId, ...playerIds]
     const [existing] = await pool.query(
@@ -115,18 +122,53 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
     )
 
     const existingIds = existing.map(r => r.player_id)
-    if (existingIds.length === 0) {
-      return res.status(404).json({ error: 'No matching players found in tournament' });
+    const missingIds = playerIds.filter(id => !existingIds.includes(id))
+
+    // Start transaction to insert any missing tournament_players rows then update group
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      if (missingIds.length > 0) {
+        // Fetch player quotas to seed tournament_quota
+        const [players] = await conn.query(
+          `SELECT id, quota_18, quota_9 FROM players WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+          missingIds
+        )
+
+        const holeCount = Number(tournament.number_of_holes)
+        const insertValues = []
+        const insertParams = []
+
+        // Build multi-row insert values
+        for (const p of players) {
+          const tq = holeCount === 9 ? p.quota_9 : p.quota_18
+          insertValues.push('(?, ?, ?, NOW(), ?)')
+          insertParams.push(tournamentId, p.id, 'yes', tq)
+        }
+
+        if (insertValues.length > 0) {
+          const insertQuery = `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota) VALUES ${insertValues.join(',')} ON DUPLICATE KEY UPDATE player_id = player_id`
+          await conn.query(insertQuery, insertParams)
+        }
+      }
+
+      // Now update the foursome_group for all provided players
+      const allIds = playerIds
+      const updateParams = [group, tournamentId, ...allIds]
+      const [result] = await conn.query(
+        `UPDATE tournament_players SET foursome_group = ? WHERE tournament_id = ? AND player_id IN (${allIds.map(() => '?').join(',')})`,
+        updateParams
+      )
+
+      await conn.commit()
+      res.json({ message: 'Foursome group assigned', affectedRows: result.affectedRows })
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
     }
-
-    // Update the foursome_group for the provided players
-    const updateParams = [group, tournamentId, ...existingIds]
-    const [result] = await pool.query(
-      `UPDATE tournament_players SET foursome_group = ? WHERE tournament_id = ? AND player_id IN (${existingIds.map(() => '?').join(',')})`,
-      updateParams
-    )
-
-    res.json({ message: 'Foursome group assigned', affectedRows: result.affectedRows })
   } catch (err) {
     console.error('DB error assigning foursome group', err)
     res.status(500).json({ error: 'Database error' })
