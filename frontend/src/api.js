@@ -65,14 +65,15 @@ export const tournamentsAPI = {
   updateSkinsCtpPaidStatus: (tournamentId, playerId, skins_ctp_paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/skins-ctp-paid`, { skins_ctp_paid }),
   sendInviteSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/invite-sms`),
   sendSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/send-sms`),
-  sendInvitations: (tournamentId, method, playerId) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, {
+  sendInvitations: (tournamentId, method, playerId, customMessage) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, {
     method,
-    ...(playerId !== undefined && playerId !== null ? { playerId } : {})
+    ...(playerId !== undefined && playerId !== null ? { playerId } : {}),
+    ...(customMessage ? { customMessage } : {})
   }),
   getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`),
   assignFoursomeGroup: (tournamentId, group, playerIds) => apiClient.post(`/tournaments/${tournamentId}/foursome-group`, { group, playerIds }),
   getResultsEmail: (id) => apiClient.get(`/tournaments/${id}/results-email`),
-    generateResultsEmail: (id) => apiClient.post(`/tournaments/${id}/results-email/generate`),
+    generateResultsEmail: (id, customMessage) => apiClient.post(`/tournaments/${id}/results-email/generate`, customMessage ? { customMessage } : {}),
   sendResultsEmail: (id, email) => apiClient.post(`/tournaments/${id}/results-email/send`, email ? { email } : {}),
 }
 

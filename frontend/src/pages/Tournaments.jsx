@@ -19,6 +19,7 @@ export const Tournaments = () => {
   const [resultsEmailSendResult, setResultsEmailSendResult] = useState(null)
   const [individualEmail, setIndividualEmail] = useState('')
   const [sendingIndividual, setSendingIndividual] = useState(false)
+  const [resultsEmailMessage, setResultsEmailMessage] = useState('')
   const [sendingCartTags, setSendingCartTags] = useState(false)
   const [cartTagsResult, setCartTagsResult] = useState(null)
 
@@ -120,8 +121,12 @@ export const Tournaments = () => {
   const handleGenerateResultsEmail = async () => {
     try {
       setSendingResultsEmail(true)
-      const response = await tournamentsAPI.generateResultsEmail(resultsEmailModal.tournamentId)
+      const response = await tournamentsAPI.generateResultsEmail(
+        resultsEmailModal.tournamentId,
+        resultsEmailMessage.trim() || null
+      )
       setResultsEmailModal({ ...response.data, tournamentId: resultsEmailModal.tournamentId })
+      setResultsEmailMessage('') // Clear message after generating
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate results email')
     } finally {
@@ -368,6 +373,22 @@ export const Tournaments = () => {
               {resultsEmailModal.noEmail ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center gap-4">
                   <p className="text-gray-600">No results email has been generated for this tournament yet.</p>
+                  
+                  {/* Custom Message Input */}
+                  <div className="w-full max-w-md">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                      Custom Message (Optional)
+                    </label>
+                    <textarea
+                      value={resultsEmailMessage}
+                      onChange={(e) => setResultsEmailMessage(e.target.value)}
+                      placeholder="Add a custom message to include at the top of the results email..."
+                      rows="3"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1 text-left">This message will appear at the top of the results email</p>
+                  </div>
+                  
                   <button
                     onClick={handleGenerateResultsEmail}
                     disabled={sendingResultsEmail}
