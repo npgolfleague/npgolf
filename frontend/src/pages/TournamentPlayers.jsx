@@ -20,6 +20,7 @@ export function TournamentPlayers() {
   const [smsResult, setSmsResult] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
+  const [inviteMessage, setInviteMessage] = useState('');
   
   const isAdmin = user?.role === 'admin';
 
@@ -99,9 +100,10 @@ export function TournamentPlayers() {
     try {
       setSendingSMS(true);
       setInviteResult(null);
-      const response = await tournamentsAPI.sendInvitations(tournamentId, method);
+      const response = await tournamentsAPI.sendInvitations(tournamentId, method, null, inviteMessage.trim() || null);
       setInviteResult(response.data);
       setShowInviteModal(false);
+      setInviteMessage(''); // Clear message after sending
     } catch (err) {
       console.error('Failed to send invitations:', err);
       setError(err.response?.data?.error || 'Failed to send invitations');
@@ -422,6 +424,21 @@ export function TournamentPlayers() {
             <p className="text-gray-600 mb-4">
               Choose how you'd like to invite players to confirm their participation:
             </p>
+
+            {/* Custom Message Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Message (Optional)
+              </label>
+              <textarea
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+                placeholder="Add a custom message to include in the invitation..."
+                rows="3"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">This message will be added to the invitation</p>
+            </div>
 
             <div className="space-y-3">
               <button

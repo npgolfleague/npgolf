@@ -230,7 +230,7 @@ const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
   return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
 };
 
-const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [] }) => {
+const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], customMessage = null }) => {
   const prizePercentages = [0.5, 0.3, 0.2];
   const prizePlayers = [];
   let i = 0;
@@ -322,6 +322,11 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rank
       </table>
     </div>` : '';
 
+  const customMessageSection = customMessage ? `
+    <div style="background:#fffbeb;padding:16px 20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-top:3px solid #f59e0b;">
+      <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customMessage}</p>
+    </div>` : '';
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:20px;background:#f3f4f6;font-family:Arial,sans-serif;">
 <div style="max-width:600px;margin:0 auto;">
@@ -330,6 +335,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rank
     <p style="margin:0;font-size:16px;">${tournamentDate} &bull; ${courseName}</p>
     <p style="margin:4px 0 0 0;font-size:14px;opacity:0.85;">${numberOfHoles} Holes</p>
   </div>
+  ${customMessageSection}
   <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">
     <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">🏆 Quota Game Leaderboard</h2>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
@@ -1070,7 +1076,8 @@ router.post('/:id/complete', async (req, res) => {
         skinPrizePerSkin,
         ctpPrizePerWinner,
         quotaPrizePot,
-        dashboardTotals
+        dashboardTotals,
+        customMessage: req.body?.customMessage || null
       });
       const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
       await pool.query(
@@ -1104,8 +1111,10 @@ router.post('/:id/complete', async (req, res) => {
 });
 
 // POST /api/tournaments/:id/results-email/generate - Build and store results email from existing completion data
+// Optional body: { customMessage: string }
 router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
+  const { customMessage } = req.body || {};
   try {
     await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
@@ -1194,7 +1203,8 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       skinPrizePerSkin,
       ctpPrizePerWinner,
       quotaPrizePot,
-      dashboardTotals
+      dashboardTotals,
+      customMessage: customMessage || null
     });
     const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
 
@@ -1490,10 +1500,10 @@ router.post('/:id/send-sms', async (req, res) => {
 });
 
 // POST /api/tournaments/:id/send-invitations - Send tournament invitations via SMS and/or Email
-// Optional body field `playerId` limits sending to one player.
+// Optional body fields: `playerId` limits sending to one player, `customMessage` adds custom text
 router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
-  const { method, playerId } = req.body; // method: 'sms' | 'email' | 'both', optional playerId
+  const { method, playerId, customMessage } = req.body; // method: 'sms' | 'email' | 'both', optional playerId, customMessage
   
   try {
     // Get tournament info with course details
@@ -1557,7 +1567,11 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
       // Send SMS if applicable
       if ((method === 'sms' || method === 'both') && player.phone) {
         try {
-          const smsMessage = `Hi ${player.name}! Are you playing ${tournament.course_name} on ${tournamentDate}?\n\nYes: ${yesUrl}\nNo: ${noUrl}`;
+          let smsMessage = `Hi ${player.name}! Are you playing ${tournament.course_name} on ${tournamentDate}?`;
+          if (customMessage) {
+            smsMessage += `\n\n${customMessage}`;
+          }
+          smsMessage += `\n\nYes: ${yesUrl}\nNo: ${noUrl}`;
           console.log(`Sending SMS to ${player.name} (${player.phone})`);
           await sendSMS(player.phone, smsMessage);
           console.log(`✓ SMS sent successfully to ${player.name}`);
@@ -1594,7 +1608,10 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
                   <div class="content">
                     <p>Hi ${player.name},</p>
                     <p>We're organizing a tournament and would like to know if you'll be joining us!</p>
-                    
+                    ${customMessage ? `
+                    <div style="background-color: #fffbeb; padding: 15px; margin: 20px 0; border-left: 4px solid #f59e0b; color: #92400e;">
+                      <p style="margin: 0; white-space: pre-wrap;">${customMessage}</p>
+                    </div>` : ''}
                     <div class="details">
                       <strong>📍 Course:</strong> ${tournament.course_name}<br>
                       <strong>📅 Date:</strong> ${tournamentDate}<br>
