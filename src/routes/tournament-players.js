@@ -153,6 +153,22 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
         }
       }
 
+      // Optionally update pair assignments if provided (body: pairs: { playerId: pairNumber, ... } or [{playerId, pair}])
+      const pairsInput = req.body.pairs
+      if (pairsInput) {
+        const pairsMap = {}
+        if (Array.isArray(pairsInput)) {
+          pairsInput.forEach(it => { if (it && it.playerId) pairsMap[it.playerId] = Number(it.pair) || null })
+        } else if (typeof pairsInput === 'object') {
+          Object.keys(pairsInput).forEach(k => { pairsMap[Number(k)] = pairsInput[k] == null ? null : Number(pairsInput[k]) })
+        }
+
+        const toUpdate = Object.keys(pairsMap).map(id => Number(id)).filter(id => !Number.isNaN(id))
+        for (const pid of toUpdate) {
+          await conn.query('UPDATE tournament_players SET foursome_pair = ? WHERE tournament_id = ? AND player_id = ?', [pairsMap[pid], tournamentId, pid])
+        }
+      }
+
       // Now update the foursome_group for all provided players
       const allIds = playerIds
       const updateParams = [group, tournamentId, ...allIds]

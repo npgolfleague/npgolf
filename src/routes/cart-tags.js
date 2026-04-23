@@ -27,62 +27,20 @@ const formatTeeTime = (baseTime, addMinutes = 0) => {
   return `${displayHours}:${displayMinutes} ${period}`;
 };
 
-// Generate HTML for a single cart tag (7.5" x 5")
+// Generate HTML for a single cart tag (styled to fit two-per-page)
 const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1) => {
   return `
-    <div style="
-      width: 7.5in;
-      height: 5in;
-      border: 3px solid #1e5631;
-      padding: 0.4in;
-      box-sizing: border-box;
-      page-break-after: always;
-      font-family: 'Georgia', serif;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    ">
+    <div class="cart-tag">
       <div style="text-align: center;">
-        <div style="
-          font-size: 28px;
-          font-weight: bold;
-          color: #1e5631;
-          letter-spacing: 1px;
-          margin-bottom: 8px;
-        ">PG/PARADISE GOLF<sup style="font-size: 14px;">®</sup></div>
-        <div style="
-          font-size: 16px;
-          color: #333;
-          margin-bottom: 24px;
-          font-style: italic;
-        ">${courseName}</div>
+        <div class="cg-title">PG/PARADISE GOLF<sup style="font-size: 12px;">®</sup></div>
+        <div class="cg-course">${courseName}</div>
       </div>
-      
-      <div style="
-        text-align: center;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-      ">
+      <div class="cg-players">
         ${playerNames.map(name => `
-          <div style="
-            font-size: 42px;
-            font-weight: bold;
-            color: #1e5631;
-            margin: 12px 0;
-            line-height: 1.2;
-          ">${name}</div>
+          <div class="cg-player">${name}</div>
         `).join('')}
       </div>
-      
-      <div style="
-        display: flex;
-        justify-content: space-between;
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
-      ">
+      <div class="cg-footer">
         <div><span style="font-weight: normal;">Time:</span> ${teeTime}</div>
         <div><span style="font-weight: normal;">Hole:</span> ${startingHole}</div>
       </div>
@@ -141,6 +99,14 @@ const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole
 
 // Generate full printable page with all cart tags
 const generateCartTagsDocument = (tags) => {
+  // Group tags two-per-page and include shared print CSS
+  const pages = [];
+  for (let i = 0; i < tags.length; i += 2) {
+    const first = tags[i];
+    const second = tags[i + 1] || '';
+    pages.push(`<div class="page">${first}${second}</div>`);
+  }
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -154,17 +120,54 @@ const generateCartTagsDocument = (tags) => {
     body {
       margin: 0;
       padding: 0;
+      background: white;
     }
+    .no-print { padding: 20px; background: #f0f0f0; margin-bottom: 20px; text-align: center; }
+    @media print { .no-print { display: none; } }
+
+    /* Page container holds two tags stacked vertically */
+    .page {
+      width: 100%;
+      box-sizing: border-box;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.125in 0;
+    }
+
+    /* Cart tag compacted slightly to ensure two fit on a letter page */
+    .cart-tag {
+      width: 7.5in;
+      height: 5in;
+      border: 2px solid #1e5631;
+      padding: 0.28in;
+      box-sizing: border-box;
+      font-family: 'Georgia', serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      margin-bottom: 0.08in;
+      background: white;
+    }
+
+    .cg-title { font-size: 24px; font-weight: bold; color: #1e5631; letter-spacing: 1px; margin-bottom: 6px; }
+    .cg-course { font-size: 14px; color: #333; margin-bottom: 18px; font-style: italic; }
+    .cg-players { text-align: center; flex-grow: 1; display:flex; flex-direction:column; justify-content:center; }
+    .cg-player { font-size: 36px; font-weight: bold; color: #1e5631; margin: 8px 0; line-height: 1.1; }
+    .cg-footer { display:flex; justify-content:space-between; font-size:18px; font-weight:bold; color:#333; }
+
     @media print {
-      .no-print { display: none; }
+      .cart-tag { border-width: 2px; }
+      .cg-player { font-size: 34px; }
     }
   </style>
 </head>
 <body>
-  <div class="no-print" style="padding: 20px; background: #f0f0f0; margin-bottom: 20px; text-align: center;">
+  <div class="no-print">
     <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Print Cart Tags</button>
   </div>
-  ${tags.join('\n')}
+  ${pages.join('\n')}
 </body>
 </html>`;
 };
@@ -211,30 +214,38 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     });
 
     // From tournament_players table (allows assigning groups without scores)
+    // Also include optional foursome_pair so specific pairs can be honoured
     const [tpRows] = await pool.query(
-      `SELECT tp.foursome_group, p.name as player_name
+      `SELECT tp.foursome_group, tp.foursome_pair, p.name as player_name, tp.player_id
        FROM tournament_players tp
        JOIN players p ON tp.player_id = p.id
        WHERE tp.tournament_id = ? AND tp.foursome_group IS NOT NULL
-       GROUP BY tp.foursome_group, p.id
-       ORDER BY tp.foursome_group, p.name`,
+       GROUP BY tp.foursome_group, tp.foursome_pair, p.id
+       ORDER BY tp.foursome_group, tp.foursome_pair, p.name`,
       [tournamentId]
     );
 
     tpRows.forEach(row => {
-      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
-      groups[row.foursome_group].add(row.player_name);
+      if (!groups[row.foursome_group]) groups[row.foursome_group] = [];
+      // store objects with player name and optional pair number
+      groups[row.foursome_group].push({ name: row.player_name, playerId: row.player_id, pair: row.foursome_pair == null ? null : Number(row.foursome_pair) });
     });
 
-    // Convert sets to arrays and ensure we have at least one group
+    // Ensure we have at least one group and normalize groups into arrays of player objects
     const groupKeys = Object.keys(groups);
     if (groupKeys.length === 0) {
       return res.status(404).json({ error: 'No foursome groups found for this tournament' });
     }
-    // transform to plain object with arrays
     const groupsArr = {};
-    groupKeys.forEach(g => { groupsArr[g] = Array.from(groups[g]); });
-    // use groupsArr going forward
+    groupKeys.forEach(g => {
+      // groups[g] might be a Set (from scores) or an array (from tpRows)
+      if (Array.isArray(groups[g])) {
+        groupsArr[g] = groups[g];
+      } else {
+        // Set of names from scores - convert to objects without pair info
+        groupsArr[g] = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
+      }
+    });
     
     // Generate cart tags (2 players per cart typically)
     const tags = [];
@@ -243,14 +254,31 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     groupNames.forEach((groupName, groupIndex) => {
       const players = groupsArr[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8); // 8 minute intervals
-      
-      // Extract starting hole from group name (e.g., "1" -> 1)
       const startingHole = parseInt(groupName) || 1;
-      
-      // Split into carts (2 players per cart)
-      for (let i = 0; i < players.length; i += 2) {
-        const cartPlayers = players.slice(i, i + 2);
-        tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+
+      // If players have pair numbers, group by pair; otherwise fall back to sequential pairing
+      const hasPairs = players.some(p => p.pair != null);
+      if (hasPairs) {
+        // group by pair number (nulls get their own unique index by order)
+        const byPair = {};
+        let noPairIdx = 1000; // large offset for null pairs
+        players.forEach(p => {
+          const key = p.pair == null ? `nopair_${noPairIdx++}` : `pair_${p.pair}`;
+          if (!byPair[key]) byPair[key] = [];
+          byPair[key].push(p.name);
+        });
+
+        Object.values(byPair).forEach(pairArr => {
+          for (let i = 0; i < pairArr.length; i += 2) {
+            const cartPlayers = pairArr.slice(i, i + 2);
+            tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+          }
+        });
+      } else {
+        for (let i = 0; i < players.length; i += 2) {
+          const cartPlayers = players.slice(i, i + 2).map(p => p.name);
+          tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+        }
       }
     });
     
