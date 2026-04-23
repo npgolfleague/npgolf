@@ -71,7 +71,8 @@ export const tournamentsAPI = {
     ...(customMessage ? { customMessage } : {})
   }),
   getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`),
-  assignFoursomeGroup: (tournamentId, group, playerIds) => apiClient.post(`/tournaments/${tournamentId}/foursome-group`, { group, playerIds }),
+  // pairs is optional: either an object { playerId: pairNumber } or array [{ playerId, pair }]
+  assignFoursomeGroup: (tournamentId, group, playerIds, pairs) => apiClient.post(`/tournaments/${tournamentId}/foursome-group`, { group, playerIds, pairs }),
   getResultsEmail: (id) => apiClient.get(`/tournaments/${id}/results-email`),
     generateResultsEmail: (id, customMessage) => apiClient.post(`/tournaments/${id}/results-email/generate`, customMessage ? { customMessage } : {}),
   sendResultsEmail: (id, email) => apiClient.post(`/tournaments/${id}/results-email/send`, email ? { email } : {}),

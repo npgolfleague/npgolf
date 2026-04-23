@@ -9,6 +9,7 @@ export const ScoreEntry = () => {
   const [selectedPlayers, setSelectedPlayers] = useState([])
   const [foursomeGroup, setFoursomeGroup] = useState('')
   const [foursomeGroups, setFoursomeGroups] = useState([])
+  const [foursomePairs, setFoursomePairs] = useState({})
   const [currentHole, setCurrentHole] = useState(1)
   const [holes, setHoles] = useState([])
   const [scores, setScores] = useState({})
@@ -150,13 +151,39 @@ export const ScoreEntry = () => {
 
     try {
       const playerIds = selectedPlayers
-      await tournamentsAPI.assignFoursomeGroup(selectedTournament.id, foursomeGroup, playerIds)
+      // build pairs payload only for selected players
+      const pairsPayload = {}
+      selectedPlayers.forEach(pid => {
+        if (foursomePairs[pid] !== undefined && foursomePairs[pid] !== null && foursomePairs[pid] !== '') {
+          pairsPayload[pid] = Number(foursomePairs[pid])
+        }
+      })
+
+      await tournamentsAPI.assignFoursomeGroup(selectedTournament.id, foursomeGroup, playerIds, Object.keys(pairsPayload).length ? pairsPayload : undefined)
       await fetchFoursomeGroups(selectedTournament.id)
       alert('Foursome group assigned to selected players')
     } catch (err) {
       console.error('Error assigning foursome group:', err)
       alert('Failed to assign foursome group')
     }
+  }
+
+  const autoPairSelected = () => {
+    // Assign pair numbers 1/2 based on selection order: first two -> pair 1, next two -> pair 2
+    const newPairs = {}
+    selectedPlayers.forEach((pid, idx) => {
+      const pairNum = Math.floor(idx / 2) + 1
+      newPairs[pid] = pairNum
+    })
+    setFoursomePairs(prev => ({ ...prev, ...newPairs }))
+  }
+
+  const clearPairs = () => {
+    setFoursomePairs(prev => {
+      const copy = { ...prev }
+      selectedPlayers.forEach(pid => { delete copy[pid] })
+      return copy
+    })
   }
 
   const loadExistingScores = async () => {
@@ -553,24 +580,70 @@ export const ScoreEntry = () => {
                     </button>
                   ))}
                 </div>
-                  <div className="mt-2 flex justify-between items-center">
-                    <div className="text-sm text-gray-600">
-                      Selected: {selectedPlayers.length}/4
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-xs text-gray-500 italic">Click players to add/remove</div>
-                      {foursomeGroup && selectedPlayers.length > 0 && (
-                        <button
-                          onClick={assignGroupToSelectedPlayers}
-                          className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-semibold"
-                        >
-                          Assign Group to Selected Players
-                        </button>
-                      )}
+                  <div className="mt-2 flex flex-col gap-2">
+                    {/* Pair selectors for selected players */}
+                    {selectedPlayers.length > 0 && (
+                      <div className="w-full">
+                        <div className="flex gap-2 mb-2">
+                          <button
+                            type="button"
+                            onClick={autoPairSelected}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-semibold"
+                          >
+                            Auto Pair
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearPairs}
+                            className="px-3 py-1 bg-gray-200 text-gray-800 rounded text-sm font-semibold"
+                          >
+                            Clear Pairs
+                          </button>
+                          <div className="text-xs text-gray-600 ml-2 self-center">Auto pairs by selection order (1/2)</div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {selectedPlayers.map(pid => {
+                            const player = players.find(p => p.id === pid)
+                            return (
+                              <div key={pid} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                <div className="text-sm font-medium">{player?.name}</div>
+                                <label className="text-xs text-gray-600">Pair</label>
+                                <select
+                                  value={foursomePairs[pid] ?? ''}
+                                  onChange={(e) => setFoursomePairs(prev => ({ ...prev, [pid]: e.target.value }))}
+                                  className="text-sm p-1 border rounded"
+                                >
+                                  <option value="">Auto</option>
+                                  <option value="1">1</option>
+                                  <option value="2">2</option>
+                                </select>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-0 flex justify-between items-center">
+                      <div className="text-sm text-gray-600">
+                        Selected: {selectedPlayers.length}/4
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-gray-500 italic">Click players to add/remove</div>
+                        {foursomeGroup && selectedPlayers.length > 0 && (
+                          <button
+                            onClick={assignGroupToSelectedPlayers}
+                            className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-semibold"
+                          >
+                            Assign Group to Selected Players
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-              </>
-            )}
+                </>
+              )}
           </div>
         )}
 
