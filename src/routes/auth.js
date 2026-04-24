@@ -37,8 +37,13 @@ router.post('/login', async (req, res) => {
 
     const payload = { sub: user.id, email: user.email };
     const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+    // create refresh token (30 days)
+    const refreshToken = crypto.randomBytes(48).toString('hex')
+    const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    const refreshExpires = new Date(Date.now() + (process.env.REFRESH_TOKEN_DAYS ? Number(process.env.REFRESH_TOKEN_DAYS) : 30) * 24 * 60 * 60 * 1000)
+    await pool.query('UPDATE players SET refresh_token_hash = ?, refresh_token_expires = ? WHERE id = ?', [refreshHash, refreshExpires, user.id])
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, sex: user.sex, active: user.active, quota_18: user.quota_18, quota_9: user.quota_9, role: user.role } });
+    res.json({ token, refreshToken, user: { id: user.id, name: user.name, email: user.email, sex: user.sex, active: user.active, quota_18: user.quota_18, quota_9: user.quota_9, role: user.role } });
   } catch (err) {
     console.error('Auth error', err);
     res.status(500).json({ error: 'Authentication failed' });
@@ -106,9 +111,15 @@ router.post('/register', async (req, res) => {
 
     const payload = { sub: userId, email };
     const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+    // create refresh token (30 days)
+    const refreshToken = crypto.randomBytes(48).toString('hex')
+    const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    const refreshExpires = new Date(Date.now() + (process.env.REFRESH_TOKEN_DAYS ? Number(process.env.REFRESH_TOKEN_DAYS) : 30) * 24 * 60 * 60 * 1000)
+    await pool.query('UPDATE players SET refresh_token_hash = ?, refresh_token_expires = ? WHERE id = ?', [refreshHash, refreshExpires, userId])
 
     res.status(201).json({
       token,
+      refreshToken,
       user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: normalizedQuota18, quota_9: normalizedQuota9, role: 'player' }
     });
   } catch (err) {
@@ -116,6 +127,51 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: 'Registration failed' });
   }
 });
+
+// POST /api/auth/refresh { refreshToken }
+router.post('/refresh', async (req, res) => {
+  const { refreshToken } = req.body || {}
+  if (!refreshToken) return res.status(400).json({ error: 'refreshToken is required' })
+
+  try {
+    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota_18, quota_9, role FROM players WHERE refresh_token_hash = ? AND refresh_token_expires > NOW() LIMIT 1', [hash])
+    const user = rows && rows[0]
+    if (!user) return res.status(401).json({ error: 'invalid or expired refresh token' })
+
+    const secret = process.env.JWT_SECRET
+    if (!secret) return res.status(500).json({ error: 'server misconfigured' })
+
+    const payload = { sub: user.id, email: user.email }
+    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' })
+
+    // rotate refresh token
+    const newRefreshToken = crypto.randomBytes(48).toString('hex')
+    const newHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex')
+    const refreshExpires = new Date(Date.now() + (process.env.REFRESH_TOKEN_DAYS ? Number(process.env.REFRESH_TOKEN_DAYS) : 30) * 24 * 60 * 60 * 1000)
+    await pool.query('UPDATE players SET refresh_token_hash = ?, refresh_token_expires = ? WHERE id = ?', [newHash, refreshExpires, user.id])
+
+    res.json({ token, refreshToken: newRefreshToken, user: { id: user.id, name: user.name, email: user.email, sex: user.sex, active: user.active, quota_18: user.quota_18, quota_9: user.quota_9, role: user.role } })
+  } catch (err) {
+    console.error('Refresh token error', err)
+    res.status(500).json({ error: 'Failed to refresh token' })
+  }
+})
+
+// POST /api/auth/logout { refreshToken }
+router.post('/logout', async (req, res) => {
+  const { refreshToken } = req.body || {}
+  if (!refreshToken) return res.json({ message: 'ok' })
+
+  try {
+    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    await pool.query('UPDATE players SET refresh_token_hash = NULL, refresh_token_expires = NULL WHERE refresh_token_hash = ?', [hash])
+    res.json({ message: 'logged out' })
+  } catch (err) {
+    console.error('Logout error', err)
+    res.status(500).json({ error: 'Failed to logout' })
+  }
+})
 
 // POST /api/auth/forgot-password { email }
 router.post('/forgot-password', async (req, res) => {

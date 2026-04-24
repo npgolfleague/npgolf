@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const QRCode = require('qrcode');
 const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
 
@@ -28,7 +29,7 @@ const formatTeeTime = (baseTime, addMinutes = 0) => {
 };
 
 // Generate HTML for a single cart tag (styled to fit two-per-page)
-const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1) => {
+const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
   return `
     <div class="cart-tag">
       <div style="text-align: center;">
@@ -40,16 +41,19 @@ const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1)
           <div class="cg-player">${name}</div>
         `).join('')}
       </div>
-      <div class="cg-footer">
-        <div><span style="font-weight: normal;">Time:</span> ${teeTime}</div>
-        <div><span style="font-weight: normal;">Hole:</span> ${startingHole}</div>
+      <div class="cg-footer" style="align-items: center;">
+        <div style="flex:1"><span style="font-weight: normal;">Time:</span> ${teeTime}</div>
+        <div style="flex:1; text-align:center"><span style="font-weight: normal;">Hole:</span> ${startingHole}</div>
+        <div style="width: 88px; text-align: right;">
+          ${qrDataURL ? `<img src="${qrDataURL}" alt="QR" style="width:72px;height:72px;border:0;"/>` : ''}
+        </div>
       </div>
     </div>
   `;
 };
 
 // Generate email-friendly cart tag using tables (email clients don't support flexbox)
-const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole = 1) => {
+const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
   return `
     <table style="
       width: 100%;
@@ -214,21 +218,21 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     });
 
     // From tournament_players table (allows assigning groups without scores)
-    // Also include optional foursome_pair so specific pairs can be honoured
+    // Use `foursome` and `pair` columns on tournament_players
     const [tpRows] = await pool.query(
-      `SELECT tp.foursome_group, tp.foursome_pair, p.name as player_name, tp.player_id
+      `SELECT tp.foursome, tp.pair, p.name as player_name, tp.player_id
        FROM tournament_players tp
        JOIN players p ON tp.player_id = p.id
-       WHERE tp.tournament_id = ? AND tp.foursome_group IS NOT NULL
-       GROUP BY tp.foursome_group, tp.foursome_pair, p.id
-       ORDER BY tp.foursome_group, tp.foursome_pair, p.name`,
+       WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
+       GROUP BY tp.foursome, tp.pair, p.id
+       ORDER BY tp.foursome, tp.pair, p.name`,
       [tournamentId]
     );
 
     tpRows.forEach(row => {
-      if (!groups[row.foursome_group]) groups[row.foursome_group] = [];
+      if (!groups[row.foursome]) groups[row.foursome] = [];
       // store objects with player name and optional pair number
-      groups[row.foursome_group].push({ name: row.player_name, playerId: row.player_id, pair: row.foursome_pair == null ? null : Number(row.foursome_pair) });
+      groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
     });
 
     // Ensure we have at least one group and normalize groups into arrays of player objects
@@ -251,6 +255,19 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const tags = [];
     const groupNames = Object.keys(groupsArr).sort();
     
+    // Pre-generate QR codes for each group linking to the score entry path
+    const qrMap = {};
+    await Promise.all(groupNames.map(async (g) => {
+      try {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const link = `${baseUrl}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(g)}`;
+        qrMap[g] = await QRCode.toDataURL(link);
+      } catch (err) {
+        console.error('Error generating QR for group', g, err);
+        qrMap[g] = '';
+      }
+    }));
+
     groupNames.forEach((groupName, groupIndex) => {
       const players = groupsArr[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8); // 8 minute intervals
@@ -271,13 +288,13 @@ router.get('/tournament/:tournamentId', async (req, res) => {
         Object.values(byPair).forEach(pairArr => {
           for (let i = 0; i < pairArr.length; i += 2) {
             const cartPlayers = pairArr.slice(i, i + 2);
-            tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+            tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
           }
         });
       } else {
         for (let i = 0; i < players.length; i += 2) {
           const cartPlayers = players.slice(i, i + 2).map(p => p.name);
-          tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+          tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
         }
       }
     });
@@ -349,24 +366,36 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
 
     // From tournament_players table
     const [tpRows2] = await pool.query(
-      `SELECT tp.foursome_group, p.name as player_name
+      `SELECT tp.foursome, p.name as player_name
        FROM tournament_players tp
        JOIN players p ON tp.player_id = p.id
-       WHERE tp.tournament_id = ? AND tp.foursome_group IS NOT NULL
-       GROUP BY tp.foursome_group, p.id
-       ORDER BY tp.foursome_group, p.name`,
+       WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
+       GROUP BY tp.foursome, p.id
+       ORDER BY tp.foursome, p.name`,
       [tournamentId]
     );
 
     tpRows2.forEach(row => {
-      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
-      groups[row.foursome_group].add(row.player_name);
+      if (!groups[row.foursome]) groups[row.foursome] = new Set();
+      groups[row.foursome].add(row.player_name);
     });
 
     const groupsArr2 = {};
     Object.keys(groups).forEach(g => { groupsArr2[g] = Array.from(groups[g]); });
     const groupNames = Object.keys(groupsArr2).sort();
-    
+    // Pre-generate QR codes for email/pdf tags
+    const qrMap2 = {};
+    await Promise.all(groupNames.map(async (g) => {
+      try {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const link = `${baseUrl}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(g)}`;
+        qrMap2[g] = await QRCode.toDataURL(link);
+      } catch (err) {
+        console.error('Error generating QR for group (email):', g, err);
+        qrMap2[g] = '';
+      }
+    }));
+
     // Build foursome list HTML
     let foursomeListHTML = '';
     groupNames.forEach((groupName, groupIndex) => {
@@ -394,8 +423,8 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       
       for (let i = 0; i < players.length; i += 2) {
         const cartPlayers = players.slice(i, i + 2);
-        emailTags.push(generateCartTagEmailHTML(courseName, cartPlayers, teeTime, startingHole));
-        pdfTags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole));
+        emailTags.push(generateCartTagEmailHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
+        pdfTags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
       }
     });
     
@@ -427,6 +456,9 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
             <th style="padding: 12px; text-align: left;">Tee Time</th>
             <th style="padding: 12px; text-align: left;">Group</th>
             <th style="padding: 12px; text-align: left;">Players</th>
+            <td style="width: 80px; vertical-align: top; text-align: right; padding-left: 12px;">
+              ${qrDataURL ? `<img src="${qrDataURL}" alt="QR" style="width:72px;height:72px;border:0;"/>` : ''}
+            </td>
           </tr>
         </thead>
         <tbody>

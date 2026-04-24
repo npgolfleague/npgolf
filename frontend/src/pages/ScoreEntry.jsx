@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
 
@@ -19,6 +19,18 @@ export const ScoreEntry = () => {
   const [showCtpModal, setShowCtpModal] = useState(false)
   const [ctpPlayerId, setCtpPlayerId] = useState(null)
   const [ctpLeader, setCtpLeader] = useState(null)
+  const scoreInputRefs = useRef({})
+
+  // Helper to focus the next player's input for the same field
+  const focusNext = (currentPlayerId, field) => {
+    const idx = selectedPlayers.indexOf(currentPlayerId)
+    const nextId = selectedPlayers[idx + 1]
+    if (nextId != null) {
+      const key = `${currentHole}-${nextId}-${field}`
+      scoreInputRefs.current[key]?.focus()
+      scoreInputRefs.current[key]?.select()
+    }
+  }
 
   const getPlayableHoles = () => {
     if (!selectedTournament) return holes
@@ -41,6 +53,37 @@ export const ScoreEntry = () => {
   useEffect(() => {
     fetchTournaments()
     fetchPlayers()
+  }, [])
+
+  // If URL has query params (tid & foursome) allow direct link to a foursome
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tid = params.get('tid')
+    const fq = params.get('foursome')
+    if (!tid) return
+
+    const loadFoursome = async () => {
+      try {
+        const tResp = await tournamentsAPI.get(tid)
+        setSelectedTournament(tResp.data)
+        await fetchTournamentPlayers(tid)
+        if (fq) {
+          setFoursomeGroup(fq)
+          const res = await tournamentsAPI.getFoursome(tid, fq)
+          const fps = {}
+          const ids = res.data.map(p => {
+            if (p.pair != null) fps[p.player_id] = p.pair
+            return p.player_id
+          })
+          setSelectedPlayers(ids)
+          setFoursomePairs(fps)
+        }
+      } catch (err) {
+        console.error('Error loading foursome from URL:', err)
+      }
+    }
+
+    loadFoursome()
   }, [])
 
   useEffect(() => {
@@ -539,132 +582,23 @@ export const ScoreEntry = () => {
           </div>
         )}
 
-        {/* Player Selection */}
-        {selectedTournament && foursomeGroup && (
-          <div className="bg-white rounded-lg shadow p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                Select Players (up to 4)
-              </label>
-              {selectedPlayers.length > 0 && (
-                <button
-                  onClick={() => setSelectedPlayers([])}
-                  className="text-xs text-red-600 hover:text-red-800 underline"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-            {players.length === 0 ? (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                No players registered for this tournament. Please add players to the tournament first.
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  {players.map(player => (
-                    <button
-                      key={player.id}
-                      onClick={() => handlePlayerToggle(player.id)}
-                      className={`p-3 rounded-lg border-2 transition-all text-left relative ${
-                        selectedPlayers.includes(player.id)
-                          ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-md'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      {selectedPlayers.includes(player.id) && (
-                        <div className="absolute top-1 right-1 text-blue-600 text-xl">✓</div>
-                      )}
-                      <div className="font-semibold pr-6">{player.name}</div>
-                      <div className="text-xs text-gray-600">Quota: {getPlayerCurrentQuota(player) ?? '-'}</div>
-                    </button>
-                  ))}
-                </div>
-                  <div className="mt-2 flex flex-col gap-2">
-                    {/* Pair selectors for selected players */}
-                    {selectedPlayers.length > 0 && (
-                      <div className="w-full">
-                        <div className="flex gap-2 mb-2">
-                          <button
-                            type="button"
-                            onClick={autoPairSelected}
-                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-semibold"
-                          >
-                            Auto Pair
-                          </button>
-                          <button
-                            type="button"
-                            onClick={clearPairs}
-                            className="px-3 py-1 bg-gray-200 text-gray-800 rounded text-sm font-semibold"
-                          >
-                            Clear Pairs
-                          </button>
-                          <div className="text-xs text-gray-600 ml-2 self-center">Auto pairs by selection order (1/2)</div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {selectedPlayers.map(pid => {
-                            const player = players.find(p => p.id === pid)
-                            return (
-                              <div key={pid} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
-                                <div className="text-sm font-medium">{player?.name}</div>
-                                <label className="text-xs text-gray-600">Pair</label>
-                                <select
-                                  value={foursomePairs[pid] ?? ''}
-                                  onChange={(e) => setFoursomePairs(prev => ({ ...prev, [pid]: e.target.value }))}
-                                  className="text-sm p-1 border rounded"
-                                >
-                                  <option value="">Auto</option>
-                                  <option value="1">1</option>
-                                  <option value="2">2</option>
-                                </select>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-0 flex justify-between items-center">
-                      <div className="text-sm text-gray-600">
-                        Selected: {selectedPlayers.length}/4
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-xs text-gray-500 italic">Click players to add/remove</div>
-                        {foursomeGroup && selectedPlayers.length > 0 && (
-                          <button
-                            onClick={assignGroupToSelectedPlayers}
-                            className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-semibold"
-                          >
-                            Assign Group to Selected Players
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-          </div>
-        )}
-
         {/* Score Entry for Current Hole */}
         {selectedPlayers.length > 0 && holeData && (
           <div className="bg-white rounded-lg shadow p-4 mb-4">
             {/* Current Scores Display */}
             <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <div className="text-sm font-semibold text-gray-700 mb-2">Current Scores</div>
+              <div className="text-sm font-semibold text-gray-700 mb-2">Current Quota</div>
               <div className="space-y-1">
                 {selectedPlayers.map(playerId => {
                   const player = players.find(p => p.id === playerId)
-                  const total = getPlayerTotal(playerId)
                   const quotaTotal = getPlayerQuotaTotal(playerId)
+                  const quotaGoal = getPlayerCurrentQuota(player)
                   return (
                     <div key={playerId} className="flex justify-between items-center text-sm">
                       <span className="font-medium text-gray-800">{player?.name}</span>
-                      <div className="flex gap-3">
-                        <span className="text-blue-600 font-bold">{total || 0}</span>
-                        <span className="text-green-600 font-semibold">Q: {Math.round(quotaTotal)}</span>
-                      </div>
+                      <span className="text-green-600 font-bold">
+                        {Math.round(quotaTotal)}{quotaGoal != null ? <span className="text-gray-500 font-normal"> / {quotaGoal}</span> : ''}
+                      </span>
                     </div>
                   )
                 })}
@@ -722,11 +656,18 @@ export const ScoreEntry = () => {
                           type="number"
                           inputMode="numeric"
                           min="1"
-                          max="15"
+                          max="9"
                           className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-blue-500 focus:outline-none"
                           placeholder="#"
+                          ref={el => { scoreInputRefs.current[`${currentHole}-${playerId}-score`] = el }}
                           value={scores[`${currentHole}-${playerId}-score`] || ''}
-                          onChange={(e) => handleScoreChange(playerId, 'score', e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 9)) {
+                              handleScoreChange(playerId, 'score', val)
+                              if (val !== '') focusNext(playerId, 'score')
+                            }
+                          }}
                         />
                       </div>
                       <div>
@@ -734,10 +675,19 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
+                          min="1"
+                          max="9"
                           className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-green-500 focus:outline-none"
                           placeholder="#"
+                          ref={el => { scoreInputRefs.current[`${currentHole}-${playerId}-quota`] = el }}
                           value={scores[`${currentHole}-${playerId}-quota`] ?? ''}
-                          onChange={(e) => handleScoreChange(playerId, 'quota', e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 9)) {
+                              handleScoreChange(playerId, 'quota', val)
+                              if (val !== '') focusNext(playerId, 'quota')
+                            }
+                          }}
                         />
                         {!playerHasQuota && (
                           <div className="text-xs text-gray-500 mt-1 text-center">No quota</div>
@@ -812,6 +762,70 @@ export const ScoreEntry = () => {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Player Selection */}
+        {selectedTournament && foursomeGroup && (
+          <div className="bg-white rounded-lg shadow p-4 mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Select Players (up to 4)
+              </label>
+              {selectedPlayers.length > 0 && (
+                <button
+                  onClick={() => setSelectedPlayers([])}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+            {players.length === 0 ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                No players registered for this tournament. Please add players to the tournament first.
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  {[0, 1, 2, 3].map(slot => (
+                    <div key={slot} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-16">Player {slot + 1}</span>
+                      <select
+                        className="flex-1 p-2 border border-gray-300 rounded-lg text-base"
+                        value={selectedPlayers[slot] ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? null : parseInt(e.target.value)
+                          setSelectedPlayers(prev => {
+                            const next = [...prev]
+                            if (val === null) {
+                              next.splice(slot, 1)
+                            } else {
+                              next[slot] = val
+                            }
+                            return next.filter(Boolean)
+                          })
+                        }}
+                      >
+                        <option value="">— Select player —</option>
+                        {players
+                          .filter(p => !selectedPlayers.includes(p.id) || selectedPlayers[slot] === p.id)
+                          .map(player => (
+                            <option key={player.id} value={player.id}>
+                              {player.name} (Quota: {getPlayerCurrentQuota(player) ?? '-'})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2">
+                  <div className="text-sm text-gray-600">
+                    Selected: {selectedPlayers.length}/4
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
