@@ -25,6 +25,8 @@
     "mysql2": "^3.3.0",
     "puppeteer-core": "^24.40.0",
     "twilio": "^5.3.5"
+    ,
+    "qrcode": "^1.5.1"
   },
   "devDependencies": {
     "jest": "^29.6.1",

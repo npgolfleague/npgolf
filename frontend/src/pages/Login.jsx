@@ -18,8 +18,8 @@ export const Login = () => {
 
     try {
       const response = await authAPI.login(email, password)
-      const { token, user } = response.data
-      login(user, token)
+      const { token, user, refreshToken } = response.data
+      login(user, token, refreshToken)
       // Small delay to ensure localStorage is written
       setTimeout(() => {
         navigate('/app/dashboard', { replace: true })

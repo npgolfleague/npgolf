@@ -21,12 +21,22 @@ export function TournamentPlayers() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteMessage, setInviteMessage] = useState('');
+  const [editValues, setEditValues] = useState({});
   
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadData();
   }, [tournamentId]);
+
+  useEffect(() => {
+    // initialize edit values from players
+    const map = {}
+    players.forEach(p => {
+      map[p.id] = { foursome: p.foursome || '', pair: p.pair == null ? '' : String(p.pair), saving: false }
+    })
+    setEditValues(map)
+  }, [players])
 
   const loadData = async () => {
     try {
@@ -135,6 +145,39 @@ export function TournamentPlayers() {
       setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, skins_ctp_paid: currentStatus } : p));
     }
   };
+
+  const saveFoursomePair = async (playerId) => {
+    const ev = editValues[playerId]
+    if (!ev) return
+    const newGroup = ev.foursome && ev.foursome.trim() !== '' ? ev.foursome.trim() : null
+    const newPair = ev.pair === '' ? null : Number(ev.pair)
+
+    if (!newGroup) {
+      // if trying to set pair without a group, prevent
+      if (newPair != null) {
+        alert('Please set a Foursome group before assigning a Pair')
+        return
+      }
+      // nothing to do if both empty
+      return
+    }
+
+    setEditValues(prev => ({ ...prev, [playerId]: { ...prev[playerId], saving: true } }))
+    try {
+      await tournamentsAPI.assignFoursomeGroup(tournamentId, newGroup, [playerId], { [playerId]: newPair })
+      // update local players
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, foursome: newGroup, pair: newPair } : p))
+    } catch (err) {
+      console.error('Failed to save foursome/pair', err)
+      setError(err.response?.data?.error || 'Failed to save foursome/pair')
+    } finally {
+      setEditValues(prev => ({ ...prev, [playerId]: { ...prev[playerId], saving: false } }))
+    }
+  }
+
+  const handleEditChange = (playerId, field, value) => {
+    setEditValues(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }))
+  }
 
   const handleMarkAllPaid = async () => {
     const unpaid = confirmedPlayers.filter(p => !p.paid);
@@ -281,7 +324,10 @@ export function TournamentPlayers() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                Foursome
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pair
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Name
@@ -307,27 +353,47 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Paid - Pins/Skins Game
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {confirmedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="9" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="11" className="px-6 py-4 text-center text-gray-500">
                   No players have confirmed they are playing yet
                 </td>
               </tr>
             ) : (
               confirmedPlayers.map((player) => (
                 <tr key={player.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleRemovePlayer(player.id)}
-                        disabled={actionLoading}
-                        className="text-red-600 hover:text-red-900 disabled:text-gray-400"
-                      >
-                        Remove
-                      </button>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {isAdmin ? (
+                      <input
+                        value={(editValues[player.id] && editValues[player.id].foursome) || ''}
+                        onChange={(e) => handleEditChange(player.id, 'foursome', e.target.value)}
+                        onBlur={() => saveFoursomePair(player.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
+                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder="e.g. 1"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{player.foursome || '-'}</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {isAdmin ? (
+                      <input
+                        value={(editValues[player.id] && editValues[player.id].pair) || ''}
+                        onChange={(e) => handleEditChange(player.id, 'pair', e.target.value)}
+                        onBlur={() => saveFoursomePair(player.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder="-"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{player.pair == null ? '-' : player.pair}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -344,6 +410,7 @@ export function TournamentPlayers() {
                       {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : player.quota_18 || '-'}
                     </div>
                   </td>
+                  
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {new Date(player.registration_date).toLocaleDateString()}
@@ -406,6 +473,17 @@ export function TournamentPlayers() {
                       }`}>
                         {player.skins_ctp_paid ? '✓ Skins Paid' : '✗ Not Paid'}
                       </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleRemovePlayer(player.id)}
+                        disabled={actionLoading}
+                        className="text-red-600 hover:text-red-900 disabled:text-gray-400"
+                      >
+                        Remove
+                      </button>
                     )}
                   </td>
                 </tr>

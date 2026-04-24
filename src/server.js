@@ -7,6 +7,7 @@ const authRouter = require('./routes/auth');
 const coursesRouter = require('./routes/courses');
 const tournamentsRouter = require('./routes/tournaments');
 const tournamentPlayersRouter = require('./routes/tournament-players');
+const foursomesRouter = require('./routes/foursomes');
 const scoresRouter = require('./routes/scores');
 const leaderboardRouter = require('./routes/leaderboard');
 const settingsRouter = require('./routes/settings');
@@ -18,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 // CORS middleware to allow frontend requests
 app.use((req, res, next) => {
-  const allowedOrigins = ['https://npgolf.net', 'http://localhost:5173', 'http://localhost:3000'];
+  const allowedOrigins = ['https://npgolf.net', 'http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002'];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
@@ -47,6 +48,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/courses', coursesRouter);
 app.use('/api/tournaments', tournamentsRouter);
 app.use('/api/tournaments', tournamentPlayersRouter);
+app.use('/api/tournaments', foursomesRouter);
 app.use('/api/scores', scoresRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/settings', settingsRouter);

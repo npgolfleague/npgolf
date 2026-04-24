@@ -8,8 +8,9 @@ router.get('/:tournamentId/players', async (req, res) => {
   
   try {
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, 
-             tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date
+      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role,
+             tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date,
+             tp.foursome AS foursome, tp.pair AS pair
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       WHERE tp.tournament_id = ?
@@ -91,8 +92,8 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
   }
 });
 
-// POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome group to one or more tournament players
-// Body: { group: string, playerIds: [int] }
+// POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome identifier to one or more tournament players
+// Body: { group: string, playerIds: [int], pairs?: { playerId: pairNumber } }
 router.post('/:tournamentId/foursome-group', async (req, res) => {
   const { tournamentId } = req.params;
   const { group, playerIds } = req.body;
@@ -165,20 +166,20 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
 
         const toUpdate = Object.keys(pairsMap).map(id => Number(id)).filter(id => !Number.isNaN(id))
         for (const pid of toUpdate) {
-          await conn.query('UPDATE tournament_players SET foursome_pair = ? WHERE tournament_id = ? AND player_id = ?', [pairsMap[pid], tournamentId, pid])
+          await conn.query('UPDATE tournament_players SET pair = ? WHERE tournament_id = ? AND player_id = ?', [pairsMap[pid], tournamentId, pid])
         }
       }
 
-      // Now update the foursome_group for all provided players
+      // Now update the foursome identifier for all provided players
       const allIds = playerIds
       const updateParams = [group, tournamentId, ...allIds]
       const [result] = await conn.query(
-        `UPDATE tournament_players SET foursome_group = ? WHERE tournament_id = ? AND player_id IN (${allIds.map(() => '?').join(',')})`,
+        `UPDATE tournament_players SET foursome = ? WHERE tournament_id = ? AND player_id IN (${allIds.map(() => '?').join(',')})`,
         updateParams
       )
 
       await conn.commit()
-      res.json({ message: 'Foursome group assigned', affectedRows: result.affectedRows })
+      res.json({ message: 'Foursome assigned', affectedRows: result.affectedRows })
     } catch (err) {
       await conn.rollback()
       throw err
@@ -186,7 +187,7 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
       conn.release()
     }
   } catch (err) {
-    console.error('DB error assigning foursome group', err)
+    console.error('DB error assigning foursome', err)
     res.status(500).json({ error: 'Database error' })
   }
 })

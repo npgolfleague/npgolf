@@ -99,18 +99,20 @@ router.post('/', async (req, res) => {
       
       const results = [];
       for (const score of scores) {
-        const { tournament_id, player_id, hole_id, score: scoreValue, quota, foursome_group, ctp_feet, ctp_inches, ctp_image_url } = score;
+        const { tournament_id, player_id, hole_id, score: scoreValue, quota, ctp_feet, ctp_inches, ctp_image_url } = score;
+        // Accept either `foursome` (new name) or `foursome_group` (legacy) in incoming payloads
+        const foursomeVal = score.foursome || score.foursome_group || null;
         
         // First, always save the score and quota (without CTP data initially)
         const [result] = await connection.query(
-          `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
+           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
            VALUES (?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE 
              score = VALUES(score), 
              quota = VALUES(quota), 
              foursome_group = VALUES(foursome_group),
              entered_at = CURRENT_TIMESTAMP`,
-          [tournament_id, player_id, hole_id, scoreValue, quota, foursome_group]
+          [tournament_id, player_id, hole_id, scoreValue, quota, foursomeVal]
         );
         
         // Now handle CTP data separately if provided
@@ -164,7 +166,7 @@ router.post('/', async (req, res) => {
           }
         }
         
-        results.push({ id: result.insertId, ...score });
+        results.push({ id: result.insertId, ...score, foursome: foursomeVal });
       }
       
       await connection.commit();
@@ -184,12 +186,14 @@ router.post('/', async (req, res) => {
 // PUT /api/scores/:id - Update score
 router.put('/:id', async (req, res) => {
   try {
-    const { score, quota, foursome_group } = req.body;
+    const { score, quota } = req.body;
+    // Accept either name for foursome field
+    const foursomeVal = req.body.foursome || req.body.foursome_group || null;
     await pool.query(
       'UPDATE scores SET score = ?, quota = ?, foursome_group = ?, entered_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [score, quota, foursome_group, req.params.id]
+      [score, quota, foursomeVal, req.params.id]
     );
-    res.json({ id: req.params.id, score, quota, foursome_group });
+    res.json({ id: req.params.id, score, quota, foursome: foursomeVal });
   } catch (err) {
     console.error('Error updating score:', err);
     res.status(500).json({ error: 'Failed to update score' });
