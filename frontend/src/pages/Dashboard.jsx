@@ -48,7 +48,7 @@ export const Dashboard = () => {
     { path: '/scores', label: 'Score Entry', icon: '📝', color: 'blue' },
     { path: '/users', label: 'Players', icon: '👥', color: 'green' },
     { path: '/courses', label: 'Courses', icon: '⛳', color: 'yellow' },
-    { path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }
+    ...(isAdmin ? [{ path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }] : [])
   ]
 
   const publicMenuItems = [
@@ -256,6 +256,12 @@ export const Dashboard = () => {
                           Paradise Pts
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Quota 18H
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Quota 9H
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                           Tournaments
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -288,9 +294,6 @@ export const Dashboard = () => {
                                 <div className="text-sm font-semibold text-gray-900">
                                   {player.name}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Quota 18: {player.quota_18 ?? '-'} | Quota 9: {player.quota_9 ?? '-'}
-                                </div>
                               </div>
                             </div>
                           </td>
@@ -298,6 +301,12 @@ export const Dashboard = () => {
                             <span className="text-lg font-bold text-blue-600">
                               {(player.fedex_points || 0).toLocaleString()}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-gray-900">{player.quota_18 ?? '-'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-gray-900">{player.quota_9 ?? '-'}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span className="text-sm text-gray-900">

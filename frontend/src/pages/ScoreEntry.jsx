@@ -535,7 +535,7 @@ export const ScoreEntry = () => {
             }}
           >
             <option value="">Choose a tournament...</option>
-            {tournaments.map(t => (
+            {tournaments.filter(t => !t.completed && !t.is_completed).map(t => (
               <option key={t.id} value={t.id}>
                 {formatDateOnly(t.date)} - {t.course_name}{t.number_of_holes === 9 ? ` (${t.nine_hole_side === 'back' ? 'back' : 'front'})` : ''}
               </option>
