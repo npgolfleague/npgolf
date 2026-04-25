@@ -1,15 +1,47 @@
 import { useState, useEffect } from 'react'
-import { emailsAPI } from '../api'
+import { emailsAPI, playersAPI } from '../api'
 
 export function Inbox() {
   const [emails, setEmails] = useState([])
   const [selectedEmail, setSelectedEmail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showCompose, setShowCompose] = useState(false)
+  const [allPlayers, setAllPlayers] = useState([])
+  const [compose, setCompose] = useState({ subject: '', body: '', recipient_type: 'active', player_ids: [], custom_emails: '' })
+  const [attachment, setAttachment] = useState(null)
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState(null)
 
   useEffect(() => {
     loadEmails()
+    playersAPI.list().then(r => setAllPlayers(r.data.filter(p => p.active && p.email))).catch(() => {})
   }, [])
+
+  const handleSendEmail = async () => {
+    setSending(true)
+    setSendResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('subject', compose.subject)
+      fd.append('body', compose.body)
+      fd.append('recipient_type', compose.recipient_type)
+      if (compose.recipient_type === 'specific') fd.append('player_ids', JSON.stringify(compose.player_ids))
+      if (compose.recipient_type === 'custom') fd.append('custom_emails', compose.custom_emails)
+      if (attachment) fd.append('attachment', attachment)
+      const res = await emailsAPI.send(fd)
+      setSendResult(res.data)
+      if (res.data.sent > 0) {
+        setShowCompose(false)
+        setCompose({ subject: '', body: '', recipient_type: 'active', player_ids: [], custom_emails: '' })
+        setAttachment(null)
+      }
+    } catch (err) {
+      setSendResult({ error: err.response?.data?.error || 'Failed to send' })
+    } finally {
+      setSending(false)
+    }
+  }
 
   const loadEmails = async () => {
     try {
@@ -71,12 +103,20 @@ export function Inbox() {
             </span>
           )}
         </h1>
-        <button
-          onClick={loadEmails}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          🔄 Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowCompose(true); setSendResult(null) }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            ✉️ Send Mail
+          </button>
+          <button
+            onClick={loadEmails}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -178,6 +218,115 @@ export function Inbox() {
           )}
         </div>
       </div>
+
+      {/* Compose Modal */}
+      {showCompose && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-lg font-bold">Compose Email</h2>
+              <button onClick={() => setShowCompose(false)} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {sendResult && (
+                <div className={`p-3 rounded text-sm ${sendResult.error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                  {sendResult.error || `✓ Sent: ${sendResult.sent}, Failed: ${sendResult.failed}`}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Recipients</label>
+                <select
+                  className="w-full p-2 border rounded-lg"
+                  value={compose.recipient_type}
+                  onChange={e => setCompose(c => ({ ...c, recipient_type: e.target.value }))}
+                >
+                  <option value="active">All Active Players (email allowed)</option>
+                  <option value="specific">Specific Players</option>
+                  <option value="custom">Enter Email Addresses</option>
+                </select>
+              </div>
+              {compose.recipient_type === 'specific' && (
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Select Players</label>
+                  <div className="border rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
+                    {allPlayers.map(p => (
+                      <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={compose.player_ids.includes(p.id)}
+                          onChange={e => setCompose(c => ({
+                            ...c,
+                            player_ids: e.target.checked
+                              ? [...c.player_ids, p.id]
+                              : c.player_ids.filter(id => id !== p.id)
+                          }))}
+                        />
+                        {p.name} <span className="text-gray-400 text-xs">{p.email}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {compose.recipient_type === 'custom' && (
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Email Addresses <span className="font-normal text-gray-500">(comma or newline separated)</span></label>
+                  <textarea
+                    className="w-full p-2 border rounded-lg text-sm"
+                    rows={3}
+                    placeholder="email1@example.com, email2@example.com"
+                    value={compose.custom_emails}
+                    onChange={e => setCompose(c => ({ ...c, custom_emails: e.target.value }))}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Subject</label>
+                <input
+                  type="text"
+                  className="w-full p-2 border rounded-lg"
+                  placeholder="Subject"
+                  value={compose.subject}
+                  onChange={e => setCompose(c => ({ ...c, subject: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Message</label>
+                <textarea
+                  className="w-full p-2 border rounded-lg"
+                  rows={8}
+                  placeholder="Write your message here..."
+                  value={compose.body}
+                  onChange={e => setCompose(c => ({ ...c, body: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Attachment <span className="font-normal text-gray-500">(optional)</span></label>
+                <input
+                  type="file"
+                  className="w-full text-sm"
+                  onChange={e => setAttachment(e.target.files[0] || null)}
+                />
+                {attachment && <p className="text-xs text-gray-500 mt-1">📎 {attachment.name}</p>}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSendEmail}
+                  disabled={sending || !compose.subject || !compose.body}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
+                >
+                  {sending ? 'Sending...' : '✉️ Send'}
+                </button>
+                <button
+                  onClick={() => setShowCompose(false)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
