@@ -237,27 +237,33 @@ export function TournamentPlayers() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowInviteModal(true)}
-            disabled={sendingSMS || actionLoading}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
-          >
-            {sendingSMS ? 'Sending...' : '📧 Send Invitations'}
-          </button>
-          <button
-            onClick={handleMarkAllPaid}
-            disabled={confirmedPlayers.every(p => p.paid)}
-            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 disabled:bg-gray-400"
-          >
-            Mark All Quota Paid
-          </button>
-          <button
-            onClick={handleMarkAllSkinsCtpPaid}
-            disabled={confirmedPlayers.every(p => p.skins_ctp_paid)}
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
-          >
-            Mark All Pins/Skins Paid
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              disabled={sendingSMS || actionLoading}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {sendingSMS ? 'Sending...' : '📧 Send Invitations'}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleMarkAllPaid}
+              disabled={confirmedPlayers.every(p => p.paid)}
+              className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 disabled:bg-gray-400"
+            >
+              Mark All Quota Paid
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleMarkAllSkinsCtpPaid}
+              disabled={confirmedPlayers.every(p => p.skins_ctp_paid)}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
+            >
+              Mark All Pins/Skins Paid
+            </button>
+          )}
           <button
             onClick={() => setShowAddModal(true)}
             disabled={actionLoading || availablePlayers.length === 0}
@@ -332,12 +338,16 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Phone
-              </th>
+              {isAdmin && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Email
+                </th>
+              )}
+              {isAdmin && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Phone
+                </th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quota
               </th>
@@ -399,12 +409,16 @@ export function TournamentPlayers() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{player.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{player.phone || '-'}</div>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{player.email}</div>
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{player.phone || '-'}</div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : player.quota_18 || '-'}

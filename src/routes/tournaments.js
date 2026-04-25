@@ -500,7 +500,7 @@ const requireAdmin = async (req, res, next) => {
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at, t.completed,
               c.id as course_id, c.name as course_name, c.address as course_address,
               CASE
                 WHEN EXISTS (

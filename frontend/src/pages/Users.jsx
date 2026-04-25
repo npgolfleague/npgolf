@@ -28,7 +28,10 @@ export const Users = () => {
     setError('')
     try {
       const response = await playersAPI.list()
-      setPlayers(response.data)
+      setPlayers([...response.data].sort((a, b) => {
+        if (b.active !== a.active) return b.active - a.active
+        return a.name.localeCompare(b.name)
+      }))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch players')
     } finally {
@@ -262,8 +265,8 @@ export const Users = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
+                  {user?.role === 'admin' && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>}
+                  {user?.role === 'admin' && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>}
                   <th className="px-6 py-3 text-center text-gray-700 font-semibold">Active</th>
                   <th className="px-6 py-3 text-center text-gray-700 font-semibold">SMS</th>
                   <th className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
@@ -326,8 +329,8 @@ export const Users = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-900">{player.name}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.email}</td>
-                      <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>
+                      {user?.role === 'admin' && <td className="px-6 py-4 text-gray-900">{player.email}</td>}
+                      {user?.role === 'admin' && <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>}
                       <td className="px-6 py-4 text-center">{player.active ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-center">{player.email_allowed ? '✓' : '-'}</td>
