@@ -1,0 +1,2 @@
+ALTER TABLE tournament_completion_backups
+DROP FOREIGN KEY tournament_completion_backups_ibfk_1;

@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { coursesAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
 
 export const Courses = () => {
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const { user } = useContext(AuthContext)
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     fetchCourses()
@@ -41,12 +44,14 @@ export const Courses = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">Golf Courses</h2>
-          <button
-            onClick={() => navigate('/courses/add')}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition"
-          >
-            + Add Course
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/courses/add')}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition"
+            >
+              + Add Course
+            </button>
+          )}
         </div>
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
@@ -62,7 +67,7 @@ export const Courses = () => {
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Address</th>
                   <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
+                  {isAdmin && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -79,20 +84,22 @@ export const Courses = () => {
                       <td className="px-6 py-4 text-gray-900">{course.name}</td>
                       <td className="px-6 py-4 text-gray-900">{course.address || '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{course.phone || '-'}</td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => navigate(`/courses/${course.id}`)}
-                          className="text-blue-500 hover:underline mr-4"
-                        >
-                          View/Edit Holes
-                        </button>
-                        <button
-                          onClick={() => handleDelete(course.id)}
-                          className="text-red-500 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => navigate(`/courses/${course.id}`)}
+                            className="text-blue-500 hover:underline mr-4"
+                          >
+                            View/Edit Holes
+                          </button>
+                          <button
+                            onClick={() => handleDelete(course.id)}
+                            className="text-red-500 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

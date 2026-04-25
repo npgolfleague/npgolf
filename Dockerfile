@@ -1,5 +1,5 @@
 ### Build the frontend
-FROM node:20 AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /usr/src/app/frontend
 # Copy frontend sources
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -9,7 +9,11 @@ RUN npm ci && npm run build
 ### Build the backend and copy frontend assets
 FROM node:20-alpine AS backend
 WORKDIR /usr/src/app
-RUN apk add --no-cache tini
+RUN apk add --no-cache tini chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+# Set Chromium path for Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Copy backend package manifests and install production deps
 COPY package.json package-lock.json* ./
