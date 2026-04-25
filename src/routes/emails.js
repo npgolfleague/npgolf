@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const multer = require('multer');
 const upload = multer();
+const { sendEmail } = require('../email');
 
 // GET /api/emails - Get all received emails (admin only)
 router.get('/', async (req, res) => {
@@ -62,6 +63,62 @@ router.delete('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting email:', err);
     res.status(500).json({ error: 'Failed to delete email' });
+  }
+});
+
+// POST /api/emails/send - Send a custom email to players or specific addresses
+router.post('/send', upload.single('attachment'), async (req, res) => {
+  const { subject, body, recipient_type, player_ids, custom_emails } = req.body;
+  if (!subject || !body) return res.status(400).json({ error: 'Subject and body are required' });
+
+  try {
+    let recipients = [];
+
+    if (recipient_type === 'all') {
+      const [rows] = await pool.query("SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1");
+      recipients = rows.map(r => r.email);
+    } else if (recipient_type === 'active') {
+      const [rows] = await pool.query("SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1");
+      recipients = rows.map(r => r.email);
+    } else if (recipient_type === 'specific' && player_ids) {
+      const ids = JSON.parse(player_ids);
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => '?').join(',');
+        const [rows] = await pool.query(`SELECT email FROM players WHERE id IN (${placeholders}) AND email IS NOT NULL AND email != ''`, ids);
+        recipients = rows.map(r => r.email);
+      }
+    } else if (recipient_type === 'custom' && custom_emails) {
+      recipients = custom_emails.split(/[,;\n]+/).map(e => e.trim()).filter(Boolean);
+    }
+
+    if (recipients.length === 0) return res.status(400).json({ error: 'No valid recipients found' });
+
+    const attachments = [];
+    if (req.file) {
+      attachments.push({
+        content: req.file.buffer.toString('base64'),
+        filename: req.file.originalname,
+        type: req.file.mimetype,
+        disposition: 'attachment'
+      });
+    }
+
+    const htmlBody = body.replace(/\n/g, '<br>');
+    let sent = 0, failed = 0;
+    for (const email of recipients) {
+      try {
+        await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null);
+        sent++;
+      } catch (e) {
+        console.error(`Failed to send to ${email}:`, e.message);
+        failed++;
+      }
+    }
+
+    res.json({ message: `Sent: ${sent}, Failed: ${failed}`, sent, failed });
+  } catch (err) {
+    console.error('Error sending email:', err);
+    res.status(500).json({ error: 'Failed to send email' });
   }
 });
 
