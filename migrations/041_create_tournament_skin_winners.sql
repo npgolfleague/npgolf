@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS tournament_skin_winners (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  tournament_id INT UNSIGNED NOT NULL,
+  hole_id INT UNSIGNED NOT NULL,
+  hole_number TINYINT UNSIGNED NOT NULL,
+  player_id INT UNSIGNED NOT NULL,
+  score TINYINT UNSIGNED NOT NULL,
+  prize_money DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_tournament_skin_hole (tournament_id, hole_id),
+  FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE,
+  FOREIGN KEY (hole_id) REFERENCES hole(id) ON DELETE CASCADE,
+  FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+);

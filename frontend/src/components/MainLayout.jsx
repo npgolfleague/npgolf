@@ -14,12 +14,22 @@ export const MainLayout = () => {
   }
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
+    { path: '/app/dashboard', label: 'Dashboard', icon: '🏠' },
     { path: '/scores', label: 'Score Entry', icon: '📝' },
     { path: '/users', label: 'Players', icon: '👥' },
+    { path: '/tournaments', label: 'Tournaments', icon: '🏆' },
     { path: '/courses', label: 'Courses', icon: '⛳' },
-    { path: '/courses/add', label: 'Add Course', icon: '➕' }
+    { path: '/rules', label: 'Rules', icon: '📋' },
+    { path: '/app/about', label: 'About', icon: 'ℹ️' }
   ]
+
+  const adminMenuItems = [
+    { path: '/quota', label: 'Quota', icon: '🎯' },
+    { path: '/inbox', label: 'Inbox', icon: '📧' },
+    { path: '/settings', label: 'Settings', icon: '⚙️' }
+  ]
+
+  const allMenuItems = user?.role === 'admin' ? [...menuItems, ...adminMenuItems] : menuItems
 
   const isActive = (path) => {
     if (path === '/courses/add') {
@@ -40,7 +50,7 @@ export const MainLayout = () => {
         <div className="p-4 border-b border-blue-700">
           <div className="flex items-center justify-between">
             {sidebarOpen && (
-              <h1 className="text-2xl font-bold">npgolf</h1>
+              <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-8 w-auto" />
             )}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -71,7 +81,7 @@ export const MainLayout = () => {
         {/* Navigation Menu */}
         <nav className="flex-1 p-4">
           <ul className="space-y-2">
-            {menuItems.map((item) => (
+            {allMenuItems.map((item) => (
               <li key={item.path}>
                 <button
                   onClick={() => navigate(item.path)}

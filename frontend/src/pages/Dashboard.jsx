@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
+import { formatDateOnly } from '../utils/date'
 
 export const Dashboard = () => {
   const navigate = useNavigate()
+  const { user } = useContext(AuthContext)
+  const isAdmin = user?.role === 'admin'
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [refreshingQuotas, setRefreshingQuotas] = useState(false)
+  const [quotaRefreshMessage, setQuotaRefreshMessage] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -32,8 +38,7 @@ export const Dashboard = () => {
   }
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return formatDateOnly(dateString, 'en-US', {
       month: 'short', 
       day: 'numeric'
     })
@@ -43,8 +48,42 @@ export const Dashboard = () => {
     { path: '/scores', label: 'Score Entry', icon: '📝', color: 'blue' },
     { path: '/users', label: 'Players', icon: '👥', color: 'green' },
     { path: '/courses', label: 'Courses', icon: '⛳', color: 'yellow' },
-    { path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }
+    ...(isAdmin ? [{ path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }] : [])
   ]
+
+  const publicMenuItems = [
+    { path: '/app/dashboard', label: 'Dashboard', icon: '🏠', enabled: false },
+    { path: '/scores', label: 'Score Entry', icon: '📝', enabled: false },
+    { path: '/users', label: 'Players', icon: '👥', enabled: false },
+    { path: '/tournaments', label: 'Tournaments', icon: '🏆', enabled: false },
+    { path: '/courses', label: 'Courses', icon: '⛳', enabled: false },
+    { path: '/rules', label: 'Rules', icon: '📋', enabled: false },
+    { path: '/about', label: 'About', icon: 'ℹ️', enabled: true }
+  ]
+
+  const handleRefreshQuotas = async () => {
+    if (!confirm('Refresh quota values from stored quota history for all players?')) return
+
+    try {
+      setRefreshingQuotas(true)
+      setQuotaRefreshMessage('')
+      setError(null)
+
+      const response = await playersAPI.refreshQuotas()
+      const playersTouched = response.data?.playersTouched ?? 0
+      const updated18 = response.data?.updated18 ?? 0
+      const updated9 = response.data?.updated9 ?? 0
+      const prizePlayersTouched = response.data?.prizePlayersTouched ?? 0
+
+      setQuotaRefreshMessage(`Quota values refreshed. Players: ${playersTouched}, 18-hole updated: ${updated18}, 9-hole updated: ${updated9}, prize money recalculated: ${prizePlayersTouched}`)
+      await fetchData()
+    } catch (err) {
+      console.error('Error refreshing quota values:', err)
+      setError(err.response?.data?.error || 'Failed to refresh quota values')
+    } finally {
+      setRefreshingQuotas(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -52,9 +91,27 @@ export const Dashboard = () => {
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">NPGolf League</h1>
-            <div className="flex gap-2">
-              {menuItems.map(item => (
+            <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-14 w-auto" />
+            <div className="flex gap-2 items-center">
+              {!user && (
+                <>
+                  <button
+                    onClick={() => navigate('/register')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition font-medium"
+                  >
+                    <span>➕</span>
+                    <span>Join</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition font-medium"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In</span>
+                  </button>
+                </>
+              )}
+              {user && menuItems.map(item => (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
@@ -74,6 +131,34 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Upcoming Tournaments */}
           <div className="lg:col-span-1">
+            {!user && (
+              <div className="bg-white rounded-lg shadow p-4 mb-4 sticky top-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Menu</h2>
+                <div className="space-y-2">
+                  {publicMenuItems.map((item) => (
+                    item.enabled ? (
+                      <button
+                        key={item.path}
+                        onClick={() => navigate(item.path)}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    ) : (
+                      <div
+                        key={item.path}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded bg-gray-100 text-gray-400 cursor-not-allowed"
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow p-4 sticky top-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Upcoming Tournaments</h2>
               
@@ -132,16 +217,33 @@ export const Dashboard = () => {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-800">FedEx Cup Standings</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-gray-800">Paradise Cup Standings</h2>
+                  {isAdmin && (
+                    <button
+                      onClick={handleRefreshQuotas}
+                      disabled={refreshingQuotas}
+                      className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50"
+                    >
+                      {refreshingQuotas ? 'Refreshing...' : 'Refresh Quotas'}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {quotaRefreshMessage && (
+                <div className="mx-6 mt-4 p-3 bg-green-100 text-green-700 rounded text-sm">
+                  {quotaRefreshMessage}
+                </div>
+              )}
               
               {loading ? (
                 <div className="text-center py-12 text-gray-600">Loading players...</div>
               ) : error ? (
                 <div className="text-center py-12 text-red-600">{error}</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full min-w-[920px]">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -151,13 +253,19 @@ export const Dashboard = () => {
                           Player
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          FedEx Pts
+                          Paradise Pts
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Quota 18H
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Quota 9H
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                           Tournaments
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          Prize Money
+                          Total Prize Money YTD
                         </th>
                       </tr>
                     </thead>
@@ -186,9 +294,6 @@ export const Dashboard = () => {
                                 <div className="text-sm font-semibold text-gray-900">
                                   {player.name}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Quota: {player.quota || '-'}
-                                </div>
                               </div>
                             </div>
                           </td>
@@ -196,6 +301,12 @@ export const Dashboard = () => {
                             <span className="text-lg font-bold text-blue-600">
                               {(player.fedex_points || 0).toLocaleString()}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-gray-900">{player.quota_18 ?? '-'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-gray-900">{player.quota_9 ?? '-'}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span className="text-sm text-gray-900">

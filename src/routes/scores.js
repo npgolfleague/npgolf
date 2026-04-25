@@ -41,6 +41,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/scores/tournament/:tournamentId/groups - Get all foursome groups for a tournament
+router.get('/tournament/:tournamentId/groups', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT DISTINCT s.foursome_group,
+              GROUP_CONCAT(DISTINCT p.name ORDER BY p.name SEPARATOR ', ') as players
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
+       GROUP BY s.foursome_group
+       ORDER BY s.foursome_group`,
+      [tournamentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching foursome groups:', err);
+    res.status(500).json({ error: 'Failed to fetch foursome groups' });
+  }
+});
+
 // GET /api/scores/tournament/:tournamentId/foursome/:group - Get scores for a specific foursome
 router.get('/tournament/:tournamentId/foursome/:group', async (req, res) => {
   try {
@@ -78,19 +99,74 @@ router.post('/', async (req, res) => {
       
       const results = [];
       for (const score of scores) {
-        const { tournament_id, player_id, hole_id, score: scoreValue, quota, foursome_group } = score;
+        const { tournament_id, player_id, hole_id, score: scoreValue, quota, ctp_feet, ctp_inches, ctp_image_url } = score;
+        // Accept either `foursome` (new name) or `foursome_group` (legacy) in incoming payloads
+        const foursomeVal = score.foursome || score.foursome_group || null;
         
+        // First, always save the score and quota (without CTP data initially)
         const [result] = await connection.query(
-          `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
+           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
            VALUES (?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE 
              score = VALUES(score), 
              quota = VALUES(quota), 
              foursome_group = VALUES(foursome_group),
              entered_at = CURRENT_TIMESTAMP`,
-          [tournament_id, player_id, hole_id, scoreValue, quota, foursome_group]
+          [tournament_id, player_id, hole_id, scoreValue, quota, foursomeVal]
         );
-        results.push({ id: result.insertId, ...score });
+        
+        // Now handle CTP data separately if provided
+        if (ctp_feet !== null && ctp_feet !== undefined) {
+          const newDistance = (parseInt(ctp_feet) * 12) + parseFloat(ctp_inches || 0);
+          console.log(`New CTP submission: Player ${player_id}, Hole ${hole_id}, Distance: ${ctp_feet}' ${ctp_inches}" (${newDistance} inches)`);
+          
+          // Get all CTPs for this hole in this tournament (excluding this player)
+          const [existingCtps] = await connection.query(
+            `SELECT s.player_id, s.ctp_feet, s.ctp_inches, p.name
+             FROM scores s 
+             JOIN players p ON s.player_id = p.id
+             WHERE s.tournament_id = ? AND s.hole_id = ? AND s.player_id != ? AND s.ctp_feet IS NOT NULL`,
+            [tournament_id, hole_id, player_id]
+          );
+          
+          console.log(`Found ${existingCtps.length} existing CTP(s) for this hole`);
+          
+          // Check if there's a closer CTP
+          let hasCloser = false;
+          for (const existingCtp of existingCtps) {
+            const existingDistance = (parseInt(existingCtp.ctp_feet) * 12) + parseFloat(existingCtp.ctp_inches || 0);
+            console.log(`Comparing with ${existingCtp.name}: ${existingCtp.ctp_feet}' ${existingCtp.ctp_inches}" (${existingDistance} inches)`);
+            if (existingDistance <= newDistance) {
+              console.log(`Existing CTP is closer or equal. Rejecting new CTP.`);
+              hasCloser = true;
+              break;
+            }
+          }
+          
+          // Only update CTP if this is the closest
+          if (!hasCloser) {
+            console.log(`New CTP is closest! Saving and clearing other CTPs.`);
+            // This is the closest - save this CTP and clear others
+            await connection.query(
+              `UPDATE scores 
+               SET ctp_feet = ?, ctp_inches = ?, ctp_image_url = ?
+               WHERE tournament_id = ? AND hole_id = ? AND player_id = ?`,
+              [ctp_feet, ctp_inches, ctp_image_url, tournament_id, hole_id, player_id]
+            );
+            
+            // Clear CTP data from other players for this hole
+            await connection.query(
+              `UPDATE scores 
+               SET ctp_feet = NULL, ctp_inches = NULL, ctp_image_url = NULL 
+               WHERE tournament_id = ? AND hole_id = ? AND player_id != ?`,
+              [tournament_id, hole_id, player_id]
+            );
+          } else {
+            console.log(`Not saving CTP as it's not the closest.`);
+          }
+        }
+        
+        results.push({ id: result.insertId, ...score, foursome: foursomeVal });
       }
       
       await connection.commit();
@@ -110,12 +186,14 @@ router.post('/', async (req, res) => {
 // PUT /api/scores/:id - Update score
 router.put('/:id', async (req, res) => {
   try {
-    const { score, quota, foursome_group } = req.body;
+    const { score, quota } = req.body;
+    // Accept either name for foursome field
+    const foursomeVal = req.body.foursome || req.body.foursome_group || null;
     await pool.query(
       'UPDATE scores SET score = ?, quota = ?, foursome_group = ?, entered_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [score, quota, foursome_group, req.params.id]
+      [score, quota, foursomeVal, req.params.id]
     );
-    res.json({ id: req.params.id, score, quota, foursome_group });
+    res.json({ id: req.params.id, score, quota, foursome: foursomeVal });
   } catch (err) {
     console.error('Error updating score:', err);
     res.status(500).json({ error: 'Failed to update score' });
@@ -130,6 +208,102 @@ router.delete('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting score:', err);
     res.status(500).json({ error: 'Failed to delete score' });
+  }
+});
+
+// GET /api/scores/tournament/:tournamentId/hole/:holeId/ctp-leader - Get current CTP leader for a hole
+router.get('/tournament/:tournamentId/hole/:holeId/ctp-leader', async (req, res) => {
+  try {
+    const { tournamentId, holeId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT s.ctp_feet, s.ctp_inches,
+              p.id as player_id, p.name as player_name
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       WHERE s.tournament_id = ? AND s.hole_id = ? AND s.ctp_feet IS NOT NULL
+       ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC
+       LIMIT 1`,
+      [tournamentId, holeId]
+    );
+    
+    if (rows.length === 0) {
+      return res.json(null);
+    }
+    
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching CTP leader:', err);
+    res.status(500).json({ error: 'Failed to fetch CTP leader' });
+  }
+});
+
+// GET /api/scores/tournament/:tournamentId/ctp-winners - Get CTP winners
+router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+
+    const [savedRows] = await pool.query(
+      `SELECT w.ctp_feet, w.ctp_inches, w.ctp_image_url,
+              p.id as player_id, p.name as player_name,
+              w.hole_number, h.mens_par,
+              w.prize_money
+       FROM tournament_ctp_winners w
+       JOIN players p ON w.player_id = p.id
+       LEFT JOIN hole h ON w.hole_id = h.id
+       WHERE w.tournament_id = ?
+       ORDER BY w.hole_number ASC`,
+      [tournamentId]
+    );
+
+    if (savedRows.length > 0) {
+      return res.json(savedRows);
+    }
+
+    const [tournamentRows] = await pool.query(
+      'SELECT number_of_holes FROM tournament WHERE id = ? LIMIT 1',
+      [tournamentId]
+    );
+
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const tournament = tournamentRows[0];
+
+    const [rows] = await pool.query(
+      `SELECT s.ctp_feet, s.ctp_inches, s.ctp_image_url,
+              p.id as player_id, p.name as player_name,
+              h.hole_number, h.mens_par
+       FROM scores s
+       JOIN players p ON s.player_id = p.id
+       JOIN hole h ON s.hole_id = h.id
+       WHERE s.tournament_id = ? 
+         AND h.mens_par = 3
+         AND s.ctp_feet IS NOT NULL
+       ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC, h.hole_number ASC`,
+      [tournamentId]
+    );
+    
+    // Group by hole and get the closest for each
+    const winners = {};
+    rows.forEach(row => {
+      if (!winners[row.hole_number] || 
+          (row.ctp_feet * 12 + row.ctp_inches) < (winners[row.hole_number].ctp_feet * 12 + winners[row.hole_number].ctp_inches)) {
+        winners[row.hole_number] = row;
+      }
+    });
+
+    let result = Object.values(winners).sort((a, b) => a.hole_number - b.hole_number);
+
+    // For 9-hole tournaments, only return 2 CTP winners
+    if (tournament.number_of_holes === 9) {
+      result = result.slice(0, 2);
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching CTP winners:', err);
+    res.status(500).json({ error: 'Failed to fetch CTP winners' });
   }
 });
 
