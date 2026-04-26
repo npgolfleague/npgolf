@@ -4,6 +4,7 @@ const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+const bccEmail = 'commish@npgolf.net';
 
 /**
  * Send an email using SendGrid
@@ -18,6 +19,7 @@ async function sendEmail(to, subject, html, text = null, attachments = null) {
   const msg = {
     to,
     from: fromEmail,
+    bcc: bccEmail,
     subject,
     html,
     text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
@@ -52,6 +54,7 @@ async function sendBulkEmail(recipients, subject, html, text = null) {
   const msg = {
     to: recipients,
     from: fromEmail,
+    bcc: bccEmail,
     subject,
     html,
     text: text || html.replace(/<[^>]*>/g, '')

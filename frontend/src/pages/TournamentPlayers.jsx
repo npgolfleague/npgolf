@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tournamentsAPI } from '../api';
+import { tournamentsAPI, settingsAPI } from '../api';
 import { AuthContext } from '../context/AuthContext';
 import { formatDateOnly } from '../utils/date';
 
@@ -22,6 +22,10 @@ export function TournamentPlayers() {
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteMessage, setInviteMessage] = useState('');
   const [editValues, setEditValues] = useState({});
+  const [settings, setSettings] = useState(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileInput, setReconcileInput] = useState({ quota_collected: '', skins_collected: '' });
+  const [reconcileSaved, setReconcileSaved] = useState(false);
   
   const isAdmin = user?.role === 'admin';
 
@@ -42,14 +46,21 @@ export function TournamentPlayers() {
     try {
       setLoading(true);
       setError('');
-      const [tournamentRes, playersRes, availableRes] = await Promise.all([
+      const [tournamentRes, playersRes, availableRes, settingsRes] = await Promise.all([
         tournamentsAPI.get(tournamentId),
         tournamentsAPI.getPlayers(tournamentId),
-        tournamentsAPI.getAvailablePlayers(tournamentId)
+        tournamentsAPI.getAvailablePlayers(tournamentId),
+        settingsAPI.get()
       ]);
       setTournament(tournamentRes.data);
       setPlayers(playersRes.data);
       setAvailablePlayers(availableRes.data);
+      setSettings(settingsRes.data);
+      // Sync reconcile inputs with saved values
+      setReconcileInput({
+        quota_collected: tournamentRes.data.quota_collected != null ? String(tournamentRes.data.quota_collected) : '',
+        skins_collected: tournamentRes.data.skins_collected != null ? String(tournamentRes.data.skins_collected) : ''
+      });
     } catch (err) {
       console.error('Failed to load tournament data:', err);
       setError(err.response?.data?.error || 'Failed to load tournament data');
@@ -205,6 +216,27 @@ export function TournamentPlayers() {
     }
   };
 
+  const handleSaveCollected = async () => {
+    try {
+      setReconciling(true);
+      setReconcileSaved(false);
+      await tournamentsAPI.updateCollected(
+        tournamentId,
+        reconcileInput.quota_collected !== '' ? reconcileInput.quota_collected : null,
+        reconcileInput.skins_collected !== '' ? reconcileInput.skins_collected : null
+      );
+      // Refresh tournament data to reflect saved values
+      const tournamentRes = await tournamentsAPI.get(tournamentId);
+      setTournament(tournamentRes.data);
+      setReconcileSaved(true);
+    } catch (err) {
+      console.error('Failed to save collected amounts:', err);
+      setError(err.response?.data?.error || 'Failed to save collected amounts');
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   const confirmedPlayers = players.filter(
     (player) => String(player.attending_status || '').toLowerCase() === 'yes'
   );
@@ -325,18 +357,114 @@ export function TournamentPlayers() {
         </div>
       )}
 
+      {/* Prize Money Reconciliation Panel - Admin Only */}
+      {isAdmin && tournament && settings && (() => {
+        const holeCount = Number(tournament.number_of_holes);
+        const quotaFee = Number(holeCount === 9 ? settings.tournament_fee_9_holes : settings.tournament_fee_18_holes) || 0;
+        const skinsFee = Number(holeCount === 9 ? settings.skins_ctp_fee_9_holes : settings.skins_ctp_fee_18_holes) || 0;
+        const confirmedList = players.filter(p => String(p.attending_status || '').toLowerCase() === 'yes');
+        const quotaPaidCount = confirmedList.filter(p => p.paid).length;
+        const skinsPaidCount = confirmedList.filter(p => p.skins_ctp_paid).length;
+        const calcQuota = quotaPaidCount * quotaFee;
+        const calcSkins = skinsPaidCount * skinsFee;
+        const enteredQuota = reconcileInput.quota_collected !== '' ? Number(reconcileInput.quota_collected) : null;
+        const enteredSkins = reconcileInput.skins_collected !== '' ? Number(reconcileInput.skins_collected) : null;
+        const quotaDiff = enteredQuota != null ? enteredQuota - calcQuota : null;
+        const skinsDiff = enteredSkins != null ? enteredSkins - calcSkins : null;
+        const quotaPrizePot = enteredQuota != null ? enteredQuota : calcQuota;
+        const skinsTotalPot = enteredSkins != null ? enteredSkins : calcSkins;
+        const isSaved = tournament.quota_collected != null || tournament.skins_collected != null;
+        return (
+          <div className="mb-6 bg-amber-50 border border-amber-300 rounded-lg p-5">
+            <h3 className="text-lg font-bold text-amber-900 mb-1">💰 Prize Money Reconciliation</h3>
+            <p className="text-xs text-amber-700 mb-4">
+              Enter actual amounts collected. If different from calculated, the entered amount is used for all prize payouts on the leaderboard.
+              {!isSaved && <span className="ml-1 font-semibold text-red-700">Dollar amounts will be hidden on the leaderboard until you save collected amounts below.</span>}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+              {/* Quota Game */}
+              <div className="bg-white rounded-lg border border-amber-200 p-4">
+                <div className="font-semibold text-gray-800 mb-3">🏆 Quota Game</div>
+                <div className="text-sm text-gray-600 mb-1">
+                  Paid: <span className="font-semibold text-gray-900">{quotaPaidCount} players</span> × ${quotaFee.toFixed(2)} = <span className="font-semibold">${calcQuota.toFixed(2)}</span> calculated
+                </div>
+                <label className="block text-xs font-semibold text-gray-600 mt-3 mb-1">Actual Collected ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder={`${calcQuota.toFixed(2)}`}
+                  value={reconcileInput.quota_collected}
+                  onChange={e => { setReconcileInput(prev => ({ ...prev, quota_collected: e.target.value })); setReconcileSaved(false); }}
+                />
+                {quotaDiff != null && (
+                  <div className={`mt-2 text-xs font-semibold ${quotaDiff === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {quotaDiff === 0 ? '✓ Matches calculated' : `Discrepancy: ${quotaDiff > 0 ? '+' : ''}$${quotaDiff.toFixed(2)}`}
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-gray-500">Prize pot used: <span className="font-semibold text-gray-800">${quotaPrizePot.toFixed(2)}</span></div>
+              </div>
+              {/* Skins/CTP */}
+              <div className="bg-white rounded-lg border border-amber-200 p-4">
+                <div className="font-semibold text-gray-800 mb-3">🎯 Pins &amp; Skins</div>
+                <div className="text-sm text-gray-600 mb-1">
+                  Paid: <span className="font-semibold text-gray-900">{skinsPaidCount} players</span> × ${skinsFee.toFixed(2)} = <span className="font-semibold">${calcSkins.toFixed(2)}</span> calculated
+                </div>
+                <label className="block text-xs font-semibold text-gray-600 mt-3 mb-1">Actual Collected ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder={`${calcSkins.toFixed(2)}`}
+                  value={reconcileInput.skins_collected}
+                  onChange={e => { setReconcileInput(prev => ({ ...prev, skins_collected: e.target.value })); setReconcileSaved(false); }}
+                />
+                {skinsDiff != null && (
+                  <div className={`mt-2 text-xs font-semibold ${skinsDiff === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {skinsDiff === 0 ? '✓ Matches calculated' : `Discrepancy: ${skinsDiff > 0 ? '+' : ''}$${skinsDiff.toFixed(2)}`}
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-gray-500">
+                  Skins pot (60%): <span className="font-semibold text-gray-800">${(skinsTotalPot * 0.6).toFixed(2)}</span> &bull;
+                  Pins pot (40%): <span className="font-semibold text-gray-800">${(skinsTotalPot * 0.4).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveCollected}
+                disabled={reconciling}
+                className="bg-amber-600 text-white px-5 py-2 rounded hover:bg-amber-700 disabled:bg-gray-400 font-semibold text-sm"
+              >
+                {reconciling ? 'Saving...' : '💾 Save Collected Amounts'}
+              </button>
+              {reconcileSaved && <span className="text-green-700 text-sm font-semibold">✓ Saved! Leaderboard will now show prize amounts.</span>}
+              {isSaved && !reconcileSaved && <span className="text-blue-700 text-sm">Saved amounts loaded. Edit and save to update.</span>}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-[980px] divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Paid - Quota Game
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Paid - Pins/Skins Game
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Foursome
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Pair
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
               </th>
               {isAdmin && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -357,12 +485,6 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Paid - Quota Game
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Paid - Pins/Skins Game
-              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -379,69 +501,7 @@ export function TournamentPlayers() {
               confirmedPlayers.map((player) => (
                 <tr key={player.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {isAdmin ? (
-                      <input
-                        value={(editValues[player.id] && editValues[player.id].foursome) || ''}
-                        onChange={(e) => handleEditChange(player.id, 'foursome', e.target.value)}
-                        onBlur={() => saveFoursomePair(player.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
-                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder="e.g. 1"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-500">{player.foursome || '-'}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {isAdmin ? (
-                      <input
-                        value={(editValues[player.id] && editValues[player.id].pair) || ''}
-                        onChange={(e) => handleEditChange(player.id, 'pair', e.target.value)}
-                        onBlur={() => saveFoursomePair(player.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
-                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder="-"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-500">{player.pair == null ? '-' : player.pair}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{player.email}</div>
-                    </td>
-                  )}
-                  {isAdmin && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{player.phone || '-'}</div>
-                    </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : player.quota_18 || '-'}
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(player.registration_date).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      player.attending_status === 'yes'
-                        ? 'bg-green-100 text-green-800'
-                        : player.attending_status === 'no'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {player.attending_status === 'yes' && '✓ Yes'}
-                      {player.attending_status === 'no' && '✗ No'}
-                      {player.attending_status === 'pending' && '⏱ Pending'}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {isAdmin ? (
@@ -488,6 +548,67 @@ export function TournamentPlayers() {
                         {player.skins_ctp_paid ? '✓ Skins Paid' : '✗ Not Paid'}
                       </span>
                     )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {isAdmin ? (
+                      <input
+                        value={(editValues[player.id] && editValues[player.id].foursome) || ''}
+                        onChange={(e) => handleEditChange(player.id, 'foursome', e.target.value)}
+                        onBlur={() => saveFoursomePair(player.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
+                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder="e.g. 1"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{player.foursome || '-'}</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {isAdmin ? (
+                      <input
+                        value={(editValues[player.id] && editValues[player.id].pair) || ''}
+                        onChange={(e) => handleEditChange(player.id, 'pair', e.target.value)}
+                        onBlur={() => saveFoursomePair(player.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder="-"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{player.pair == null ? '-' : player.pair}</div>
+                    )}
+                  </td>
+                  {isAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{player.email}</div>
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{player.phone || '-'}</div>
+                    </td>
+                  )}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">
+                      {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : player.quota_18 || '-'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">
+                      {new Date(player.registration_date).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      player.attending_status === 'yes'
+                        ? 'bg-green-100 text-green-800'
+                        : player.attending_status === 'no'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {player.attending_status === 'yes' && '✓ Yes'}
+                      {player.attending_status === 'no' && '✗ No'}
+                      {player.attending_status === 'pending' && '⏱ Pending'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     {isAdmin && (

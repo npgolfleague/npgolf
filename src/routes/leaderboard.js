@@ -11,6 +11,8 @@ router.get('/:tournamentId', async (req, res) => {
     // Get tournament details and settings
     const [tournamentInfo] = await pool.query(`
       SELECT t.number_of_holes,
+             t.quota_collected,
+             t.skins_collected,
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND paid = 1) as paid_players,
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND skins_ctp_paid = 1) as skins_ctp_players
       FROM tournament t
@@ -36,8 +38,12 @@ router.get('/:tournamentId', async (req, res) => {
         : settings.skins_ctp_fee_9_holes
     ) || 0;
 
-    const quotaPrizePot = tournament.paid_players * tournamentFee;
-    const skinsCTPTotalPot = tournament.skins_ctp_players * skinsCTPFee;
+    const quotaPrizePot = tournament.quota_collected != null
+      ? Number(tournament.quota_collected)
+      : tournament.paid_players * tournamentFee;
+    const skinsCTPTotalPot = tournament.skins_collected != null
+      ? Number(tournament.skins_collected)
+      : tournament.skins_ctp_players * skinsCTPFee;
     const SKINS_PCT = 0.6;
     const CTP_PCT = 0.4;
     const skinPrizePot = skinsCTPTotalPot * SKINS_PCT;
@@ -309,7 +315,9 @@ router.get('/:tournamentId', async (req, res) => {
           skins_ctp_fee: skinsCTPFee,
           skins_ctp_total_pot: Number(skinsCTPTotalPot.toFixed(2)),
           skin_prize_pot: Number(skinPrizePot.toFixed(2)),
-          ctp_prize_pot: Number(ctpPrizePot.toFixed(2))
+          ctp_prize_pot: Number(ctpPrizePot.toFixed(2)),
+          quota_collected: tournament.quota_collected != null ? Number(tournament.quota_collected) : null,
+          skins_collected: tournament.skins_collected != null ? Number(tournament.skins_collected) : null
         });
       }
       
