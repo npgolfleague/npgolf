@@ -66,6 +66,7 @@ export const tournamentsAPI = {
   getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
   updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid }),
   updateSkinsCtpPaidStatus: (tournamentId, playerId, skins_ctp_paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/skins-ctp-paid`, { skins_ctp_paid }),
+  updateCollected: (tournamentId, quota_collected, skins_collected) => apiClient.put(`/tournaments/${tournamentId}/collected`, { quota_collected, skins_collected }),
   sendInviteSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/invite-sms`),
   sendSMS: (tournamentId) => apiClient.post(`/tournaments/${tournamentId}/send-sms`),
   sendInvitations: (tournamentId, method, playerId, customMessage) => apiClient.post(`/tournaments/${tournamentId}/send-invitations`, {

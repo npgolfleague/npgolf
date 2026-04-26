@@ -565,6 +565,7 @@ router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
+              t.quota_collected, t.skins_collected,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
               CASE
                 WHEN EXISTS (
@@ -586,6 +587,25 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error fetching tournament:', err);
     res.status(500).json({ error: 'Failed to fetch tournament' });
+  }
+});
+
+// PUT /api/tournaments/:id/collected - Save actual collected amounts for reconciliation
+router.put('/:id/collected', async (req, res) => {
+  try {
+    const { quota_collected, skins_collected } = req.body;
+    await pool.query(
+      'UPDATE tournament SET quota_collected = ?, skins_collected = ? WHERE id = ?',
+      [
+        quota_collected != null && quota_collected !== '' ? Number(quota_collected) : null,
+        skins_collected != null && skins_collected !== '' ? Number(skins_collected) : null,
+        req.params.id
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating collected amounts:', err);
+    res.status(500).json({ error: 'Failed to update collected amounts' });
   }
 });
 

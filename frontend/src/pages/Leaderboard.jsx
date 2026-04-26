@@ -111,6 +111,10 @@ export function Leaderboard() {
       }
     : null;
 
+  // Prize amounts are only displayed after admin has entered actual collected amounts
+  const prizeAmountsReady = leaderboard.length > 0 &&
+    (leaderboard[0].quota_collected != null || leaderboard[0].skins_collected != null);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -150,7 +154,7 @@ export function Leaderboard() {
         </div>
       ) : (
         <>
-        {payoutSummary && (
+        {payoutSummary && prizeAmountsReady && (
           <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
             <h3 className="font-semibold text-indigo-900 mb-1">Pins &amp; Skins Split</h3>
             <p className="text-sm text-indigo-800">
@@ -159,6 +163,12 @@ export function Leaderboard() {
             <p className="text-sm text-indigo-800">
               Skins Pot (60%): <span className="font-semibold">${payoutSummary.skinsPot.toFixed(2)}</span> | Pins Pot (40%): <span className="font-semibold">${payoutSummary.pinsPot.toFixed(2)}</span>
             </p>
+          </div>
+        )}
+        {payoutSummary && !prizeAmountsReady && (
+          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-700 mb-1">Pins &amp; Skins Split</h3>
+            <p className="text-sm text-gray-500 italic">Prize amounts will be displayed once the commissioner enters actual collected amounts.</p>
           </div>
         )}
         <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
@@ -231,12 +241,16 @@ export function Leaderboard() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {player.quota_prize_money > 0 ? (
-                      <div className="text-sm font-bold text-green-600">
-                        ${player.quota_prize_money}
-                      </div>
+                    {prizeAmountsReady ? (
+                      player.quota_prize_money > 0 ? (
+                        <div className="text-sm font-bold text-green-600">
+                          ${player.quota_prize_money}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )
                     ) : (
-                      <div className="text-sm text-gray-400">-</div>
+                      <div className="text-sm text-gray-400 italic">TBD</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -254,21 +268,29 @@ export function Leaderboard() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {player.skin_prize_money > 0 ? (
-                      <div className="text-sm font-bold text-green-600">
-                        ${player.skin_prize_money}
-                      </div>
+                    {prizeAmountsReady ? (
+                      player.skin_prize_money > 0 ? (
+                        <div className="text-sm font-bold text-green-600">
+                          ${player.skin_prize_money}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )
                     ) : (
-                      <div className="text-sm text-gray-400">-</div>
+                      <div className="text-sm text-gray-400 italic">TBD</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {player.ctp_prize_money > 0 ? (
-                      <div className="text-sm font-bold text-green-600">
-                        ${player.ctp_prize_money}
-                      </div>
+                    {prizeAmountsReady ? (
+                      player.ctp_prize_money > 0 ? (
+                        <div className="text-sm font-bold text-green-600">
+                          ${player.ctp_prize_money}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )
                     ) : (
-                      <div className="text-sm text-gray-400">-</div>
+                      <div className="text-sm text-gray-400 italic">TBD</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
