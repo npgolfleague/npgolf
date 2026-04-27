@@ -32,57 +32,79 @@ export const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-        <div className="mb-6 flex justify-center">
-          <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-12 w-auto" />
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-fairway-500 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md relative z-10 border border-slate-100">
+        <div className="mb-8 flex flex-col items-center">
+          <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-16 w-auto mb-2" />
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome Back</h1>
+          <p className="text-slate-500 text-sm">Please enter your details to sign in</p>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">Email</label>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-slate-700 text-sm font-bold mb-1.5 ml-1">Email Address</label>
             <input
               type="email"
+              placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fairway-500/20 focus:border-fairway-500 transition-all placeholder:text-slate-400"
               required
             />
           </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">Password</label>
+          <div>
+            <div className="flex justify-between items-center mb-1.5 ml-1">
+              <label className="block text-slate-700 text-sm font-bold">Password</label>
+              <a href="/forgot-password" disabled className="text-xs font-semibold text-fairway-700 hover:text-fairway-800 transition-colors">
+                Forgot password?
+              </a>
+            </div>
             <input
               type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fairway-500/20 focus:border-fairway-500 transition-all placeholder:text-slate-400"
               required
             />
           </div>
 
-          {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-medium flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg transition disabled:opacity-50"
+            className="w-full btn-primary py-3 text-base shadow-lg shadow-fairway-600/20"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Disc3 className="w-5 h-5 animate-spin" />
+                Signing in...
+              </span>
+            ) : 'Sign In'}
           </button>
-
-          <p className="mt-3 text-right text-sm">
-            <a href="/forgot-password" className="text-blue-500 hover:underline">
-              Forgot password?
-            </a>
-          </p>
         </form>
 
-        <p className="mt-4 text-center text-gray-600">
-          Don't have an account?{' '}
-          <a href="/register" className="text-blue-500 hover:underline">
-            Register
-          </a>
-        </p>
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <p className="text-slate-500 text-sm">
+            Don't have an account?{' '}
+            <a href="/register" className="font-bold text-slate-900 hover:text-fairway-700 transition-colors">
+              Request Access
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   )

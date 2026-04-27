@@ -3,6 +3,7 @@ import { playersAPI, tournamentsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { EditPlayerModal } from '../components/EditPlayerModal'
 import { formatDateOnly } from '../utils/date'
+import { Smartphone } from 'lucide-react'
 
 export const Users = () => {
   const { user } = useContext(AuthContext)
@@ -305,7 +306,7 @@ export const Users = () => {
                               className="text-green-600 hover:text-green-800 font-semibold ml-2"
                               title="Send SMS"
                             >
-                              📱
+                              <Smartphone className="w-4 h-4 inline" />
                             </button>
                           )}
                           {user?.role === 'admin' && (
