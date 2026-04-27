@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, cartTagsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { formatDateOnly } from '../utils/date'
+import { Users, Trophy, Flag, Mail, Pencil, BarChart2, Trash2, Smartphone, Check, Tag, Sparkles } from 'lucide-react'
 
 export const Tournaments = () => {
   const navigate = useNavigate()
@@ -181,16 +182,16 @@ export const Tournaments = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="w-full px-6 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">🏆 Tournaments</h2>
+          <h2 className="text-3xl font-bold text-gray-800">Tournaments</h2>
           {isAdmin && (
             <div className="flex gap-2">
               <button
                 onClick={() => navigate('/tournaments/add')}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition"
+                className="btn-primary"
               >
-                + Add Tournament
+                <Trophy className="w-4 h-4" /> Add Tournament
               </button>
             </div>
           )}
@@ -203,14 +204,14 @@ export const Tournaments = () => {
             <p className="font-semibold">✓ Invitations Sent Successfully!</p>
             <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
               <div>
-                <p className="font-medium">📱 SMS:</p>
+                <p className="font-medium flex items-center gap-1"><Smartphone className="w-3.5 h-3.5" /> SMS:</p>
                 <p>✓ Sent: {inviteResult.sms?.sent || 0}</p>
                 {inviteResult.sms?.failed?.length > 0 && (
                   <p className="text-red-600">✗ Failed: {inviteResult.sms.failed.length}</p>
                 )}
               </div>
               <div>
-                <p className="font-medium">📧 Email:</p>
+                <p className="font-medium flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Email:</p>
                 <p>✓ Sent: {inviteResult.email?.sent || 0}</p>
                 {inviteResult.email?.failed?.length > 0 && (
                   <p className="text-red-600">✗ Failed: {inviteResult.email.failed.length}</p>
@@ -230,7 +231,7 @@ export const Tournaments = () => {
           <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
             <p className="font-semibold">✓ Cart Tags Sent Successfully!</p>
             <p className="text-sm mt-1">{cartTagsResult.message}</p>
-            <p className="text-xs mt-1">📧 Groups: {cartTagsResult.groups}</p>
+            <p className="text-xs mt-1 flex items-center gap-1"><Mail className="w-3 h-3" /> Groups: {cartTagsResult.groups}</p>
             <button
               onClick={() => setCartTagsResult(null)}
               className="mt-2 text-xs text-green-800 underline"
@@ -243,15 +244,15 @@ export const Tournaments = () => {
         {loading ? (
           <div className="text-center text-gray-600">Loading tournaments...</div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-200">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Date</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Course</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Holes</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Location</th>
-                  <th className="px-6 py-3 text-right text-gray-700 font-semibold">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Holes</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,22 +275,22 @@ export const Tournaments = () => {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => navigate(`/tournaments/${tournament.id}/players`)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            className="btn-ghost btn-xs text-blue-600"
                           >
-                            👥 Players
+                            <Users className="w-3.5 h-3.5" /> Players
                           </button>
                           <button
                             onClick={() => navigate(`/tournaments/${tournament.id}/leaderboard`)}
-                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                            className="btn-ghost btn-xs text-fairway-600"
                           >
-                            🏆 Leaderboard
+                            <Trophy className="w-3.5 h-3.5" /> Leaderboard
                           </button>
                           {Number(tournament.is_completed || 0) === 1 && (
                             <button
                               onClick={() => navigate(`/tournaments/${tournament.id}/hole-scores`)}
-                              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                              className="btn-ghost btn-xs text-indigo-600"
                             >
-                              ⛳ Hole Scores
+                              <Flag className="w-3.5 h-3.5" /> Hole Scores
                             </button>
                           )}
                           {isAdmin && (
@@ -297,48 +298,50 @@ export const Tournaments = () => {
                               <button
                                 onClick={() => openInviteModal(tournament.id)}
                                 disabled={sendingInvitations === tournament.id}
-                                className="text-purple-600 hover:text-purple-800 text-sm font-medium disabled:text-gray-400"
+                                className="btn-ghost btn-xs text-purple-600"
                               >
-                                {sendingInvitations === tournament.id ? '📧 Sending...' : '📧 Invitations'}
+                                <Mail className="w-3.5 h-3.5" />
+                                {sendingInvitations === tournament.id ? 'Sending...' : 'Invitations'}
                               </button>
                               <button
                                 onClick={() => handleOpenCartTags(tournament.id)}
-                                className="text-cyan-600 hover:text-cyan-800 text-sm font-medium"
+                                className="text-cyan-600 hover:text-cyan-800 text-sm font-medium flex items-center gap-1"
                                 title="View/Print Cart Tags"
                               >
-                                🏷️ Cart Tags
+                                <Tag className="w-3.5 h-3.5" /> Cart Tags
                               </button>
                               <button
                                 onClick={() => handleSendCartTags(tournament.id)}
                                 disabled={sendingCartTags}
-                                className="text-teal-600 hover:text-teal-800 text-sm font-medium disabled:text-gray-400"
+                                className="text-teal-600 hover:text-teal-800 text-sm font-medium disabled:text-gray-400 flex items-center gap-1"
                                 title="Send Cart Tags to Golf Course"
                               >
-                                {sendingCartTags ? '📧 Sending...' : '📧 Send Tags'}
+                                <Mail className="w-3.5 h-3.5" />
+                                {sendingCartTags ? 'Sending...' : 'Send Tags'}
                               </button>
                               <button
                                 onClick={() => navigate(`/tournaments/${tournament.id}/edit`)}
-                                className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+                                className="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center gap-1"
                               >
-                                ✏️ Edit
+                                <Pencil className="w-3.5 h-3.5" /> Edit
                               </button>
                               <button
                                 onClick={() => handleOpenResultsEmail(tournament.id)}
-                                className="text-orange-600 hover:text-orange-800 text-sm font-medium"
+                                className="text-orange-600 hover:text-orange-800 text-sm font-medium flex items-center gap-1"
                               >
-                                📊 Results Email
+                                <BarChart2 className="w-3.5 h-3.5" /> Results Email
                               </button>
                               <button
                                 onClick={() => handleComplete(tournament.id)}
-                                className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                                className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1"
                               >
-                                ✓ Complete
+                                <Check className="w-3.5 h-3.5" /> Complete
                               </button>
                               <button
                                 onClick={() => handleDelete(tournament.id)}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1"
                               >
-                                🗑️ Delete
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
                               </button>
                             </>
                           )}
@@ -358,7 +361,7 @@ export const Tournaments = () => {
             <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl flex flex-col" style={{ maxHeight: '90vh' }}>
               <div className="flex justify-between items-start p-5 border-b">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">📊 Tournament Results Email</h2>
+                  <h2 className="text-xl font-bold text-gray-800">Tournament Results Email</h2>
                   {!resultsEmailModal.noEmail && <p className="text-sm text-gray-500 mt-1">{resultsEmailModal.subject}</p>}
                   {resultsEmailModal.sent_at && (
                     <p className="text-xs text-green-600 mt-1">✓ Last sent: {new Date(resultsEmailModal.sent_at).toLocaleString()}</p>
@@ -392,9 +395,9 @@ export const Tournaments = () => {
                   <button
                     onClick={handleGenerateResultsEmail}
                     disabled={sendingResultsEmail}
-                    className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 font-semibold"
+                    className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 font-semibold flex items-center gap-2 mx-auto"
                   >
-                    {sendingResultsEmail ? 'Generating...' : '✨ Generate Results Email'}
+                    {sendingResultsEmail ? 'Generating...' : <><Sparkles className="w-4 h-4" /> Generate Results Email</>}
                   </button>
                   <button
                     onClick={() => { setResultsEmailModal(null); setResultsEmailSendResult(null) }}
@@ -443,7 +446,7 @@ export const Tournaments = () => {
                     disabled={sendingIndividual || !individualEmail.trim()}
                     className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-semibold whitespace-nowrap"
                   >
-                    {sendingIndividual ? 'Sending...' : '📧 Send'}
+                    {sendingIndividual ? 'Sending...' : <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Send</span>}
                   </button>
                 </div>
                 <div className="flex justify-end gap-3">
@@ -458,7 +461,7 @@ export const Tournaments = () => {
                     disabled={sendingResultsEmail}
                     className="px-5 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-400 font-semibold"
                   >
-                    {sendingResultsEmail ? 'Sending...' : '📧 Send to All Players'}
+                    {sendingResultsEmail ? 'Sending...' : <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Send to All Players</span>}
                   </button>
                 </div>
               </div>
@@ -484,7 +487,7 @@ export const Tournaments = () => {
                   disabled={sendingInvitations}
                   className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
                 >
-                  <span>📱</span>
+                  <Smartphone className="w-4 h-4" />
                   <span>Send SMS Only</span>
                 </button>
 
@@ -493,7 +496,7 @@ export const Tournaments = () => {
                   disabled={sendingInvitations}
                   className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
                 >
-                  <span>📧</span>
+                  <Mail className="w-4 h-4" />
                   <span>Send Email Only</span>
                 </button>
 
@@ -502,8 +505,8 @@ export const Tournaments = () => {
                   disabled={sendingInvitations}
                   className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
                 >
-                  <span>📱📧</span>
-                  <span>Send Both SMS & Email</span>
+                  <Smartphone className="w-4 h-4" /><Mail className="w-4 h-4" />
+                  <span>Send Both SMS &amp; Email</span>
                 </button>
               </div>
 
