@@ -13,17 +13,22 @@ const bccEmail = 'commish@npgolf.net';
  * @param {string} html - HTML content of the email
  * @param {string} text - Plain text version (optional, will be auto-generated from html if not provided)
  * @param {Array} attachments - Array of attachment objects (optional)
+ * @param {boolean} includeBcc - Whether to include BCC (default: true)
  * @returns {Promise} SendGrid response
  */
-async function sendEmail(to, subject, html, text = null, attachments = null) {
+async function sendEmail(to, subject, html, text = null, attachments = null, includeBcc = true) {
   const msg = {
     to,
     from: fromEmail,
-    bcc: bccEmail,
     subject,
     html,
     text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
   };
+
+  // Only add BCC if requested (for first email in batch)
+  if (includeBcc) {
+    msg.bcc = bccEmail;
+  }
 
   if (attachments && attachments.length > 0) {
     msg.attachments = attachments;
@@ -51,19 +56,51 @@ async function sendEmail(to, subject, html, text = null, attachments = null) {
  * @returns {Promise} SendGrid response
  */
 async function sendBulkEmail(recipients, subject, html, text = null) {
-  const msg = {
-    to: recipients,
-    from: fromEmail,
-    bcc: bccEmail,
-    subject,
-    html,
-    text: text || html.replace(/<[^>]*>/g, '')
-  };
+  if (recipients.length === 0) {
+    throw new Error('No recipients provided');
+  }
 
   try {
-    const response = await sgMail.sendMultiple(msg);
-    console.log(`Bulk email sent to ${recipients.length} recipients: ${subject}`);
-    return response;
+    // Send first email with BCC if multiple recipients
+    if (recipients.length > 1) {
+      const firstMsg = {
+        to: recipients[0],
+        from: fromEmail,
+        bcc: bccEmail,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]*>/g, '')
+      };
+      await sgMail.send(firstMsg);
+      console.log(`Email sent to ${recipients[0]} (with BCC): ${subject}`);
+
+      // Send remaining emails without BCC
+      if (recipients.length > 1) {
+        const remainingMsg = {
+          to: recipients.slice(1),
+          from: fromEmail,
+          subject,
+          html,
+          text: text || html.replace(/<[^>]*>/g, '')
+        };
+        await sgMail.sendMultiple(remainingMsg);
+        console.log(`Bulk email sent to ${recipients.length - 1} additional recipients: ${subject}`);
+      }
+    } else {
+      // Single recipient - send normally with BCC
+      const msg = {
+        to: recipients[0],
+        from: fromEmail,
+        bcc: bccEmail,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]*>/g, '')
+      };
+      await sgMail.send(msg);
+      console.log(`Email sent to ${recipients[0]}: ${subject}`);
+    }
+
+    return { success: true };
   } catch (error) {
     console.error('Error sending bulk email:', error);
     if (error.response) {

@@ -1,5 +1,6 @@
 import { useState, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Disc3 } from 'lucide-react'
 import { authAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 
@@ -9,6 +10,7 @@ export const Login = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useContext(AuthContext)
 
   const handleSubmit = async (e) => {
@@ -22,7 +24,9 @@ export const Login = () => {
       login(user, token, refreshToken)
       // Small delay to ensure localStorage is written
       setTimeout(() => {
-        navigate('/app/dashboard', { replace: true })
+        // Check if there's a redirect path from the location state
+        const from = location.state?.from || '/app/dashboard'
+        navigate(from, { replace: true })
       }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed')

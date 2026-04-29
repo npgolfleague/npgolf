@@ -1296,9 +1296,12 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
 
     let sent = 0;
     const failed = [];
-    for (const player of recipients) {
+    for (let i = 0; i < recipients.length; i++) {
+      const player = recipients[i];
       try {
-        await sendEmail(player.email, subject, html);
+        // Only BCC on the first email when sending to multiple recipients
+        const includeBcc = (i === 0 && recipients.length > 1);
+        await sendEmail(player.email, subject, html, null, null, includeBcc);
         sent++;
       } catch (err) {
         failed.push({ email: player.email, error: err.message });
@@ -1580,6 +1583,9 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     
     let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
     
+    // Count email recipients for BCC logic
+    const emailPlayers = players.filter(p => (method === 'email' || method === 'both') && p.email);
+    
     for (const player of players) {
       const yesUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=yes`;
       const noUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=no`;
@@ -1654,7 +1660,9 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
           `;
           
           console.log(`Sending Email to ${player.name} (${player.email})`);
-          await sendEmail(player.email, subject, html);
+          // Only BCC on the first email when sending to multiple recipients
+          const includeBcc = (emailSent === 0 && emailPlayers.length > 1);
+          await sendEmail(player.email, subject, html, null, null, includeBcc);
           console.log(`✓ Email sent successfully to ${player.name}`);
           emailSent++;
         } catch (err) {
