@@ -137,21 +137,21 @@ const generateCartTagsDocument = (tags) => {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 0.125in 0;
+      padding: 0.2in 0;
     }
 
     /* Cart tag compacted slightly to ensure two fit on a letter page */
     .cart-tag {
       width: 7.5in;
-      height: 5in;
+      height: 4.75in;
       border: 2px solid #1e5631;
-      padding: 0.28in;
+      padding: 0.25in;
       box-sizing: border-box;
       font-family: 'Georgia', serif;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      margin-bottom: 0.08in;
+      margin-bottom: 0.15in;
       background: white;
     }
 
