@@ -57,23 +57,22 @@ router.get('/:tournamentId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid quota column' });
     }
     
-    // Get all scores for the tournament with player info
+    // Get all scores for the tournament with player info (including players with no scores)
     const [rows] = await pool.query(`
       SELECT 
         p.id,
         p.name,
         p.email,
         COALESCE(tp.tournament_quota, p.${quotaColumn}) as player_quota,
-        SUM(s.quota) as total_quota_points,
+        COALESCE(SUM(s.quota), 0) as total_quota_points,
         COUNT(DISTINCT s.hole_id) as holes_played,
-        SUM(s.score) as total_strokes
+        COALESCE(SUM(s.score), 0) as total_strokes
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?
       WHERE tp.tournament_id = ? AND p.active = 1
       GROUP BY p.id, p.name, p.email, COALESCE(tp.tournament_quota, p.${quotaColumn})
-      HAVING holes_played > 0
-      ORDER BY (total_quota_points - player_quota) DESC, p.name ASC
+      ORDER BY holes_played DESC, (total_quota_points - player_quota) DESC, p.name ASC
     `, [tournamentId, tournamentId]);
     
     const skins = {};
@@ -255,21 +254,29 @@ router.get('/:tournamentId', async (req, res) => {
         skin_holes: skins[player.id]?.holes || []
       };
     });
+
+    // Count players with complete scores vs total players
+    const totalPlayersCount = rows.length;
+    const completeScoresCount = rows.filter(p => p.holes_played >= holeCount).length;
     
     // Prize percentages for positions 1, 2, 3
     const prizePercentages = [0.5, 0.3, 0.2];
     
     // Calculate quota prize money with tie handling
+    // Only rank players who have scores entered
+    const playersWithScores = playersWithOverUnder.filter(p => p.holes_played > 0);
+    const playersWithoutScores = playersWithOverUnder.filter(p => p.holes_played === 0);
+    
     const leaderboard = [];
     let currentPosition = 0;
     
-    while (currentPosition < playersWithOverUnder.length) {
+    while (currentPosition < playersWithScores.length) {
       // Find all players tied at this position
-      const currentOverUnder = playersWithOverUnder[currentPosition].over_under;
+      const currentOverUnder = playersWithScores[currentPosition].over_under;
       let tiedCount = 1;
       
-      while (currentPosition + tiedCount < playersWithOverUnder.length &&
-             playersWithOverUnder[currentPosition + tiedCount].over_under === currentOverUnder) {
+      while (currentPosition + tiedCount < playersWithScores.length &&
+             playersWithScores[currentPosition + tiedCount].over_under === currentOverUnder) {
         tiedCount++;
       }
       
@@ -288,7 +295,7 @@ router.get('/:tournamentId', async (req, res) => {
       
       // Add all tied players with the same rank and prize
       for (let i = 0; i < tiedCount; i++) {
-        const player = playersWithOverUnder[currentPosition + i];
+        const player = playersWithScores[currentPosition + i];
         const skinPrizeMoney = Math.floor(skins[player.id]?.prize || 0);
         const ctpPrizeMoney = ctpPrizes[player.id]?.prize || 0;
         const ctpWins = ctpPrizes[player.id]?.count || 0;
@@ -324,7 +331,41 @@ router.get('/:tournamentId', async (req, res) => {
       currentPosition += tiedCount;
     }
     
-    res.json(leaderboard);
+    // Add players without scores at the end (no rank)
+    playersWithoutScores.forEach((player) => {
+      leaderboard.push({
+        rank: null,
+        id: player.id,
+        name: player.name,
+        email: player.email,
+        player_quota: player.player_quota,
+        total_quota_points: 0,
+        over_under: 0,
+        holes_played: 0,
+        total_strokes: 0,
+        skins: 0,
+        skin_holes: [],
+        ctp_wins: 0,
+        ctp_holes: [],
+        quota_prize_money: 0,
+        skin_prize_money: 0,
+        ctp_prize_money: 0,
+        skins_ctp_paid_players: Number(tournament.skins_ctp_players) || 0,
+        skins_ctp_fee: skinsCTPFee,
+        skins_ctp_total_pot: Number(skinsCTPTotalPot.toFixed(2)),
+        skin_prize_pot: Number(skinPrizePot.toFixed(2)),
+        ctp_prize_pot: Number(ctpPrizePot.toFixed(2)),
+        quota_collected: tournament.quota_collected != null ? Number(tournament.quota_collected) : null,
+        skins_collected: tournament.skins_collected != null ? Number(tournament.skins_collected) : null
+      });
+    });
+    
+    res.json({
+      leaderboard,
+      totalPlayers: totalPlayersCount,
+      playersWithCompleteScores: completeScoresCount,
+      expectedHoles: holeCount
+    });
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });
