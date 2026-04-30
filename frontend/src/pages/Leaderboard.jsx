@@ -9,6 +9,7 @@ export function Leaderboard() {
   const [tournament, setTournament] = useState(null);
   const [tournamentPlayers, setTournamentPlayers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboardStats, setLeaderboardStats] = useState(null);
   const [ctpWinners, setCtpWinners] = useState([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [selectedPlayerScores, setSelectedPlayerScores] = useState([]);
@@ -45,7 +46,21 @@ export function Leaderboard() {
       ]);
       setTournament(tournamentRes.data);
       setTournamentPlayers(playersRes.data || []);
-      setLeaderboard(leaderboardRes.data);
+      
+      // Handle new response format
+      if (leaderboardRes.data.leaderboard) {
+        setLeaderboard(leaderboardRes.data.leaderboard);
+        setLeaderboardStats({
+          totalPlayers: leaderboardRes.data.totalPlayers,
+          playersWithCompleteScores: leaderboardRes.data.playersWithCompleteScores,
+          expectedHoles: leaderboardRes.data.expectedHoles
+        });
+      } else {
+        // Fallback for old format
+        setLeaderboard(leaderboardRes.data);
+        setLeaderboardStats(null);
+      }
+      
       setCtpWinners(ctpRes.data);
       setSelectedPlayerId('');
       setSelectedPlayerScores([]);
@@ -59,6 +74,7 @@ export function Leaderboard() {
   };
 
   const getMedalEmoji = (rank) => {
+    if (rank === null) return '-';
     if (rank === 1) return '🥇';
     if (rank === 2) return '🥈';
     if (rank === 3) return '🥉';
@@ -140,6 +156,13 @@ export function Leaderboard() {
             Holes: {tournament.number_of_holes}
           </p>
         )}
+        {leaderboardStats && (
+          <div className="mt-3 inline-block bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+            <span className="text-blue-900 font-semibold">
+              Players with Complete Scores: {leaderboardStats.playersWithCompleteScores} / {leaderboardStats.totalPlayers}
+            </span>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -215,30 +238,37 @@ export function Leaderboard() {
                 <tr 
                   key={player.id} 
                   className={`hover:bg-gray-50 ${
-                    player.rank <= 3 ? 'bg-yellow-50' : ''
+                    player.rank && player.rank <= 3 ? 'bg-yellow-50' : player.holes_played === 0 ? 'bg-gray-50' : ''
                   }`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className={`text-2xl font-bold ${player.rank ? 'text-gray-900' : 'text-gray-400'}`}>
                       {getMedalEmoji(player.rank)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
                     <div className="text-xs text-gray-500">{player.email}</div>
+                    {player.holes_played === 0 && (
+                      <div className="text-xs text-red-500 italic">No scores yet</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-900">{Math.round(player.player_quota)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm font-semibold text-blue-600">
-                      {Math.round(player.total_quota_points)}
+                    <div className={`text-sm ${player.holes_played > 0 ? 'font-semibold text-blue-600' : 'text-gray-400'}`}>
+                      {player.holes_played > 0 ? Math.round(player.total_quota_points) : '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className={`text-lg ${getScoreColor(player.over_under)}`}>
-                      {player.over_under > 0 ? '+' : ''}{Math.round(player.over_under)}
-                    </div>
+                    {player.holes_played > 0 ? (
+                      <div className={`text-lg ${getScoreColor(player.over_under)}`}>
+                        {player.over_under > 0 ? '+' : ''}{Math.round(player.over_under)}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">-</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {prizeAmountsReady ? (
@@ -294,10 +324,14 @@ export function Leaderboard() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-500">{player.holes_played}</div>
+                    <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {player.holes_played > 0 ? player.holes_played : '-'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-500">{player.total_strokes}</div>
+                    <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {player.holes_played > 0 ? player.total_strokes : '-'}
+                    </div>
                   </td>
                 </tr>
               ))}

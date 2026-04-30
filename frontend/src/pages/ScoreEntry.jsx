@@ -710,7 +710,7 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
-                          min="1"
+                          min="0"
                           max="9"
                           className="w-full p-3 border-2 border-gray-200 rounded-lg text-xl text-center font-bold focus:border-fairway-500 focus:outline-none bg-white"
                           placeholder="#"
@@ -718,7 +718,7 @@ export const ScoreEntry = () => {
                           value={scores[`${currentHole}-${playerId}-quota`] ?? ''}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 9)) {
+                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 9)) {
                               handleScoreChange(playerId, 'quota', val)
                               if (val !== '') focusNext(playerId, 'quota')
                             }
