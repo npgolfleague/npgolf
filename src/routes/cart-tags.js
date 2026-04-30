@@ -462,9 +462,6 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
             <th style="padding: 12px; text-align: left;">Tee Time</th>
             <th style="padding: 12px; text-align: left;">Group</th>
             <th style="padding: 12px; text-align: left;">Players</th>
-            <td style="width: 80px; vertical-align: top; text-align: right; padding-left: 12px;">
-              ${qrDataURL ? `<img src="${qrDataURL}" alt="QR" style="width:72px;height:72px;border:0;"/>` : ''}
-            </td>
           </tr>
         </thead>
         <tbody>
