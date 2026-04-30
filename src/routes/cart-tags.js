@@ -230,7 +230,13 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     );
 
     tpRows.forEach(row => {
-      if (!groups[row.foursome]) groups[row.foursome] = [];
+      // Initialize as array if doesn't exist, or convert Set to array if it exists as a Set
+      if (!groups[row.foursome]) {
+        groups[row.foursome] = [];
+      } else if (groups[row.foursome] instanceof Set) {
+        // Convert Set to array of objects
+        groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null }));
+      }
       // store objects with player name and optional pair number
       groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
     });
