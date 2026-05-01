@@ -433,6 +433,26 @@ export const Tournaments = () => {
               </div>
 
               <div className="p-4 md:p-5 border-t bg-gray-50 rounded-b-lg space-y-3">
+                {/* Regenerate with custom message */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Custom Message (Optional)</label>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={resultsEmailMessage}
+                      onChange={(e) => setResultsEmailMessage(e.target.value)}
+                      placeholder="Add a custom message to include at the top of the results email..."
+                      rows="2"
+                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <button
+                      onClick={handleGenerateResultsEmail}
+                      disabled={sendingResultsEmail}
+                      className="px-3 py-2 bg-orange-100 text-orange-700 border border-orange-300 rounded hover:bg-orange-200 disabled:bg-gray-100 text-sm font-semibold whitespace-nowrap self-start"
+                    >
+                      {sendingResultsEmail ? 'Regenerating...' : <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> Regenerate</span>}
+                    </button>
+                  </div>
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="email"
