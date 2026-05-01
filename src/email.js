@@ -2,7 +2,7 @@
 const nodemailer = require('nodemailer');
 
 const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER;
-const bccEmail = 'eric@npgolf.net';
+const bccEmail = 'commish@npgolf.net';
 
 // Create a transporter using Zoho SMTP settings
 const transporter = nodemailer.createTransport({
