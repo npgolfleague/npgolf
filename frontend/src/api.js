@@ -110,7 +110,9 @@ export const scoresAPI = {
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
   delete: (id) => apiClient.delete(`/scores/${id}`),
   getCtpWinners: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/ctp-winners`),
-  getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`)
+  getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`),
+  getFoursomePostStatus: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post-status`),
+  postFoursomeScores: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post`)
 }
 
 export const leaderboardAPI = {
@@ -126,6 +128,7 @@ export const leaguesAPI = {
   list: () => apiClient.get('/leagues'),
   get: (id) => apiClient.get(`/leagues/${id}`),
   getSettings: (id) => apiClient.get(`/leagues/${id}/settings`),
+  updateSettings: (id, data) => apiClient.put(`/leagues/${id}/settings`, data),
   getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
   getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`)
 }

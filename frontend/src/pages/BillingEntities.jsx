@@ -177,13 +177,19 @@ export const BillingEntities = () => {
 
   const handleEditLeague = (league) => {
     setEditingLeague(league)
+    const toDateInput = (val) => {
+      if (!val) return ''
+      if (typeof val === 'string') return val.slice(0, 10)
+      // MySQL2 returns DATE columns as JS Date objects
+      return new Date(val).toISOString().slice(0, 10)
+    }
     setLeagueFormData({
       name: league.name || '',
       slug: league.slug || '',
       description: league.description || '',
       season_year: league.season_year || new Date().getFullYear(),
-      start_date: league.start_date || '',
-      end_date: league.end_date || '',
+      start_date: toDateInput(league.start_date),
+      end_date: toDateInput(league.end_date),
       active: league.active ?? 1
     })
   }
@@ -424,7 +430,7 @@ export const BillingEntities = () => {
                     name="slug"
                     value={formData.slug}
                     onChange={handleChange}
-                    pattern="[a-z0-9-]+"
+                    pattern="[a-z0-9\-]+"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -652,7 +658,7 @@ export const BillingEntities = () => {
                       name="slug"
                       value={leagueFormData.slug}
                       onChange={handleLeagueChange}
-                      pattern="[a-z0-9-]+"
+                      pattern="[a-z0-9\-]+"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
