@@ -19,18 +19,18 @@ async function ensureMigrationTable(connection) {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-      migration_name VARCHAR(255) NOT NULL UNIQUE,
+      filename VARCHAR(255) NOT NULL UNIQUE,
       applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_migration_name (migration_name)
+      INDEX idx_filename (filename)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 }
 
 async function getAppliedMigrations(connection) {
   const [rows] = await connection.query(
-    'SELECT migration_name FROM schema_migrations ORDER BY migration_name'
+    'SELECT filename FROM schema_migrations ORDER BY filename'
   );
-  return rows.map(row => row.migration_name);
+  return rows.map(row => row.filename);
 }
 
 async function getPendingMigrations(appliedMigrations) {
@@ -58,7 +58,7 @@ async function applyMigration(connection, filename) {
     
     // Record in migrations table
     await connection.query(
-      'INSERT INTO schema_migrations (migration_name) VALUES (?)',
+      'INSERT INTO schema_migrations (filename) VALUES (?)',
       [filename]
     );
     
@@ -87,6 +87,7 @@ async function runMigrations() {
     // Get applied migrations
     const appliedMigrations = await getAppliedMigrations(connection);
     console.log(`Applied migrations: ${appliedMigrations.length}`);
+    console.log('First few applied:', appliedMigrations.slice(0, 5));
     
     // Get pending migrations
     const pendingMigrations = await getPendingMigrations(appliedMigrations);

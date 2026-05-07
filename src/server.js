@@ -11,8 +11,12 @@ const foursomesRouter = require('./routes/foursomes');
 const scoresRouter = require('./routes/scores');
 const leaderboardRouter = require('./routes/leaderboard');
 const settingsRouter = require('./routes/settings');
+const leaguesRouter = require('./routes/leagues');
+const leagueSelectRouter = require('./routes/league-select');
 const emailsRouter = require('./routes/emails');
 const cartTagsRouter = require('./routes/cart-tags');
+const billingEntitiesRouter = require('./routes/billing-entities');
+const { leagueAliasMiddleware } = require('./middleware/league');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -42,6 +46,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// League alias middleware - extracts league from URL path
+// Supports: /paradise/api/tournaments, /paradise/tournaments, etc.
+app.use(leagueAliasMiddleware);
+
 // Register API routes FIRST before static files
 app.use('/api/players', usersRouter);
 app.use('/api/auth', authRouter);
@@ -52,8 +60,11 @@ app.use('/api/tournaments', foursomesRouter);
 app.use('/api/scores', scoresRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/leagues', leaguesRouter);
+app.use('/api/league-select', leagueSelectRouter);
 app.use('/api/emails', emailsRouter);
 app.use('/api/cart-tags', cartTagsRouter);
+app.use('/api/billing-entities', billingEntitiesRouter);
 
 // Public pages for SMS compliance (Twilio verification)
 app.get('/', (req, res) => {

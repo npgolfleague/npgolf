@@ -3,6 +3,7 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
 const requireAdmin = async (req, res, next) => {
@@ -31,9 +32,10 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
-const recalculateAllPlayersPrizeMoney = async (db) => {
+const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
   const [settingsRows] = await db.query(
-    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1'
+    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
+    [leagueId]
   );
   const settings = settingsRows[0] || {};
 
@@ -129,8 +131,24 @@ const recalculateAllPlayersPrizeMoney = async (db) => {
 // GET /api/users - list players
 router.get('/', async (req, res) => {
   try {
-    await recalculateAllPlayersPrizeMoney(pool);
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players ORDER BY fedex_points DESC, name ASC');
+    await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
+    
+    // If we have a league context, only return players in that league
+    let query = 'SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players';
+    let params = [];
+    
+    if (req.league && req.league.id) {
+      query = `SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.fedex_points, 
+               p.tournaments_played, p.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at 
+               FROM players p
+               INNER JOIN league_players lp ON p.id = lp.player_id
+               WHERE lp.league_id = ?`;
+      params = [req.league.id];
+    }
+    
+    query += ' ORDER BY fedex_points DESC, name ASC';
+    
+    const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
     console.error('DB error', err);
@@ -162,11 +180,49 @@ router.post('/', async (req, res) => {
     }
 
     const activeValue = active !== undefined ? active : 1;
+    
+    // Get billing_entity_id from league context
+    if (!req.league || !req.league.billing_entity_id) {
+      return res.status(400).json({ error: 'billing_entity_id is required (must access via league context)' });
+    }
+    
+    // Check if a player with this email already exists in this league
+    const [existingInLeague] = await pool.query(
+      `SELECT p.id, p.name, p.email 
+       FROM players p
+       INNER JOIN league_players lp ON p.id = lp.player_id
+       WHERE lp.league_id = ? AND p.email = ?
+       LIMIT 1`,
+      [req.league.id, email]
+    );
+    
+    if (existingInLeague.length > 0) {
+      return res.status(409).json({ 
+        error: `A player with email ${email} already exists in this league`,
+        player: existingInLeague[0]
+      });
+    }
+    
     const [result] = await pool.execute(
-      'INSERT INTO players (name, email, phone, sex, active, quota_18, quota_9, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, email, phone || null, sex || null, activeValue, quota_18 || null, quota_9 || null, hashed]
+      'INSERT INTO players (billing_entity_id, name, email, phone, sex, active, quota_18, quota_9, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.league.billing_entity_id, name, email, phone || null, sex || null, activeValue, quota_18 || null, quota_9 || null, hashed]
     );
     const insertedId = result.insertId;
+    
+    // Add the player to the league
+    if (req.league && req.league.id) {
+      try {
+        await pool.query(
+          'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
+          [req.league.id, insertedId]
+        );
+        console.log(`Player ${insertedId} added to league ${req.league.id} (${req.league.name})`);
+      } catch (leagueErr) {
+        console.error('Failed to add player to league:', leagueErr);
+        // Don't fail player creation if league association fails
+      }
+    }
+    
     const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota_18, quota_9, sms_allowed, email_allowed, created_at FROM players WHERE id = ?', [insertedId]);
     
     // Send SMS opt-in message if phone number is provided
@@ -265,7 +321,7 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
       playersTouched++;
     }
 
-    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool);
+    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
 
     res.json({
       message: 'Quota values refreshed successfully',

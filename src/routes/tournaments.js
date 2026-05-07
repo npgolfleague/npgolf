@@ -30,6 +30,8 @@ const getTournamentQuotaColumn = (numberOfHoles) => (
   Number(numberOfHoles) === 9 ? 'quota_9' : 'quota_18'
 );
 
+const getLeagueId = (req) => req.league?.id || null;
+
 const ensureTournamentResultsEmailTable = async (db) => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS tournament_results_email (
@@ -47,7 +49,7 @@ const ensureTournamentResultsEmailTable = async (db) => {
 
 const recalculateAllPlayersPrizeMoney = async (db) => {
   const [settingsRows] = await db.query(
-    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1'
+    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = 1 LIMIT 1'
   );
   const settings = settingsRows[0] || {};
 
@@ -613,13 +615,14 @@ router.put('/:id/collected', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { date, course_id, number_of_holes, nine_hole_side } = req.body;
+    const leagueId = getLeagueId(req);
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     const [result] = await pool.query(
-      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side) VALUES (?, ?, ?, ?)',
-      [date, course_id, holeCount, side]
+      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, league_id) VALUES (?, ?, ?, ?, ?)',
+      [date, course_id, holeCount, side, leagueId]
     );
-    res.status(201).json({ id: result.insertId, date, course_id, number_of_holes: holeCount, nine_hole_side: side });
+    res.status(201).json({ id: result.insertId, date, course_id, number_of_holes: holeCount, nine_hole_side: side, league_id: leagueId });
   } catch (err) {
     console.error('Error creating tournament:', err);
     res.status(500).json({ error: 'Failed to create tournament' });
@@ -663,7 +666,7 @@ router.post('/:id/complete', async (req, res) => {
     
     // Get tournament date and course
     const [tournamentRows] = await connection.query(
-      `SELECT t.date, t.number_of_holes, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.league_id, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
@@ -677,6 +680,7 @@ router.post('/:id/complete', async (req, res) => {
     
     const tournamentDate = tournamentRows[0].date;
     const tournamentHoleCount = Number(tournamentRows[0].number_of_holes) === 9 ? 9 : 18;
+    const leagueId = tournamentRows[0].league_id;
     const isNineHoleTournament = tournamentHoleCount === 9;
     const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
 
@@ -877,7 +881,8 @@ router.post('/:id/complete', async (req, res) => {
     );
 
     const [settingsRows] = await connection.query(
-      'SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM settings LIMIT 1'
+      'SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
+      [getLeagueId(req)]
     );
 
     const paidCounts = paidCountsRows[0] || {};
@@ -940,9 +945,9 @@ router.post('/:id/complete', async (req, res) => {
       if (quotaRows.length === 0) {
         // Create new quota record with tournament result in slot 1
         await connection.query(
-          `INSERT INTO quota (player_id, date_1, points_1, quota_diff_1, holes_1)
-           VALUES (?, ?, ?, ?, ?)`,
-          [playerId, tournamentDate, totalPoints, quotaDiff, tournamentHoleCount]
+          `INSERT INTO quota (player_id, league_id, date_1, points_1, quota_diff_1, holes_1)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [playerId, leagueId, tournamentDate, totalPoints, quotaDiff, tournamentHoleCount]
         );
       } else {
         // Shift: 6→7, 5→6, 4→5, 3→4, 2→3, 1→2, new tournament→1
@@ -1006,9 +1011,9 @@ router.post('/:id/complete', async (req, res) => {
       if (skinsQuotaRows.length === 0) {
         // Create new skins_quota record with tournament result in slot 1
         await connection.query(
-          `INSERT INTO skins_quota (player_id, date_1, points_1, quota_diff_1)
-           VALUES (?, ?, ?, ?)`,
-          [playerId, tournamentDate, totalPoints, quotaDiff]
+          `INSERT INTO skins_quota (player_id, league_id, date_1, points_1, quota_diff_1)
+           VALUES (?, ?, ?, ?, ?)`,
+          [playerId, leagueId, tournamentDate, totalPoints, quotaDiff]
         );
       } else {
         // Shift existing data: 19->20, 18->19, ..., 1->2, and new->1
@@ -1206,7 +1211,8 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       [tournamentId]
     );
     const [settingsRows] = await pool.query(
-      'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM settings LIMIT 1'
+      'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
+      [getLeagueId(req)]
     );
     const settings = settingsRows[0] || {};
     const tournamentFee = Number(tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes) || 0;

@@ -1,8 +1,9 @@
 -- ============================================================================
--- Migration: Add Billing Entity Hierarchy
+-- Migration: Add Billing Entity Hierarchy (IDEMPOTENT VERSION)
 -- Date: 2026-05-02
 -- Description: Introduces billing entities as top-level organization
 --              Replaces the previous multi-league design with billing hierarchy
+--              This version can be safely re-run if it fails partway through
 -- ============================================================================
 
 -- ============================================================================
@@ -38,11 +39,59 @@ CREATE TABLE IF NOT EXISTS billing_entities (
   INDEX idx_stripe_customer (stripe_customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Players now belong to billing entities
-ALTER TABLE players
-  ADD COLUMN billing_entity_id INT UNSIGNED DEFAULT NULL AFTER id,
-  ADD FOREIGN KEY fk_players_billing_entity (billing_entity_id) REFERENCES billing_entities(id) ON DELETE RESTRICT,
-  ADD INDEX idx_billing_entity_id (billing_entity_id);
+-- Add billing_entity_id to players (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'players' 
+    AND COLUMN_NAME = 'billing_entity_id'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE players ADD COLUMN billing_entity_id INT UNSIGNED DEFAULT NULL AFTER id',
+  'SELECT ''Column billing_entity_id already exists in players'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for players.billing_entity_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'players'
+    AND CONSTRAINT_NAME = 'fk_players_billing_entity'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE players ADD CONSTRAINT fk_players_billing_entity FOREIGN KEY (billing_entity_id) REFERENCES billing_entities(id) ON DELETE RESTRICT',
+  'SELECT ''Foreign key fk_players_billing_entity already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add index for players.billing_entity_id (idempotent)
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'players'
+    AND INDEX_NAME = 'idx_billing_entity_id'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE players ADD INDEX idx_billing_entity_id (billing_entity_id)',
+  'SELECT ''Index idx_billing_entity_id already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Billing entity roles: Defines member roles within billing entity
 CREATE TABLE IF NOT EXISTS billing_entity_roles (
@@ -64,13 +113,94 @@ CREATE TABLE IF NOT EXISTS billing_entity_roles (
 -- COURSES - Global with ownership
 -- ============================================================================
 
--- Courses are global but can be owned/managed by billing entities
-ALTER TABLE course
-  ADD COLUMN created_by_entity_id INT UNSIGNED DEFAULT NULL AFTER id,
-  ADD COLUMN is_public TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=anyone can use, 0=only creating entity',
-  ADD FOREIGN KEY fk_course_entity (created_by_entity_id) REFERENCES billing_entities(id) ON DELETE SET NULL,
-  ADD INDEX idx_created_by_entity (created_by_entity_id),
-  ADD INDEX idx_is_public (is_public);
+-- Add created_by_entity_id to course (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'course' 
+    AND COLUMN_NAME = 'created_by_entity_id'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE course ADD COLUMN created_by_entity_id INT UNSIGNED DEFAULT NULL AFTER id',
+  'SELECT ''Column created_by_entity_id already exists in course'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add is_public to course (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'course' 
+    AND COLUMN_NAME = 'is_public'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE course ADD COLUMN is_public TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=anyone can use, 0=only creating entity'' AFTER created_by_entity_id',
+  'SELECT ''Column is_public already exists in course'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for course.created_by_entity_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'course'
+    AND CONSTRAINT_NAME = 'fk_course_entity'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE course ADD CONSTRAINT fk_course_entity FOREIGN KEY (created_by_entity_id) REFERENCES billing_entities(id) ON DELETE SET NULL',
+  'SELECT ''Foreign key fk_course_entity already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add indexes for course (idempotent)
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'course'
+    AND INDEX_NAME = 'idx_created_by_entity'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE course ADD INDEX idx_created_by_entity (created_by_entity_id)',
+  'SELECT ''Index idx_created_by_entity already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'course'
+    AND INDEX_NAME = 'idx_is_public'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE course ADD INDEX idx_is_public (is_public)',
+  'SELECT ''Index idx_is_public already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================================
 -- LEAGUES - Under Billing Entity
@@ -140,16 +270,113 @@ CREATE TABLE IF NOT EXISTS league_player_stats (
   INDEX idx_fedex_points (fedex_points DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Add league_id to quota tracking tables
-ALTER TABLE quota
-  ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER player_id,
-  ADD FOREIGN KEY fk_quota_league (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-  ADD INDEX idx_league_id (league_id);
+-- Add league_id to quota (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'quota' 
+    AND COLUMN_NAME = 'league_id'
+);
 
-ALTER TABLE skins_quota
-  ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER player_id,
-  ADD FOREIGN KEY fk_skins_quota_league (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-  ADD INDEX idx_league_id (league_id);
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE quota ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER player_id',
+  'SELECT ''Column league_id already exists in quota'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for quota.league_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'quota'
+    AND CONSTRAINT_NAME = 'fk_quota_league'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE quota ADD CONSTRAINT fk_quota_league FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE',
+  'SELECT ''Foreign key fk_quota_league already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add index for quota.league_id (idempotent)
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'quota'
+    AND INDEX_NAME = 'idx_league_id'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE quota ADD INDEX idx_league_id (league_id)',
+  'SELECT ''Index idx_league_id already exists in quota'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add league_id to skins_quota (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'skins_quota' 
+    AND COLUMN_NAME = 'league_id'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE skins_quota ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER player_id',
+  'SELECT ''Column league_id already exists in skins_quota'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for skins_quota.league_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'skins_quota'
+    AND CONSTRAINT_NAME = 'fk_skins_quota_league'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE skins_quota ADD CONSTRAINT fk_skins_quota_league FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE',
+  'SELECT ''Foreign key fk_skins_quota_league already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add index for skins_quota.league_id (idempotent)
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'skins_quota'
+    AND INDEX_NAME = 'idx_league_id'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE skins_quota ADD INDEX idx_league_id (league_id)',
+  'SELECT ''Index idx_league_id already exists in skins_quota'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================================
 -- EVENTS - Under Billing Entity (separate from leagues)
@@ -196,17 +423,112 @@ CREATE TABLE IF NOT EXISTS event_participants (
 -- TOURNAMENTS - Can belong to League OR Event
 -- ============================================================================
 
-ALTER TABLE tournament
-  ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER id,
-  ADD COLUMN event_id INT UNSIGNED DEFAULT NULL AFTER league_id,
-  ADD FOREIGN KEY fk_tournament_league (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-  ADD FOREIGN KEY fk_tournament_event (event_id) REFERENCES events(id) ON DELETE CASCADE,
-  ADD INDEX idx_league_id (league_id),
-  ADD INDEX idx_event_id (event_id),
-  ADD CONSTRAINT chk_tournament_parent CHECK (
-    (league_id IS NOT NULL AND event_id IS NULL) OR 
-    (league_id IS NULL AND event_id IS NOT NULL)
-  );
+-- Add league_id to tournament (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'tournament' 
+    AND COLUMN_NAME = 'league_id'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE tournament ADD COLUMN league_id INT UNSIGNED DEFAULT NULL AFTER id',
+  'SELECT ''Column league_id already exists in tournament'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add event_id to tournament (idempotent)
+SET @column_exists = (
+  SELECT COUNT(*) 
+  FROM information_schema.COLUMNS 
+  WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'tournament' 
+    AND COLUMN_NAME = 'event_id'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE tournament ADD COLUMN event_id INT UNSIGNED DEFAULT NULL AFTER league_id',
+  'SELECT ''Column event_id already exists in tournament'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for tournament.league_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND CONSTRAINT_NAME = 'fk_tournament_league'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE tournament ADD CONSTRAINT fk_tournament_league FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE',
+  'SELECT ''Foreign key fk_tournament_league already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for tournament.event_id (idempotent)
+SET @fk_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND CONSTRAINT_NAME = 'fk_tournament_event'
+);
+
+SET @sql = IF(@fk_exists = 0,
+  'ALTER TABLE tournament ADD CONSTRAINT fk_tournament_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE',
+  'SELECT ''Foreign key fk_tournament_event already exists'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add indexes for tournament (idempotent)
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND INDEX_NAME = 'idx_league_id'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE tournament ADD INDEX idx_league_id (league_id)',
+  'SELECT ''Index idx_league_id already exists in tournament'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND INDEX_NAME = 'idx_event_id'
+);
+
+SET @sql = IF(@idx_exists = 0,
+  'ALTER TABLE tournament ADD INDEX idx_event_id (event_id)',
+  'SELECT ''Index idx_event_id already exists in tournament'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ============================================================================
 -- SETTINGS - Three Tiers
@@ -237,9 +559,31 @@ CREATE TABLE IF NOT EXISTS billing_entity_settings (
   INDEX idx_setting_key (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- League settings: Per-league configuration (rename existing settings table)
-RENAME TABLE settings TO league_settings_old;
+-- Rename settings table if it hasn't been renamed yet (idempotent)
+SET @table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'settings'
+);
 
+SET @old_table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'league_settings_old'
+);
+
+SET @sql = IF(@table_exists = 1 AND @old_table_exists = 0,
+  'RENAME TABLE settings TO league_settings_old',
+  'SELECT ''Table settings already renamed or does not exist'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- League settings: Per-league configuration
 CREATE TABLE IF NOT EXISTS league_settings (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   league_id INT UNSIGNED NOT NULL,
@@ -264,29 +608,76 @@ CREATE TABLE IF NOT EXISTS league_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- DATA MIGRATION - Create default billing entity and league
+-- DATA MIGRATION - Create default billing entity and league (IDEMPOTENT)
 -- ============================================================================
 
--- Create default billing entity for existing data
-INSERT INTO billing_entities (name, slug, entity_type, description, active)
-VALUES ('Paradise Golf', 'paradise-golf', 'league_organization', 'Original Paradise Golf league organization', 1);
+-- Check if default entity already exists
+SET @entity_exists = (
+  SELECT COUNT(*)
+  FROM billing_entities
+  WHERE slug = 'paradise-golf'
+);
 
-SET @default_entity_id = LAST_INSERT_ID();
+-- Create default billing entity only if it doesn't exist
+SET @sql = IF(@entity_exists = 0,
+  'INSERT INTO billing_entities (name, slug, entity_type, description, active) VALUES (''Paradise Golf'', ''paradise-golf'', ''league_organization'', ''Original Paradise Golf league organization'', 1)',
+  'SELECT ''Default billing entity already exists'' AS message'
+);
 
--- Create default league under this entity
-INSERT INTO leagues (billing_entity_id, name, slug, description, season_year, active)
-VALUES (@default_entity_id, 'Paradise Golf League', 'paradise-golf-league', 'Main competitive league', YEAR(CURDATE()), 1);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-SET @default_league_id = LAST_INSERT_ID();
+-- Get the default entity ID
+SET @default_entity_id = (SELECT id FROM billing_entities WHERE slug = 'paradise-golf' LIMIT 1);
 
--- Assign all existing players to default billing entity
-UPDATE players SET billing_entity_id = @default_entity_id;
+-- Check if default league already exists
+SET @league_exists = (
+  SELECT COUNT(*)
+  FROM leagues
+  WHERE slug = 'paradise-golf-league'
+);
 
--- Make billing_entity_id NOT NULL after backfill
-ALTER TABLE players MODIFY COLUMN billing_entity_id INT UNSIGNED NOT NULL;
+-- Create default league only if it doesn't exist
+SET @sql = IF(@league_exists = 0,
+  CONCAT('INSERT INTO leagues (billing_entity_id, name, slug, description, season_year, active) VALUES (', @default_entity_id, ', ''Paradise Golf League'', ''paradise-golf-league'', ''Main competitive league'', YEAR(CURDATE()), 1)'),
+  'SELECT ''Default league already exists'' AS message'
+);
 
--- Create billing entity roles for all players
-INSERT INTO billing_entity_roles (billing_entity_id, player_id, role)
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Get the default league ID
+SET @default_league_id = (SELECT id FROM leagues WHERE slug = 'paradise-golf-league' LIMIT 1);
+
+-- Assign players to default billing entity (only if they don't have one)
+UPDATE players 
+SET billing_entity_id = @default_entity_id
+WHERE billing_entity_id IS NULL;
+
+-- Make billing_entity_id NOT NULL if all players have been assigned (idempotent)
+SET @null_count = (SELECT COUNT(*) FROM players WHERE billing_entity_id IS NULL);
+
+SET @column_nullable = (
+  SELECT IS_NULLABLE
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'players'
+    AND COLUMN_NAME = 'billing_entity_id'
+);
+
+SET @sql = IF(@null_count = 0 AND @column_nullable = 'YES',
+  'ALTER TABLE players MODIFY COLUMN billing_entity_id INT UNSIGNED NOT NULL',
+  'SELECT ''Cannot make billing_entity_id NOT NULL - some players still have NULL values or already NOT NULL'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Create billing entity roles for players (idempotent - skip existing)
+INSERT IGNORE INTO billing_entity_roles (billing_entity_id, player_id, role)
 SELECT 
   @default_entity_id,
   id,
@@ -296,12 +687,14 @@ SELECT
   END
 FROM players;
 
--- Add all players to default league
-INSERT INTO league_players (league_id, player_id)
-SELECT @default_league_id, id FROM players WHERE active = 1;
+-- Add active players to default league (idempotent - skip existing)
+INSERT IGNORE INTO league_players (league_id, player_id)
+SELECT @default_league_id, id 
+FROM players 
+WHERE active = 1;
 
--- Migrate player stats to league_player_stats
-INSERT INTO league_player_stats (league_id, player_id, quota_18, quota_9, fedex_points, tournaments_played, prize_money)
+-- Migrate player stats to league_player_stats (idempotent - skip existing)
+INSERT IGNORE INTO league_player_stats (league_id, player_id, quota_18, quota_9, fedex_points, tournaments_played, prize_money)
 SELECT 
   @default_league_id,
   id,
@@ -312,40 +705,101 @@ SELECT
   prize_money
 FROM players;
 
--- Update all existing tournaments to belong to default league
-UPDATE tournament SET league_id = @default_league_id;
+-- Update tournaments to belong to default league (only if they don't have one)
+UPDATE tournament 
+SET league_id = @default_league_id
+WHERE league_id IS NULL AND event_id IS NULL;
 
--- Make league_id NOT NULL for tournaments after backfill
-ALTER TABLE tournament MODIFY COLUMN league_id INT UNSIGNED NOT NULL;
+-- Add CHECK constraint (idempotent)
+SET @constraint_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND CONSTRAINT_NAME = 'chk_tournament_parent'
+);
 
--- Update quota tables to default league
-UPDATE quota SET league_id = @default_league_id;
-UPDATE skins_quota SET league_id = @default_league_id;
+SET @sql = IF(@constraint_exists = 0,
+  'ALTER TABLE tournament ADD CONSTRAINT chk_tournament_parent CHECK ((league_id IS NOT NULL AND event_id IS NULL) OR (league_id IS NULL AND event_id IS NOT NULL))',
+  'SELECT ''CHECK constraint chk_tournament_parent already exists'' AS message'
+);
 
--- Make league_id NOT NULL after backfill
-ALTER TABLE quota MODIFY COLUMN league_id INT UNSIGNED NOT NULL;
-ALTER TABLE skins_quota MODIFY COLUMN league_id INT UNSIGNED NOT NULL;
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- Migrate settings to league settings
-INSERT INTO league_settings (league_id, tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, golf_course_email)
-SELECT 
-  @default_league_id,
-  tournament_fee_18_holes,
-  tournament_fee_9_holes,
-  skins_ctp_fee_18_holes,
-  skins_ctp_fee_9_holes,
-  golf_course_email
-FROM league_settings_old
-LIMIT 1;
+-- Update quota tables to default league (only NULL values)
+UPDATE quota 
+SET league_id = @default_league_id
+WHERE league_id IS NULL;
 
--- Insert default global settings
-INSERT INTO global_settings (setting_key, setting_value, description, data_type) VALUES
+UPDATE skins_quota 
+SET league_id = @default_league_id
+WHERE league_id IS NULL;
+
+-- Make league_id NOT NULL in quota tables (idempotent)
+SET @null_count_quota = (SELECT COUNT(*) FROM quota WHERE league_id IS NULL);
+
+SET @column_nullable = (
+  SELECT IS_NULLABLE
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'quota'
+    AND COLUMN_NAME = 'league_id'
+);
+
+SET @sql = IF(@null_count_quota = 0 AND @column_nullable = 'YES',
+  'ALTER TABLE quota MODIFY COLUMN league_id INT UNSIGNED NOT NULL',
+  'SELECT ''Cannot make quota.league_id NOT NULL - some rows still have NULL values or already NOT NULL'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @null_count_skins = (SELECT COUNT(*) FROM skins_quota WHERE league_id IS NULL);
+
+SET @column_nullable = (
+  SELECT IS_NULLABLE
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'skins_quota'
+    AND COLUMN_NAME = 'league_id'
+);
+
+SET @sql = IF(@null_count_skins = 0 AND @column_nullable = 'YES',
+  'ALTER TABLE skins_quota MODIFY COLUMN league_id INT UNSIGNED NOT NULL',
+  'SELECT ''Cannot make skins_quota.league_id NOT NULL - some rows still have NULL values or already NOT NULL'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Migrate settings to league settings (idempotent - check if already migrated)
+SET @league_settings_count = (SELECT COUNT(*) FROM league_settings WHERE league_id = @default_league_id);
+
+SET @old_table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'league_settings_old'
+);
+
+SET @sql = IF(@league_settings_count = 0 AND @old_table_exists = 1,
+  CONCAT('INSERT INTO league_settings (league_id, tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, golf_course_email) SELECT ', @default_league_id, ', tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, golf_course_email FROM league_settings_old LIMIT 1'),
+  'SELECT ''League settings already migrated or old table does not exist'' AS message'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Insert default global settings (idempotent)
+INSERT IGNORE INTO global_settings (setting_key, setting_value, description, data_type) VALUES
 ('default_tournament_fee_18', '20.00', 'Default tournament fee for 18-hole events', 'number'),
 ('default_tournament_fee_9', '10.00', 'Default tournament fee for 9-hole events', 'number'),
 ('default_skins_fee_18', '10.00', 'Default skins/CTP fee for 18-hole events', 'number'),
 ('default_skins_fee_9', '5.00', 'Default skins/CTP fee for 9-hole events', 'number'),
 ('system_timezone', 'America/Los_Angeles', 'System default timezone', 'string'),
 ('max_players_per_tournament', '100', 'Maximum players per tournament', 'number');
-
--- Update courses to be owned by default entity (optional - or leave NULL for public courses)
--- UPDATE course SET created_by_entity_id = @default_entity_id, is_public = 1;
