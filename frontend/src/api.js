@@ -1,14 +1,34 @@
 import axios from 'axios'
 
-// Use relative URL so it works whether accessed via localhost or IP address
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+// Detect league alias from URL path (e.g., /paradise/app/dashboard)
+// Extract the first path segment if it's not a common route
+function detectLeaguePrefix() {
+  const pathParts = window.location.pathname.split('/').filter(p => p.length > 0);
+  const commonRoutes = ['api', 'login', 'register', 'forgot-password', 'reset-password', 
+                        'sms-consent', 'dashboard', 'about', 'app', 'assets', 'billing-entities'];
+  
+  // If first segment is not a common route, it's likely a league alias
+  if (pathParts.length > 0 && !commonRoutes.includes(pathParts[0])) {
+    return '/' + pathParts[0];
+  }
+  return '';
+}
 
+// Use relative URL so it works whether accessed via localhost or IP address
 const apiClient = axios.create({
-  baseURL: API_BASE
+  baseURL: '/api'
 })
 
-// Add JWT token to requests if available
+// Add league prefix and JWT token to requests
 apiClient.interceptors.request.use((config) => {
+  // Detect league prefix at request time
+  const leaguePrefix = detectLeaguePrefix();
+  if (leaguePrefix) {
+    // Update baseURL to include league prefix
+    config.baseURL = `${leaguePrefix}/api`;
+  }
+  
+  // Add JWT token if available
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -100,6 +120,14 @@ export const leaderboardAPI = {
 export const settingsAPI = {
   get: () => apiClient.get('/settings'),
   update: (data) => apiClient.put('/settings', data)
+}
+
+export const leaguesAPI = {
+  list: () => apiClient.get('/leagues'),
+  get: (id) => apiClient.get(`/leagues/${id}`),
+  getSettings: (id) => apiClient.get(`/leagues/${id}/settings`),
+  getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
+  getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`)
 }
 
 export const emailsAPI = {

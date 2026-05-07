@@ -4,6 +4,7 @@ const pool = require('../db');
 const QRCode = require('qrcode');
 const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
+const { getLeagueId } = require('../utils/league');
 
 // Helper to format time from MySQL TIME format or add minutes
 const formatTeeTime = (baseTime, addMinutes = 0) => {
@@ -320,7 +321,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const { tournamentId } = req.params;
     
     // Get settings for golf course email
-    const [settingsRows] = await pool.query('SELECT golf_course_email FROM settings LIMIT 1');
+    const [settingsRows] = await pool.query('SELECT golf_course_email FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     const golfCourseEmail = settingsRows[0]?.golf_course_email;
     
     if (!golfCourseEmail) {

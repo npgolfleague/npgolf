@@ -3,7 +3,7 @@ import { useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import {
   LayoutDashboard, ClipboardList, Users, Trophy, Flag, BookOpen,
-  Info, Target, Inbox, Settings, LogOut, ChevronLeft, ChevronRight
+  Info, Target, Inbox, Settings, Shield, LogOut, ChevronLeft, ChevronRight, Building2
 } from 'lucide-react'
 
 export const MainLayout = () => {
@@ -23,6 +23,7 @@ export const MainLayout = () => {
     { path: '/users', label: 'Players', icon: Users },
     { path: '/tournaments', label: 'Tournaments', icon: Trophy },
     { path: '/courses', label: 'Courses', icon: Flag },
+    { path: '/league', label: 'League Info', icon: Shield },
     { path: '/rules', label: 'Rules', icon: BookOpen },
     { path: '/app/about', label: 'About', icon: Info }
   ]
@@ -30,6 +31,7 @@ export const MainLayout = () => {
   const adminMenuItems = [
     { path: '/quota', label: 'Quota', icon: Target },
     { path: '/inbox', label: 'Inbox', icon: Inbox },
+    { path: '/billing-entities', label: 'Billing Entities', icon: Building2 },
     { path: '/settings', label: 'Settings', icon: Settings }
   ]
 

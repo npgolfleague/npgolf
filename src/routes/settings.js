@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
 // Middleware to verify admin role
@@ -34,7 +35,8 @@ const requireAdmin = async (req, res, next) => {
 // GET /api/settings - Get current settings
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM settings LIMIT 1');
+    const leagueId = getLeagueId(req);
+    const [rows] = await pool.query('SELECT * FROM league_settings WHERE league_id = ? LIMIT 1', [leagueId]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Settings not found' });
     }
@@ -85,11 +87,11 @@ router.put('/', requireAdmin, async (req, res) => {
     }
 
     await pool.query(
-      `UPDATE settings SET ${updates.join(', ')} WHERE id = 1`,
-      values
+      `UPDATE league_settings SET ${updates.join(', ')} WHERE league_id = ?`,
+      [...values, getLeagueId(req)]
     );
 
-    const [rows] = await pool.query('SELECT * FROM settings WHERE id = 1');
+    const [rows] = await pool.query('SELECT * FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     res.json(rows[0]);
   } catch (err) {
     console.error('DB error', err);

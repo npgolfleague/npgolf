@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
 // GET /api/leaderboard/:tournamentId - Get leaderboard for a tournament
@@ -19,7 +20,7 @@ router.get('/:tournamentId', async (req, res) => {
       WHERE t.id = ?
     `, [tournamentId, tournamentId, tournamentId]);
     
-    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM settings LIMIT 1');
+    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     
     const tournament = tournamentInfo[0];
     const holeCount = Number(tournament?.number_of_holes);
