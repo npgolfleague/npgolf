@@ -30,7 +30,7 @@ const getTournamentQuotaColumn = (numberOfHoles) => (
   Number(numberOfHoles) === 9 ? 'quota_9' : 'quota_18'
 );
 
-const getLeagueId = (req) => req.league?.id || null;
+const getLeagueId = (req) => req.league?.id || 1;
 
 const ensureTournamentResultsEmailTable = async (db) => {
   await db.query(`
@@ -684,6 +684,24 @@ router.post('/:id/complete', async (req, res) => {
     const isNineHoleTournament = tournamentHoleCount === 9;
     const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
 
+    // Load quota point values from league settings (fall back to system defaults)
+    const [settingsRows] = await connection.query(
+      `SELECT quota_points_albatross, quota_points_eagle, quota_points_birdie,
+              quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse
+       FROM league_settings WHERE league_id = ? LIMIT 1`,
+      [leagueId]
+    );
+    const qp = settingsRows.length > 0 ? settingsRows[0] : {};
+    const pts = {
+      albatross: Number.isInteger(qp.quota_points_albatross) ? qp.quota_points_albatross : 8,
+      eagle: Number.isInteger(qp.quota_points_eagle) ? qp.quota_points_eagle : 8,
+      birdie: Number.isInteger(qp.quota_points_birdie) ? qp.quota_points_birdie : 6,
+      par: Number.isInteger(qp.quota_points_par) ? qp.quota_points_par : 4,
+      bogey: Number.isInteger(qp.quota_points_bogey) ? qp.quota_points_bogey : 2,
+      double_bogey: Number.isInteger(qp.quota_points_double_bogey) ? qp.quota_points_double_bogey : 1,
+      worse: Number.isInteger(qp.quota_points_worse) ? qp.quota_points_worse : 0
+    };
+
     const [scoreCountRows] = await connection.query(
       'SELECT COUNT(*) AS score_count FROM scores WHERE tournament_id = ?',
       [tournamentId]
@@ -715,13 +733,14 @@ router.post('/:id/complete', async (req, res) => {
          s.player_id,
          SUM(
            CASE
-             WHEN CAST(s.score AS SIGNED) = 1 THEN 8
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) <= -3 THEN 8
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -2 THEN 6
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -1 THEN 4
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 0 THEN 2
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 1 THEN 1
-             ELSE 0
+             WHEN CAST(s.score AS SIGNED) = 1 THEN ${pts.albatross}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) <= -3 THEN ${pts.albatross}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -2 THEN ${pts.eagle}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -1 THEN ${pts.birdie}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 0 THEN ${pts.par}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 1 THEN ${pts.bogey}
+             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 2 THEN ${pts.double_bogey}
+             ELSE ${pts.worse}
            END
          ) AS seeded_quota
        FROM scores s
@@ -880,13 +899,13 @@ router.post('/:id/complete', async (req, res) => {
       [tournamentId]
     );
 
-    const [settingsRows] = await connection.query(
+    const [feeSettingsRows] = await connection.query(
       'SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
       [getLeagueId(req)]
     );
 
     const paidCounts = paidCountsRows[0] || {};
-    const settings = settingsRows[0] || {};
+    const settings = feeSettingsRows[0] || {};
     const skinsCTPFee = Number(
       tournamentHoleCount === 18 ? settings.skins_ctp_fee_18_holes : settings.skins_ctp_fee_9_holes
     ) || 0;

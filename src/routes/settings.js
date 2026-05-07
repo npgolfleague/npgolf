@@ -49,11 +49,21 @@ router.get('/', async (req, res) => {
 
 // PUT /api/settings - Update settings (admin only)
 router.put('/', requireAdmin, async (req, res) => {
-  const { tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, golf_course_email } = req.body;
+  const {
+    tournament_fee_18_holes, tournament_fee_9_holes,
+    skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
+    golf_course_email,
+    quota_points_albatross, quota_points_eagle, quota_points_birdie,
+    quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse
+  } = req.body;
 
   if (tournament_fee_18_holes === undefined && tournament_fee_9_holes === undefined && 
       skins_ctp_fee_18_holes === undefined && skins_ctp_fee_9_holes === undefined && 
-      golf_course_email === undefined) {
+      golf_course_email === undefined &&
+      quota_points_albatross === undefined && quota_points_eagle === undefined &&
+      quota_points_birdie === undefined && quota_points_par === undefined &&
+      quota_points_bogey === undefined && quota_points_double_bogey === undefined &&
+      quota_points_worse === undefined) {
     return res.status(400).json({ error: 'No settings provided to update' });
   }
 
@@ -85,6 +95,14 @@ router.put('/', requireAdmin, async (req, res) => {
       updates.push('golf_course_email = ?');
       values.push(golf_course_email);
     }
+
+    if (quota_points_albatross !== undefined) { updates.push('quota_points_albatross = ?'); values.push(quota_points_albatross); }
+    if (quota_points_eagle !== undefined) { updates.push('quota_points_eagle = ?'); values.push(quota_points_eagle); }
+    if (quota_points_birdie !== undefined) { updates.push('quota_points_birdie = ?'); values.push(quota_points_birdie); }
+    if (quota_points_par !== undefined) { updates.push('quota_points_par = ?'); values.push(quota_points_par); }
+    if (quota_points_bogey !== undefined) { updates.push('quota_points_bogey = ?'); values.push(quota_points_bogey); }
+    if (quota_points_double_bogey !== undefined) { updates.push('quota_points_double_bogey = ?'); values.push(quota_points_double_bogey); }
+    if (quota_points_worse !== undefined) { updates.push('quota_points_worse = ?'); values.push(quota_points_worse); }
 
     await pool.query(
       `UPDATE league_settings SET ${updates.join(', ')} WHERE league_id = ?`,

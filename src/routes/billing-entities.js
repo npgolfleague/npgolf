@@ -56,7 +56,7 @@ router.get('/:id', async (req, res) => {
     
     // Get leagues
     const [leagues] = await pool.query(`
-      SELECT id, name, alias, active
+      SELECT id, name, slug, alias, description, season_year, start_date, end_date, active
       FROM leagues
       WHERE billing_entity_id = ?
       ORDER BY name

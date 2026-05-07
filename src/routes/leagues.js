@@ -55,13 +55,92 @@ router.get('/:id/settings', async (req, res) => {
     );
     
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'League settings not found' });
+      // Return defaults — settings row will be created on first save
+      return res.json({
+        league_id: Number(id),
+        tournament_fee_18_holes: 20.00,
+        tournament_fee_9_holes: 10.00,
+        skins_ctp_fee_18_holes: 10.00,
+        skins_ctp_fee_9_holes: 5.00,
+        golf_course_email: null,
+        quota_points_albatross: 8,
+        quota_points_eagle: 8,
+        quota_points_birdie: 6,
+        quota_points_par: 4,
+        quota_points_bogey: 2,
+        quota_points_double_bogey: 1,
+        quota_points_worse: 0,
+        live_scoring: 1
+      });
     }
     
     res.json(rows[0]);
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch league settings' });
+  }
+});
+
+// PUT /api/leagues/:id/settings - Update league settings (admin only)
+router.put('/:id/settings', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const {
+    tournament_fee_18_holes, tournament_fee_9_holes,
+    skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
+    golf_course_email,
+    quota_points_albatross, quota_points_eagle, quota_points_birdie,
+    quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
+    live_scoring
+  } = req.body;
+
+  try {
+    // Verify league exists
+    const [leagueRows] = await pool.query('SELECT id FROM leagues WHERE id = ? LIMIT 1', [id]);
+    if (leagueRows.length === 0) {
+      return res.status(404).json({ error: 'League not found' });
+    }
+
+    await pool.query(
+      `INSERT INTO league_settings (
+        league_id,
+        tournament_fee_18_holes, tournament_fee_9_holes,
+        skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
+        golf_course_email,
+        quota_points_albatross, quota_points_eagle, quota_points_birdie,
+        quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
+        live_scoring
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        tournament_fee_18_holes = VALUES(tournament_fee_18_holes),
+        tournament_fee_9_holes = VALUES(tournament_fee_9_holes),
+        skins_ctp_fee_18_holes = VALUES(skins_ctp_fee_18_holes),
+        skins_ctp_fee_9_holes = VALUES(skins_ctp_fee_9_holes),
+        golf_course_email = VALUES(golf_course_email),
+        quota_points_albatross = VALUES(quota_points_albatross),
+        quota_points_eagle = VALUES(quota_points_eagle),
+        quota_points_birdie = VALUES(quota_points_birdie),
+        quota_points_par = VALUES(quota_points_par),
+        quota_points_bogey = VALUES(quota_points_bogey),
+        quota_points_double_bogey = VALUES(quota_points_double_bogey),
+        quota_points_worse = VALUES(quota_points_worse),
+        live_scoring = VALUES(live_scoring)`,
+      [
+        id,
+        tournament_fee_18_holes ?? 20.00, tournament_fee_9_holes ?? 10.00,
+        skins_ctp_fee_18_holes ?? 10.00, skins_ctp_fee_9_holes ?? 5.00,
+        golf_course_email ?? null,
+        quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
+        quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
+        quota_points_worse ?? 0,
+        live_scoring != null ? (live_scoring ? 1 : 0) : 1
+      ]
+    );
+
+    const [rows] = await pool.query('SELECT * FROM league_settings WHERE league_id = ? LIMIT 1', [id]);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating league settings:', err);
+    res.status(500).json({ error: 'Failed to update league settings' });
   }
 });
 
@@ -148,7 +227,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO leagues (billing_entity_id, name, slug, alias, description, season_year, start_date, end_date, active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [billing_entity_id, name, slug, slug, description, season_year, start_date, end_date, active]
+      [billing_entity_id, name, slug, slug, description, season_year, start_date || null, end_date || null, active]
     );
 
     const leagueId = result.insertId;
@@ -225,8 +304,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
     if (description !== undefined) { updates.push('description = ?'); values.push(description); }
     if (season_year !== undefined) { updates.push('season_year = ?'); values.push(season_year); }
-    if (start_date !== undefined) { updates.push('start_date = ?'); values.push(start_date); }
-    if (end_date !== undefined) { updates.push('end_date = ?'); values.push(end_date); }
+    if (start_date !== undefined) { updates.push('start_date = ?'); values.push(start_date || null); }
+    if (end_date !== undefined) { updates.push('end_date = ?'); values.push(end_date || null); }
     if (active !== undefined) { updates.push('active = ?'); values.push(active); }
 
     if (updates.length === 0) {
