@@ -17,6 +17,7 @@ const emailsRouter = require('./routes/emails');
 const cartTagsRouter = require('./routes/cart-tags');
 const billingEntitiesRouter = require('./routes/billing-entities');
 const { leagueAliasMiddleware } = require('./middleware/league');
+const { startEmailPoller } = require('./email-poller');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -123,6 +124,8 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
   });
+
+  startEmailPoller();
   
   process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
