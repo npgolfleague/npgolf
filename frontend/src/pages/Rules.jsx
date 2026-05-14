@@ -35,6 +35,24 @@ export const Rules = () => {
           </div>
         </section>
 
+        {/* Local Rules */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Local Rules</h2>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+            <ol className="list-decimal list-inside space-y-4 text-gray-700">
+              <li>
+                <strong>Mulligan on first hole played.</strong> If your first shot is not a good one you may without penalty play a second shot, with the caveat that you must play the second shot (you don't choose the best one).
+              </li>
+              <li>
+                <strong>Out of Bounds.</strong> Balls hit OB can be played as one stoke penalty with no distance penalty. The ball can NOT be played from OB but the ball may be dropped as it would if the penalty area was marked with red stakes. Either two club lengths from where the ball entered the penalty area; or as far back as desired on a line from the hole to the where the ball crossed into the penalty area.
+              </li>
+              <li>
+                <strong>Gimme's there are no gimme's during the championship.</strong> During regular season anything within 12 inches can be given. Gimme's must be given by a playing partner (you can't give yourself a putt).
+              </li>
+            </ol>
+          </div>
+        </section>
+
         {/* Quota Point System */}
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Quota Point System</h2>
