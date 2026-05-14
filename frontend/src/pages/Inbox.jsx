@@ -95,14 +95,10 @@ export function Inbox() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Inbox {unreadCount > 0 && (
-            <span className="ml-2 text-sm bg-blue-600 text-white px-2 py-1 rounded-full">
-              {unreadCount} new
-            </span>
-          )}
-        </h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Inbox</h1>
+        <p className="text-slate-500 text-sm mt-1">Incoming league emails</p>
+      </div>
         <div className="flex gap-2">
           <button
             onClick={() => { setShowCompose(true); setSendResult(null) }}
@@ -117,7 +113,6 @@ export function Inbox() {
             🔄 Refresh
           </button>
         </div>
-      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">

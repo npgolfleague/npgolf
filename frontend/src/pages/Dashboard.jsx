@@ -2,26 +2,29 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { ToastContext } from '../context/ToastContext'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { formatDateOnly } from '../utils/date'
 import {
   ClipboardList, Users, Flag, Plus, Lock, LayoutDashboard,
-  Trophy, BookOpen, Info, CalendarDays, Disc3
+  Trophy, BookOpen, Info, CalendarDays, Activity, Disc3
 } from 'lucide-react'
 
 export const Dashboard = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
+  const { addToast } = useContext(ToastContext)
   const isAdmin = user?.role === 'admin'
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshingQuotas, setRefreshingQuotas] = useState(false)
-  const [quotaRefreshMessage, setQuotaRefreshMessage] = useState('')
+  const [confirmModal, setConfirmModal] = useState(null)
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [user])
 
   const fetchData = async () => {
     try {
@@ -65,32 +68,43 @@ export const Dashboard = () => {
     { path: '/about', label: 'About', icon: Info, enabled: true }
   ]
 
-  const handleRefreshQuotas = async () => {
-    if (!confirm('Refresh quota values from stored quota history for all players?')) return
+  const handleRefreshQuotas = () => {
+    setConfirmModal({
+      title: 'Refresh Quota Values',
+      message: 'Refresh quota values from stored quota history for all players? This will recalculate all player quotas.',
+      confirmLabel: 'Refresh',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          setRefreshingQuotas(true)
+          setError(null)
 
-    try {
-      setRefreshingQuotas(true)
-      setQuotaRefreshMessage('')
-      setError(null)
+          const response = await playersAPI.refreshQuotas()
+          const playersTouched = response.data?.playersTouched ?? 0
+          const updated18 = response.data?.updated18 ?? 0
+          const updated9 = response.data?.updated9 ?? 0
+          const prizePlayersTouched = response.data?.prizePlayersTouched ?? 0
 
-      const response = await playersAPI.refreshQuotas()
-      const playersTouched = response.data?.playersTouched ?? 0
-      const updated18 = response.data?.updated18 ?? 0
-      const updated9 = response.data?.updated9 ?? 0
-      const prizePlayersTouched = response.data?.prizePlayersTouched ?? 0
-
-      setQuotaRefreshMessage(`Quota values refreshed. Players: ${playersTouched}, 18-hole updated: ${updated18}, 9-hole updated: ${updated9}, prize money recalculated: ${prizePlayersTouched}`)
-      await fetchData()
-    } catch (err) {
-      console.error('Error refreshing quota values:', err)
-      setError(err.response?.data?.error || 'Failed to refresh quota values')
-    } finally {
-      setRefreshingQuotas(false)
-    }
+          addToast(`Quota refreshed: ${playersTouched} players, 18H: ${updated18}, 9H: ${updated9}, Prize: ${prizePlayersTouched}`, 'success')
+          await fetchData()
+        } catch (err) {
+          console.error('Error refreshing quota values:', err)
+          setError(err.response?.data?.error || 'Failed to refresh quota values')
+        } finally {
+          setRefreshingQuotas(false)
+        }
+      }
+    })
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-fairway-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       {/* Top Navigation Menu */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -134,19 +148,23 @@ export const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-sm mt-1">Paradise Cup — 2026 Season</p>
+        </div>
         {/* Priority 5: Dashboard Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* Card 1: Next Event */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-fairway-100 flex items-center justify-center text-fairway-600 shrink-0">
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
               <CalendarDays className="w-6 h-6" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Next Event</p>
-              <h3 className="text-lg font-bold text-slate-900 truncate">
+              <p className="text-lg font-bold text-slate-900 truncate">
                 {tournaments.length > 0 ? formatDate(tournaments[0].date) : 'TBD'}
-              </h3>
+              </p>
               <p className="text-xs text-slate-500 truncate">
                 {tournaments.length > 0 ? tournaments[0].course_name : 'No scheduled events'}
               </p>
@@ -155,26 +173,26 @@ export const Dashboard = () => {
 
           {/* Card 2: Field Strength */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+            <div className="w-12 h-12 rounded-full bg-fairway-50 flex items-center justify-center text-fairway-600 shrink-0">
               <Users className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Active Field</p>
-              <h3 className="text-2xl font-bold text-slate-900">{players.length}</h3>
+              <p className="text-2xl font-bold text-slate-900">{players.length}</p>
               <p className="text-xs text-slate-500">Registered Players</p>
             </div>
           </div>
 
           {/* Card 3: League Leader */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
               <Trophy className="w-6 h-6" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Points Leader</p>
-              <h3 className="text-lg font-bold text-slate-900 truncate">
+              <p className="text-lg font-bold text-slate-900 truncate">
                 {players.length > 0 ? players[0].name : '---'}
-              </h3>
+              </p>
               <p className="text-xs text-slate-500">
                 {players.length > 0 ? `${Math.round(players[0].fedex_points || 0)} Points` : 'No results yet'}
               </p>
@@ -183,12 +201,12 @@ export const Dashboard = () => {
 
           {/* Card 4: Prize Pool Estimate */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-              <Disc3 className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
+              <Activity className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Season Status</p>
-              <h3 className="text-lg font-bold text-slate-900">Active</h3>
+              <p className="text-lg font-bold text-slate-900">Active</p>
               <p className="text-xs text-slate-500">Tournament Mode</p>
             </div>
           </div>
@@ -272,41 +290,39 @@ export const Dashboard = () => {
                   </button>
                 )}
               </div>
-
-              {quotaRefreshMessage && (
-                <div className="mx-6 mt-4 p-3 bg-green-100 text-green-700 rounded text-sm">
-                  {quotaRefreshMessage}
-                </div>
-              )}
               
               {loading ? (
-                <div className="text-center py-12 text-gray-600">Loading players...</div>
+                <div className="animate-pulse space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-12 bg-slate-200 rounded-lg" />
+                  ))}
+                </div>
               ) : error ? (
                 <div className="text-center py-12 text-red-600">{error}</div>
               ) : (
-                <div className="overflow-x-auto w-full">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
                   <table className="w-full min-w-[920px]">
                     <thead className="bg-slate-50 border-y border-slate-200">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Rank" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Rank
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Player" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Player
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Paradise Cup Points" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Paradise Pts
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="18-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 18H
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="9-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 9H
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Tournaments Played" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Tournaments
                         </th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Prize Money Year to Date" className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Prize Money YTD
                         </th>
                       </tr>
@@ -373,7 +389,16 @@ export const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        title={confirmModal?.title}
+        message={confirmModal?.message}
+        confirmLabel={confirmModal?.confirmLabel}
+        danger={confirmModal?.danger}
+        onConfirm={confirmModal?.onConfirm}
+        onCancel={() => setConfirmModal(null)}
+      />
     </div>
   )
 }

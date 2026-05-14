@@ -600,7 +600,10 @@ export const ScoreEntry = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Score Entry</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Score Entry</h1>
+          <p className="text-slate-500 text-sm mt-1">Enter tournament scores</p>
+        </div>
 
         {/* Posted / Locked Banner */}
         {isPosted && (
@@ -754,6 +757,7 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           min="1"
                           max="9"
                           className={`w-full p-3 border-2 rounded-lg text-xl text-center font-bold focus:outline-none transition-colors ${
@@ -778,6 +782,7 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           min="0"
                           max="9"
                           className="w-full p-3 border-2 border-gray-200 rounded-lg text-xl text-center font-bold focus:border-fairway-500 focus:outline-none bg-white"
@@ -802,7 +807,7 @@ export const ScoreEntry = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenCtpModal(playerId)}
-                          className={`w-full py-2 px-3 rounded-lg font-semibold text-sm transition ${
+                          className={`w-full min-h-[44px] py-2 px-3 rounded-lg font-semibold text-sm transition ${
                             ctpData[playerId] 
                               ? 'bg-green-100 text-green-800 border-2 border-green-500' 
                               : 'bg-gray-100 text-gray-700 border-2 border-gray-300 hover:bg-gray-200'
@@ -855,7 +860,7 @@ export const ScoreEntry = () => {
                 <button
                   key={hole.hole_number}
                   onClick={() => setCurrentHole(hole.hole_number)}
-                  className={`p-2 rounded text-sm font-semibold ${
+                  className={`p-2 min-h-[44px] min-w-[44px] rounded text-sm font-semibold ${
                     currentHole === hole.hole_number
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700'
@@ -1004,6 +1009,7 @@ export const ScoreEntry = () => {
                     <input
                       type="number"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       min="0"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                       placeholder="0"

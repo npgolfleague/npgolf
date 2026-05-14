@@ -144,8 +144,8 @@ export const Settings = () => {
         >
           ← Back to Dashboard
         </button>
-        <h1 className="text-3xl font-bold text-gray-800">⚙️ Settings</h1>
-        <p className="text-gray-600 mt-2">Configure tournament fees and other settings per league</p>
+        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+        <p className="text-slate-500 text-sm mt-1">League configuration</p>
       </div>
 
       {/* League selector */}

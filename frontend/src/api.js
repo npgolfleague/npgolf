@@ -19,6 +19,10 @@ const apiClient = axios.create({
   baseURL: '/api'
 })
 
+const refreshClient = axios.create({
+  baseURL: '/api'
+})
+
 // Add league prefix and JWT token to requests
 apiClient.interceptors.request.use((config) => {
   // Detect league prefix at request time
@@ -35,6 +39,52 @@ apiClient.interceptors.request.use((config) => {
   }
   return config
 })
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+
+    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error)
+    }
+
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) {
+      return Promise.reject(error)
+    }
+
+    originalRequest._retry = true
+
+    try {
+      const leaguePrefix = detectLeaguePrefix()
+      refreshClient.defaults.baseURL = leaguePrefix ? `${leaguePrefix}/api` : '/api'
+
+      const response = await refreshClient.post('/auth/refresh', { refreshToken })
+      const { token: newToken, refreshToken: newRefreshToken, user } = response.data || {}
+
+      if (newToken) {
+        localStorage.setItem('token', newToken)
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user))
+        }
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken)
+        }
+
+        originalRequest.headers = originalRequest.headers || {}
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return apiClient.request(originalRequest)
+      }
+    } catch (refreshError) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('refreshToken')
+    }
+
+    return Promise.reject(error)
+  }
+)
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
@@ -142,8 +192,14 @@ export const emailsAPI = {
 }
 
 export const cartTagsAPI = {
-  generate: (tournamentId) => apiClient.get(`/cart-tags/tournament/${tournamentId}`),
-  send: (tournamentId) => apiClient.post(`/cart-tags/tournament/${tournamentId}/send`)
+  generate: (tournamentId) => {
+    const leaguePrefix = detectLeaguePrefix();
+    return apiClient.get(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}`);
+  },
+  send: (tournamentId) => {
+    const leaguePrefix = detectLeaguePrefix();
+    return apiClient.post(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}/send`);
+  }
 }
 
 export default apiClient

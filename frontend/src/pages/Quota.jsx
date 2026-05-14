@@ -191,8 +191,11 @@ export const Quota = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Quota Management</h1>
+          <p className="text-slate-500 text-sm mt-1">Player quota history</p>
+        </div>
         <div className="flex flex-col gap-4 mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">🎯 Player Quota History</h2>
           <div className="bg-white rounded-lg shadow p-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2" htmlFor="playerSelect">
               Select Player

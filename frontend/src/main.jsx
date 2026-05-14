@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useContext } from 'react'
 import { AuthProvider } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 import { AuthContext } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { MainLayout } from './components/MainLayout'
@@ -34,10 +35,6 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 
 const HomeEntry = () => {
-  const { token } = useContext(AuthContext)
-  if (token) {
-    return <Navigate to="/app/dashboard" replace />
-  }
   return <Dashboard />
 }
 
@@ -69,7 +66,8 @@ try {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <AuthProvider>
-        <Router basename={basename}>
+        <ToastProvider>
+          <Router basename={basename}>
           <Routes>
             <Route path="/" element={<HomeEntry />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -108,8 +106,7 @@ try {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Router>
-      </AuthProvider>
+        </Router>        </ToastProvider>      </AuthProvider>
     </React.StrictMode>
   )
 } catch (err) {
