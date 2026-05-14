@@ -122,7 +122,8 @@ export function SMSConsent() {
 
           <div className="border-t pt-6 mt-8 text-sm text-gray-500 text-center">
             <p>NPGOLF SMS Messaging Program</p>
-            <p>Last Updated: December 2024</p>
+            {/* TODO: Review and update this date whenever SMS consent language changes. Annual review recommended. */}
+            <p>Last Updated: May 2026</p>
             <p className="mt-2">
               For questions, email{' '}
               <a href="mailto:commish@npgolf.net" className="text-blue-600 hover:underline">

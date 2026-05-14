@@ -10,12 +10,44 @@ export const Register = () => {
   const [sex, setSex] = useState('M')
   const [smsAllowed, setSmsAllowed] = useState(false)
   const [error, setError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  const validatePassword = (pwd) => {
+    if (pwd.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
+      return false
+    }
+    if (!/[a-zA-Z]/.test(pwd)) {
+      setPasswordError('Password must include at least one letter')
+      return false
+    }
+    if (!/[0-9]/.test(pwd)) {
+      setPasswordError('Password must include at least one number')
+      return false
+    }
+    setPasswordError('')
+    return true
+  }
+
+  const handlePasswordBlur = () => {
+    if (password) {
+      validatePassword(password)
+    } else {
+      setPasswordError('')
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    
+    // Validate password before submission
+    if (!validatePassword(password)) {
+      return
+    }
+    
     setLoading(true)
 
     try {
@@ -36,8 +68,9 @@ export const Register = () => {
         <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">NPGOLF Sign Up</h1>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">Name</label>
+            <label htmlFor="reg-name" className="block text-gray-700 font-semibold mb-2">Name</label>
             <input
+              id="reg-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -47,8 +80,9 @@ export const Register = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">Email</label>
+            <label htmlFor="reg-email" className="block text-gray-700 font-semibold mb-2">Email</label>
             <input
+              id="reg-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -58,21 +92,23 @@ export const Register = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">Phone</label>
+            <label htmlFor="reg-phone" className="block text-gray-700 font-semibold mb-2">Phone</label>
             <input
+              id="reg-phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-              placeholder="+12025551234"
+              placeholder="+18135550100"
               required
             />
-            <p className="text-sm text-gray-600 mt-1">Include country code (e.g., +1 for US)</p>
+            <p className="text-sm text-gray-600 mt-1">Include country code — e.g., +1 for US (+18135550100)</p>
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">Gender</label>
+            <label htmlFor="reg-gender" className="block text-gray-700 font-semibold mb-2">Gender</label>
             <select
+              id="reg-gender"
               value={sex}
               onChange={(e) => setSex(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
@@ -83,20 +119,24 @@ export const Register = () => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">Password</label>
+            <label htmlFor="reg-password" className="block text-gray-700 font-semibold mb-2">Password</label>
             <input
+              id="reg-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onBlur={handlePasswordBlur}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               required
             />
+            {passwordError && <p className="text-red-600 text-sm mt-1" role="alert">{passwordError}</p>}
             <p className="text-sm text-gray-600 mt-2">Min 8 chars, letters + numbers</p>
           </div>
 
           <div className="mb-6">
-            <label className="flex items-start">
+            <label htmlFor="reg-sms-consent" className="flex items-start">
               <input
+                id="reg-sms-consent"
                 type="checkbox"
                 checked={smsAllowed}
                 onChange={(e) => setSmsAllowed(e.target.checked)}

@@ -132,20 +132,14 @@ const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
 router.get('/', async (req, res) => {
   try {
     await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
-    
-    // If we have a league context, only return players in that league
-    let query = 'SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players';
-    let params = [];
-    
-    if (req.league && req.league.id) {
-      query = `SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.fedex_points, 
-               p.tournaments_played, p.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at 
-               FROM players p
-               INNER JOIN league_players lp ON p.id = lp.player_id
-               WHERE lp.league_id = ?`;
-      params = [req.league.id];
-    }
-    
+    const leagueId = getLeagueId(req);
+    let query = `SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.fedex_points,
+                 p.tournaments_played, p.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at
+                 FROM players p
+                 INNER JOIN league_players lp ON p.id = lp.player_id
+                 WHERE lp.league_id = ?`;
+    let params = [leagueId];
+
     query += ' ORDER BY fedex_points DESC, name ASC';
     
     const [rows] = await pool.query(query, params);

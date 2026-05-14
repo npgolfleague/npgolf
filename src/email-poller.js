@@ -130,6 +130,12 @@ function pollInbox() {
 }
 
 function startEmailPoller() {
+  const pollerEnabled = String(process.env.EMAIL_POLLER_ENABLED || 'true').toLowerCase() === 'true';
+  if (!pollerEnabled) {
+    console.log('[EmailPoller] Disabled by EMAIL_POLLER_ENABLED=false');
+    return;
+  }
+
   if (!process.env.SMTP_USER && !process.env.IMAP_USER) {
     console.log('[EmailPoller] No IMAP credentials configured, skipping email poller');
     return;

@@ -38,6 +38,7 @@ services:
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_POLLER_ENABLED: ${EMAIL_POLLER_ENABLED:-false}
       EMAIL_FROM: ${EMAIL_FROM}
       APP_BASE_URL: https://npgolf.net
     networks:

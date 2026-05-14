@@ -52,6 +52,7 @@ app.use((req, res, next) => {
 app.use(leagueAliasMiddleware);
 
 // Register API routes FIRST before static files
+app.use('/:alias/api/cart-tags', cartTagsRouter); // League-prefixed cart tags (enables req.league)
 app.use('/api/players', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', coursesRouter);
