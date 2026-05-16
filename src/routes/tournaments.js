@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
+const { requireAdmin } = require('../middleware/admin');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 
@@ -471,37 +472,11 @@ const createPreCompleteBackup = async (db, tournamentId) => {
   return insertResult.insertId;
 };
 
-const requireAdmin = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: 'Server misconfigured' });
-    }
-
-    const decoded = jwt.verify(token, secret);
-    const [rows] = await pool.query('SELECT role FROM players WHERE id = ?', [decoded.sub]);
-
-    if (!rows[0] || rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-};
-
 // GET /api/tournaments - List all tournaments
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+      const leagueId = getLeagueId(req);
+      const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at, t.completed,
               c.id as course_id, c.name as course_name, c.address as course_address,
               CASE
@@ -514,7 +489,9 @@ router.get('/', async (req, res) => {
               END AS is_completed
        FROM tournament t
        JOIN course c ON t.course_id = c.id
+         WHERE t.league_id = ?
        ORDER BY t.date DESC`
+      , [leagueId]
     );
     res.json(rows);
   } catch (err) {
@@ -526,14 +503,16 @@ router.get('/', async (req, res) => {
 // GET /api/tournaments/upcoming - Get next 3 upcoming tournaments
 router.get('/upcoming', async (req, res) => {
   try {
+      const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
               c.id as course_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
-       WHERE t.date >= CURDATE()
+         WHERE t.league_id = ? AND t.date >= CURDATE()
        ORDER BY t.date ASC
        LIMIT 3`
+      , [leagueId]
     );
     res.json(rows);
   } catch (err) {
@@ -544,14 +523,16 @@ router.get('/upcoming', async (req, res) => {
 // GET /api/tournaments/next - Get next upcoming tournament
 router.get('/next', async (req, res) => {
   try {
+      const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.course_id, t.number_of_holes, t.nine_hole_side, t.first_tee_time, t.created_at,
               c.name as course_name, c.address as course_address, c.phone as course_phone
        FROM tournament t
        JOIN course c ON t.course_id = c.id
-       WHERE t.date >= CURDATE()
+         WHERE t.league_id = ? AND t.date >= CURDATE()
        ORDER BY t.date ASC
        LIMIT 1`
+      , [leagueId]
     );
     if (rows.length === 0) {
       return res.json(null);
@@ -565,6 +546,7 @@ router.get('/next', async (req, res) => {
 // GET /api/tournaments/:id - Get single tournament
 router.get('/:id', async (req, res) => {
   try {
+    const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
               t.quota_collected, t.skins_collected,
@@ -579,8 +561,8 @@ router.get('/:id', async (req, res) => {
               END AS is_completed
        FROM tournament t
        JOIN course c ON t.course_id = c.id
-       WHERE t.id = ?`,
-      [req.params.id]
+       WHERE t.id = ? AND t.league_id = ?`,
+      [req.params.id, leagueId]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
@@ -632,12 +614,13 @@ router.post('/', async (req, res) => {
 // PUT /api/tournaments/:id - Update tournament
 router.put('/:id', async (req, res) => {
   try {
+    const leagueId = getLeagueId(req);
     const { date, course_id, number_of_holes, nine_hole_side } = req.body;
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     await pool.query(
-      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ? WHERE id = ?',
-      [date, course_id, holeCount, side, req.params.id]
+      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ? WHERE id = ? AND league_id = ?',
+      [date, course_id, holeCount, side, req.params.id, leagueId]
     );
     res.json({ id: req.params.id, date, course_id, number_of_holes: holeCount, nine_hole_side: side });
   } catch (err) {
@@ -649,7 +632,8 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/tournaments/:id - Delete tournament
 router.delete('/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM tournament WHERE id = ?', [req.params.id]);
+  const leagueId = getLeagueId(req);
+  await pool.query('DELETE FROM tournament WHERE id = ? AND league_id = ?', [req.params.id, leagueId]);
     res.json({ message: 'Tournament deleted' });
   } catch (err) {
     console.error('Error deleting tournament:', err);

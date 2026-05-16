@@ -1,36 +1,8 @@
 const express = require('express');
 const pool = require('../db');
-const jwt = require('jsonwebtoken');
+const { requireAdmin } = require('../middleware/admin');
 const { getLeagueId } = require('../utils/league');
 const router = express.Router();
-
-// Middleware to verify admin role
-const requireAdmin = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: 'Server misconfigured' });
-    }
-
-    const decoded = jwt.verify(token, secret);
-    const [rows] = await pool.query('SELECT role FROM players WHERE id = ?', [decoded.sub]);
-    
-    if (!rows[0] || rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-};
 
 // GET /api/settings - Get current settings
 router.get('/', async (req, res) => {

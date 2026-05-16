@@ -15,6 +15,7 @@ const leaguesRouter = require('./routes/leagues');
 const leagueSelectRouter = require('./routes/league-select');
 const emailsRouter = require('./routes/emails');
 const cartTagsRouter = require('./routes/cart-tags');
+const rulesRouter = require('./routes/rules');
 const billingEntitiesRouter = require('./routes/billing-entities');
 const { leagueAliasMiddleware } = require('./middleware/league');
 const { startEmailPoller } = require('./email-poller');
@@ -66,6 +67,7 @@ app.use('/api/leagues', leaguesRouter);
 app.use('/api/league-select', leagueSelectRouter);
 app.use('/api/emails', emailsRouter);
 app.use('/api/cart-tags', cartTagsRouter);
+app.use('/api/rules', rulesRouter);
 app.use('/api/billing-entities', billingEntitiesRouter);
 
 // Public pages for SMS compliance (Twilio verification)

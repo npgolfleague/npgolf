@@ -1,12 +1,19 @@
 const express = require('express');
 const pool = require('../db');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/players - Get all players in a tournament
 router.get('/:tournamentId/players', async (req, res) => {
   const { tournamentId } = req.params;
+  const leagueId = getLeagueId(req);
   
   try {
+    const [tournaments] = await pool.query('SELECT id FROM tournament WHERE id = ? AND league_id = ? LIMIT 1', [tournamentId, leagueId]);
+    if (tournaments.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found in this league' });
+    }
+
     const [rows] = await pool.query(`
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role,
              tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date,
@@ -29,22 +36,30 @@ router.get('/:tournamentId/players', async (req, res) => {
 router.post('/:tournamentId/players', async (req, res) => {
   const { tournamentId } = req.params;
   const { playerId } = req.body;
+  const leagueId = getLeagueId(req);
   
   if (!playerId) {
     return res.status(400).json({ error: 'playerId is required' });
   }
   
   try {
-    // Check if tournament exists
-    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ?', [tournamentId]);
+    // Check if tournament exists in current league
+    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ? AND league_id = ?', [tournamentId, leagueId]);
     if (tournaments.length === 0) {
-      return res.status(404).json({ error: 'Tournament not found' });
+      return res.status(404).json({ error: 'Tournament not found in this league' });
     }
     
-    // Check if player exists
-    const [players] = await pool.query('SELECT id, quota_18, quota_9 FROM players WHERE id = ?', [playerId]);
+    // Check if player exists in current league
+    const [players] = await pool.query(
+      `SELECT p.id, p.quota_18, p.quota_9
+       FROM players p
+       INNER JOIN league_players lp ON lp.player_id = p.id
+       WHERE p.id = ? AND lp.league_id = ?
+       LIMIT 1`,
+      [playerId, leagueId]
+    );
     if (players.length === 0) {
-      return res.status(404).json({ error: 'Player not found' });
+      return res.status(404).json({ error: 'Player not found in this league' });
     }
     
     // Snapshot the player's current quota based on tournament hole count
@@ -74,8 +89,14 @@ router.post('/:tournamentId/players', async (req, res) => {
 // DELETE /api/tournaments/:tournamentId/players/:playerId - Remove a player from a tournament
 router.delete('/:tournamentId/players/:playerId', async (req, res) => {
   const { tournamentId, playerId } = req.params;
+  const leagueId = getLeagueId(req);
   
   try {
+    const [tournaments] = await pool.query('SELECT id FROM tournament WHERE id = ? AND league_id = ? LIMIT 1', [tournamentId, leagueId]);
+    if (tournaments.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found in this league' });
+    }
+
     const [result] = await pool.query(
       'DELETE FROM tournament_players WHERE tournament_id = ? AND player_id = ?',
       [tournamentId, playerId]
@@ -247,19 +268,27 @@ router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) =
 // GET /api/tournaments/:tournamentId/available-players - Get players NOT in the tournament
 router.get('/:tournamentId/available-players', async (req, res) => {
   const { tournamentId } = req.params;
+  const leagueId = getLeagueId(req);
   
   try {
+    const [tournaments] = await pool.query('SELECT id FROM tournament WHERE id = ? AND league_id = ? LIMIT 1', [tournamentId, leagueId]);
+    if (tournaments.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found in this league' });
+    }
+
     const [rows] = await pool.query(`
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role
       FROM players p
+      INNER JOIN league_players lp ON lp.player_id = p.id
       WHERE p.active = 1
+        AND lp.league_id = ?
         AND p.id NOT IN (
           SELECT player_id 
           FROM tournament_players 
           WHERE tournament_id = ?
         )
       ORDER BY p.name ASC
-    `, [tournamentId]);
+    `, [leagueId, tournamentId]);
     
     res.json(rows);
   } catch (err) {

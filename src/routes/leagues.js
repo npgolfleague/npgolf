@@ -3,10 +3,61 @@ const pool = require('../db');
 const { requireAdmin } = require('../middleware/admin');
 const router = express.Router();
 
+function ensureLeagueScope(req, res, id) {
+  if (!req.league?.id) return true;
+
+  const requestedId = Number(id);
+  if (!Number.isInteger(requestedId) || requestedId !== Number(req.league.id)) {
+    res.status(403).json({ error: 'Cross-league access is not allowed' });
+    return false;
+  }
+
+  return true;
+}
+
+// Get current league from alias context (or sensible default when no alias is present)
+router.get('/current', async (req, res) => {
+  try {
+    if (req.league?.id) {
+      const [rows] = await pool.query(
+        `SELECT l.*, be.name as billing_entity_name, be.billing_email
+         FROM leagues l
+         LEFT JOIN billing_entities be ON l.billing_entity_id = be.id
+         WHERE l.id = ?
+         LIMIT 1`,
+        [req.league.id]
+      );
+
+      if (rows.length > 0) {
+        return res.json(rows[0]);
+      }
+    }
+
+    const [rows] = await pool.query(
+      `SELECT l.*, be.name as billing_entity_name, be.billing_email
+       FROM leagues l
+       LEFT JOIN billing_entities be ON l.billing_entity_id = be.id
+       WHERE l.active = 1
+       ORDER BY l.id ASC
+       LIMIT 1`
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No active leagues found' });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('DB error', err);
+    return res.status(500).json({ error: 'Failed to fetch current league' });
+  }
+});
+
 // Get league by ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureLeagueScope(req, res, id)) return;
     
     const [rows] = await pool.query(
       `SELECT l.*, be.name as billing_entity_name, be.billing_email
@@ -30,6 +81,19 @@ router.get('/:id', async (req, res) => {
 // Get all leagues
 router.get('/', async (req, res) => {
   try {
+    if (req.league?.id) {
+      const [scopedRows] = await pool.query(
+        `SELECT l.*, be.name as billing_entity_name, be.billing_email
+         FROM leagues l
+         LEFT JOIN billing_entities be ON l.billing_entity_id = be.id
+         WHERE l.id = ?
+         ORDER BY l.active DESC, l.season_year DESC, l.name`,
+        [req.league.id]
+      );
+
+      return res.json(scopedRows);
+    }
+
     const [rows] = await pool.query(
       `SELECT l.*, be.name as billing_entity_name, be.billing_email
        FROM leagues l
@@ -48,6 +112,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/settings', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureLeagueScope(req, res, id)) return;
     
     const [rows] = await pool.query(
       'SELECT * FROM league_settings WHERE league_id = ? LIMIT 1',
@@ -84,6 +149,7 @@ router.get('/:id/settings', async (req, res) => {
 // PUT /api/leagues/:id/settings - Update league settings (admin only)
 router.put('/:id/settings', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
   const {
     tournament_fee_18_holes, tournament_fee_9_holes,
     skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
@@ -148,6 +214,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
 router.get('/:id/players', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureLeagueScope(req, res, id)) return;
     
     const [rows] = await pool.query(
       `SELECT p.*, lp.joined_at
@@ -169,6 +236,7 @@ router.get('/:id/players', async (req, res) => {
 router.get('/:id/tournaments', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureLeagueScope(req, res, id)) return;
     
     const [rows] = await pool.query(
       `SELECT t.*, c.name as course_name
@@ -257,6 +325,7 @@ router.post('/', requireAdmin, async (req, res) => {
 // PUT /api/leagues/:id - Update league (admin only)
 router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
   const {
     name,
     slug,
@@ -338,6 +407,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 // DELETE /api/leagues/:id - Delete league (admin only)
 router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
 
   try {
     // Check if league exists

@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useContext } from 'react'
 import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
 import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 export const ScoreEntry = () => {
   const { user } = useContext(AuthContext)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [selectedTournament, setSelectedTournament] = useState(null)

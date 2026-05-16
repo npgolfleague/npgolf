@@ -1,11 +1,13 @@
 import { useEffect, useState, useContext } from 'react'
 import { playersAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 const rounds = [1, 2, 3, 4, 5, 6, 7]
 
 export const Quota = () => {
   const { user } = useContext(AuthContext)
+  const adminCapable = isAdminCapable(user)
   const [players, setPlayers] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [quotaRow, setQuotaRow] = useState(null)
@@ -176,7 +178,7 @@ export const Quota = () => {
     }
   }
 
-  if (user?.role !== 'admin') {
+  if (!adminCapable) {
     return (
       <div className="min-h-screen bg-gray-100">
         <div className="max-w-5xl mx-auto px-4 py-8">

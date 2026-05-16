@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext'
 import { ToastContext } from '../context/ToastContext'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { formatDateOnly } from '../utils/date'
+import { isAdminCapable } from '../utils/roles'
 import { Users, Trophy, Flag, Mail, Pencil, BarChart2, Trash2, Smartphone, Check, Tag, Sparkles } from 'lucide-react'
 
 export const Tournaments = () => {
@@ -28,7 +29,7 @@ export const Tournaments = () => {
   const [cartTagsResult, setCartTagsResult] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
 
   useEffect(() => {
     fetchTournaments()

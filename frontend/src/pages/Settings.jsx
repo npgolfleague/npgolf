@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import { leaguesAPI } from '../api'
+import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_SETTINGS = {
   tournament_fee_18_holes: 20,
@@ -36,6 +37,7 @@ function settingsFromResponse(data) {
 export const Settings = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
+  const adminCapable = isAdminCapable(user)
   const [leagues, setLeagues] = useState([])
   const [selectedLeagueId, setSelectedLeagueId] = useState(null)
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS })
@@ -47,10 +49,10 @@ export const Settings = () => {
 
   // Redirect non-admin users
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (!adminCapable) {
       navigate('/app/dashboard')
     }
-  }, [user, navigate])
+  }, [adminCapable, navigate])
 
   // Load league list
   useEffect(() => {
@@ -125,7 +127,7 @@ export const Settings = () => {
     }
   }
 
-  if (user?.role !== 'admin') return null
+  if (!adminCapable) return null
 
   if (loadingLeagues) {
     return (

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/admin');
+const { isAdminCapableRole, isSuperAdminRole } = require('../middleware/admin');
 const jwt = require('jsonwebtoken');
 
 // GET /api/scores - List all scores
@@ -111,9 +112,25 @@ router.post('/', async (req, res) => {
         }
         try {
           const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
-          const [userRows] = await pool.query('SELECT role FROM players WHERE id = ? LIMIT 1', [decoded.sub]);
-          if (!userRows[0] || userRows[0].role !== 'admin') {
+          const [userRows] = await pool.query('SELECT id, role FROM players WHERE id = ? LIMIT 1', [decoded.sub]);
+          const user = userRows[0];
+          if (!user || !isAdminCapableRole(user.role)) {
             return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+          }
+
+          if (!isSuperAdminRole(user.role)) {
+            if (!req.league?.id) {
+              return res.status(403).json({ error: 'Scores have been posted. League admin access requires league context.' });
+            }
+
+            const [leagueMembership] = await pool.query(
+              'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
+              [req.league.id, user.id]
+            );
+
+            if (!leagueMembership.length) {
+              return res.status(403).json({ error: 'Scores have been posted. League admin is not a member of this league.' });
+            }
           }
         } catch {
           return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });

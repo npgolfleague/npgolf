@@ -2,11 +2,13 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import apiClient from '../api'
+import { isSuperAdmin } from '../utils/roles'
 import { Building2, Plus, Edit2, Trash2, Users, Trophy, X, Shield } from 'lucide-react'
 
 export const BillingEntities = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
+  const superAdmin = isSuperAdmin(user)
   const [entities, setEntities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -46,16 +48,16 @@ export const BillingEntities = () => {
 
   // Redirect non-admin users
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (!superAdmin) {
       navigate('/app/dashboard')
     }
-  }, [user, navigate])
+  }, [superAdmin, navigate])
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (superAdmin) {
       fetchEntities()
     }
-  }, [user])
+  }, [superAdmin])
 
   const fetchEntities = async () => {
     try {
@@ -253,7 +255,7 @@ export const BillingEntities = () => {
     }
   }
 
-  if (user?.role !== 'admin') {
+  if (!superAdmin) {
     return null
   }
 
