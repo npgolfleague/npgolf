@@ -5,7 +5,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useContext } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
-import { AuthContext } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { MainLayout } from './components/MainLayout'
 import { Login } from './pages/Login'
@@ -34,10 +33,6 @@ import { BillingEntities } from './pages/BillingEntities'
 import { About } from './pages/About'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
-
-const HomeEntry = () => {
-  return <Dashboard />
-}
 
 // Wrapper to show LeagueSelect or Login based on league context
 const LoginEntry = () => {
@@ -70,7 +65,7 @@ try {
         <ToastProvider>
           <Router basename={basename}>
           <Routes>
-            <Route path="/" element={<HomeEntry />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<LoginEntry />} />
@@ -106,7 +101,7 @@ try {
               <Route path="/billing-entities" element={<BillingEntities />} />
               <Route path="/app/about" element={<About />} />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Router>        </ToastProvider>      </AuthProvider>
     </React.StrictMode>

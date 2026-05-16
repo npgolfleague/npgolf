@@ -17,9 +17,11 @@ router.get('/:tournamentId/players', async (req, res) => {
     const [rows] = await pool.query(`
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role,
              tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date,
-             tp.foursome AS foursome, tp.pair AS pair
+             tp.foursome AS foursome, tp.pair AS pair,
+             tp.tee_id, ct.tee_name, ct.tee_color
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
+      LEFT JOIN course_tee ct ON ct.id = tp.tee_id
       WHERE tp.tournament_id = ?
       ORDER BY p.name ASC
     `, [tournamentId]);
@@ -35,7 +37,7 @@ router.get('/:tournamentId/players', async (req, res) => {
 // Body: { playerId }
 router.post('/:tournamentId/players', async (req, res) => {
   const { tournamentId } = req.params;
-  const { playerId } = req.body;
+  const { playerId, teeId } = req.body;
   const leagueId = getLeagueId(req);
   
   if (!playerId) {
@@ -44,14 +46,14 @@ router.post('/:tournamentId/players', async (req, res) => {
   
   try {
     // Check if tournament exists in current league
-    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ? AND league_id = ?', [tournamentId, leagueId]);
+    const [tournaments] = await pool.query('SELECT id, number_of_holes, course_id FROM tournament WHERE id = ? AND league_id = ?', [tournamentId, leagueId]);
     if (tournaments.length === 0) {
       return res.status(404).json({ error: 'Tournament not found in this league' });
     }
     
     // Check if player exists in current league
     const [players] = await pool.query(
-      `SELECT p.id, p.quota_18, p.quota_9
+      `SELECT p.id, p.quota_18, p.quota_9, p.sex, p.default_tee_name
        FROM players p
        INNER JOIN league_players lp ON lp.player_id = p.id
        WHERE p.id = ? AND lp.league_id = ?
@@ -68,12 +70,37 @@ router.post('/:tournamentId/players', async (req, res) => {
     const holeCount = Number(tournament.number_of_holes);
     const tournamentQuota = holeCount === 9 ? player.quota_9 : player.quota_18;
 
+    // Resolve tee_id: use explicitly passed teeId, then player's default_tee_name,
+    // then fall back to first tee matching player sex at this course.
+    let resolvedTeeId = teeId ? Number(teeId) : null;
+    if (!resolvedTeeId) {
+      if (player.default_tee_name) {
+        const [teeByName] = await pool.query(
+          `SELECT id FROM course_tee WHERE course_id = ? AND tee_name = ? LIMIT 1`,
+          [tournament.course_id, player.default_tee_name]
+        );
+        if (teeByName.length > 0) resolvedTeeId = teeByName[0].id;
+      }
+      if (!resolvedTeeId) {
+        // Fall back to first tee whose gender matches the player (prefer exact match, then 'A')
+        const genderPref = player.sex === 'F' ? 'F' : 'M';
+        const [teeByGender] = await pool.query(
+          `SELECT id FROM course_tee
+           WHERE course_id = ?
+           ORDER BY (gender = ?) DESC, (gender = 'A') DESC
+           LIMIT 1`,
+          [tournament.course_id, genderPref]
+        );
+        if (teeByGender.length > 0) resolvedTeeId = teeByGender[0].id;
+      }
+    }
+
     // Add player to tournament as actively playing (yes)
     // so admin-added players appear in confirmed lists immediately
     await pool.query(
-      `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota)
-       VALUES (?, ?, 'yes', NOW(), ?)`,
-      [tournamentId, playerId, tournamentQuota]
+      `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota, tee_id)
+       VALUES (?, ?, 'yes', NOW(), ?, ?)`,
+      [tournamentId, playerId, tournamentQuota, resolvedTeeId]
     );
     
     res.status(201).json({ message: 'Player added to tournament successfully' });

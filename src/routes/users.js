@@ -365,7 +365,7 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
 // PUT /api/users/:id - update player
 router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, active, role } = req.body;
+  const { name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, active, role, default_tee_name } = req.body;
   
   try {
     const leagueId = getLeagueId(req);
@@ -412,6 +412,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (role !== undefined) { updates.push('role = ?'); values.push(role); }
     if (req.body.sms_allowed !== undefined) { updates.push('sms_allowed = ?'); values.push(req.body.sms_allowed); }
     if (req.body.email_allowed !== undefined) { updates.push('email_allowed = ?'); values.push(req.body.email_allowed); }
+    if (default_tee_name !== undefined) { updates.push('default_tee_name = ?'); values.push(default_tee_name || null); }
     
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -421,7 +422,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     const sql = `UPDATE players SET ${updates.join(', ')} WHERE id = ?`;
     
     await pool.execute(sql, values);
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, created_at FROM players WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, default_tee_name, created_at FROM players WHERE id = ?', [id]);
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
