@@ -20,9 +20,23 @@ function isStrongPassword(password) {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+  const normalizedEmail = String(email).trim();
 
   try {
-    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota_18, quota_9, role, password FROM players WHERE email = ? LIMIT 1', [email]);
+    const leagueBillingEntityId = req.league?.billing_entity_id ?? null;
+    const [rows] = await pool.query(
+      `SELECT id, billing_entity_id, name, email, sex, active, quota_18, quota_9, role, password
+       FROM players
+       WHERE LOWER(email) = LOWER(?)
+       ORDER BY
+         CASE
+           WHEN ? IS NOT NULL AND billing_entity_id = ? THEN 0
+           ELSE 1
+         END,
+         id DESC
+       LIMIT 1`,
+      [normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
+    );
     const user = rows && rows[0];
     if (!user || !user.password) return res.status(401).json({ error: 'invalid credentials' });
 
