@@ -19,11 +19,16 @@ export const LeagueSelect = () => {
       setLoading(true)
       setError('')
       const response = await axios.get(`/api/league-select/by-email?email=${encodeURIComponent(email)}`)
-      if (response.data.length === 0) {
+      const validLeagues = (response.data || []).filter((league) => {
+        const alias = String(league?.alias || '').trim()
+        return alias.length > 0 && alias.toLowerCase() !== 'null'
+      })
+
+      if (validLeagues.length === 0) {
         setError('No leagues found for this email address. Please check your email or contact your league administrator.')
         setLeagues([])
       } else {
-        setLeagues(response.data)
+        setLeagues(validLeagues)
       }
       setSearched(true)
     } catch (err) {
@@ -35,8 +40,14 @@ export const LeagueSelect = () => {
   }
 
   const handleLeagueSelect = (alias) => {
+    const normalizedAlias = String(alias || '').trim()
+    if (!normalizedAlias || normalizedAlias.toLowerCase() === 'null') {
+      setError('This league is not configured with a valid URL alias. Please contact your administrator.')
+      return
+    }
+
     // Redirect to league-specific login
-    window.location.href = `/${alias}/login`
+    window.location.href = `/${normalizedAlias}/login`
   }
 
   return (

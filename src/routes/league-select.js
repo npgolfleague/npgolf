@@ -12,7 +12,9 @@ router.get('/by-email', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Find all leagues where this player exists
+    const normalizedEmail = String(email).trim();
+
+    // Find all active leagues with a valid alias where this player exists
     const [rows] = await pool.query(`
       SELECT DISTINCT 
         l.id,
@@ -24,9 +26,12 @@ router.get('/by-email', async (req, res) => {
       JOIN league_players lp ON l.id = lp.league_id
       JOIN players p ON lp.player_id = p.id
       LEFT JOIN billing_entities be ON l.billing_entity_id = be.id
-      WHERE p.email = ? AND l.active = 1
+      WHERE LOWER(p.email) = LOWER(?)
+        AND l.active = 1
+        AND l.alias IS NOT NULL
+        AND TRIM(l.alias) <> ''
       ORDER BY l.name
-    `, [email]);
+    `, [normalizedEmail]);
 
     res.json(rows);
   } catch (err) {
@@ -49,6 +54,8 @@ router.get('/all', async (req, res) => {
       FROM leagues l
       LEFT JOIN billing_entities be ON l.billing_entity_id = be.id
       WHERE l.active = 1
+        AND l.alias IS NOT NULL
+        AND TRIM(l.alias) <> ''
       ORDER BY l.name
     `);
 
