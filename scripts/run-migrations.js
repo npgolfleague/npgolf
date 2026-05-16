@@ -38,7 +38,7 @@ async function getPendingMigrations(appliedMigrations) {
   const files = await fs.readdir(migrationsDir);
   
   const sqlFiles = files
-    .filter(f => f.endsWith('.sql'))
+    .filter(f => /^\d+.*\.sql$/.test(f) && !f.endsWith('_old.sql'))
     .sort();
   
   const pending = sqlFiles.filter(f => !appliedMigrations.includes(f));
