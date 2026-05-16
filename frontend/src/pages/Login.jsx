@@ -1,8 +1,11 @@
-import { useState, useContext } from 'react'
+import { useState, useContext, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Disc3 } from 'lucide-react'
 import { authAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+
+const LEAGUE_FINDER_STORAGE_KEY = 'npgolf_league_finder_profile'
+const LAST_LOGIN_EMAIL_KEY = 'npgolf_last_login_email'
 
 export const Login = () => {
   const [email, setEmail] = useState('')
@@ -13,6 +16,26 @@ export const Login = () => {
   const location = useLocation()
   const { login } = useContext(AuthContext)
 
+  useEffect(() => {
+    try {
+      const savedLoginEmail = localStorage.getItem(LAST_LOGIN_EMAIL_KEY)
+      if (savedLoginEmail) {
+        setEmail(savedLoginEmail)
+        return
+      }
+
+      const finderRaw = localStorage.getItem(LEAGUE_FINDER_STORAGE_KEY)
+      if (!finderRaw) return
+      const finderData = JSON.parse(finderRaw)
+      const finderEmail = String(finderData?.email || '').trim()
+      if (finderEmail) {
+        setEmail(finderEmail)
+      }
+    } catch (e) {
+      // Ignore malformed local storage and continue.
+    }
+  }, [])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -22,6 +45,7 @@ export const Login = () => {
       const response = await authAPI.login(email, password)
       const { token, user, refreshToken } = response.data
       login(user, token, refreshToken)
+      localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim())
       // Small delay to ensure localStorage is written
       setTimeout(() => {
         // Check if there's a redirect path from the location state
@@ -102,6 +126,20 @@ export const Login = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <a
+              href="/register"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
+            >
+              Join a League
+            </a>
+            <a
+              href="/login"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
+            >
+              Find my league(s)
+            </a>
+          </div>
           <p className="text-slate-500 text-sm">
             Don't have an account?{' '}
             <a href="/register" className="font-bold text-slate-900 hover:text-fairway-700 transition-colors">

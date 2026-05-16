@@ -1,6 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { authAPI } from '../api'
+
+const LEAGUE_FINDER_STORAGE_KEY = 'npgolf_league_finder_profile'
+
+function detectAliasFromPath() {
+  const pathParts = window.location.pathname.split('/').filter((p) => p.length > 0)
+  const commonRoutes = ['api', 'login', 'register', 'forgot-password', 'reset-password',
+    'sms-consent', 'dashboard', 'about', 'app', 'assets', 'billing-entities']
+
+  if (pathParts.length > 0 && !commonRoutes.includes(pathParts[0])) {
+    return pathParts[0]
+  }
+
+  return ''
+}
 
 export const Register = () => {
   const [name, setName] = useState('')
@@ -8,11 +23,51 @@ export const Register = () => {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [sex, setSex] = useState('M')
+  const [leagues, setLeagues] = useState([])
+  const [leagueId, setLeagueId] = useState('')
+  const [leaguesLoading, setLeaguesLoading] = useState(true)
   const [smsAllowed, setSmsAllowed] = useState(false)
   const [error, setError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const loadLeagues = async () => {
+      try {
+        setLeaguesLoading(true)
+        const alias = detectAliasFromPath()
+        const response = await axios.get('/api/league-select/all', {
+          params: alias ? { alias } : undefined,
+        })
+        const allLeagues = Array.isArray(response.data) ? response.data : []
+        setLeagues(allLeagues)
+
+        // Prefer the first remembered league from league finder when available.
+        const rememberedRaw = localStorage.getItem(LEAGUE_FINDER_STORAGE_KEY)
+        if (rememberedRaw) {
+          const remembered = JSON.parse(rememberedRaw)
+          const rememberedLeagues = Array.isArray(remembered?.leagues) ? remembered.leagues : []
+          const rememberedLeagueId = rememberedLeagues[0]?.id
+          if (rememberedLeagueId && allLeagues.some((league) => Number(league.id) === Number(rememberedLeagueId))) {
+            setLeagueId(String(rememberedLeagueId))
+            return
+          }
+        }
+
+        if (allLeagues.length > 0) {
+          setLeagueId(String(allLeagues[0].id))
+        }
+      } catch (err) {
+        console.error('Failed to load leagues for registration:', err)
+        setError('Unable to load leagues. Please refresh and try again.')
+      } finally {
+        setLeaguesLoading(false)
+      }
+    }
+
+    loadLeagues()
+  }, [])
 
   const validatePassword = (pwd) => {
     if (pwd.length < 8) {
@@ -47,11 +102,30 @@ export const Register = () => {
     if (!validatePassword(password)) {
       return
     }
+
+    if (!leagueId) {
+      setError('Please select a league')
+      return
+    }
+
+    const selectedLeague = leagues.find((league) => Number(league.id) === Number(leagueId))
+    if (!selectedLeague) {
+      setError('Selected league is no longer available. Please refresh and try again.')
+      return
+    }
+
+    const currentAlias = detectAliasFromPath()
+    const selectedAlias = String(selectedLeague.alias || '').trim()
+
+    // Keep URL alias in sync with the chosen league before creating the player.
+    if (currentAlias && selectedAlias && currentAlias.toLowerCase() !== selectedAlias.toLowerCase()) {
+      window.history.replaceState({}, '', `/${selectedAlias}/register`)
+    }
     
     setLoading(true)
 
     try {
-      await authAPI.register(name, email, password, phone, sex, smsAllowed)
+      await authAPI.register(name, email, password, phone, sex, smsAllowed, Number(leagueId))
       navigate('/login', { state: { message: 'Registration successful! Check your email for further instructions.' } })
     } catch (err) {
       console.error('Registration error:', err)
@@ -116,6 +190,26 @@ export const Register = () => {
               <option value="M">Male</option>
               <option value="F">Female</option>
             </select>
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="reg-league" className="block text-gray-700 font-semibold mb-2">League</label>
+            <select
+              id="reg-league"
+              value={leagueId}
+              onChange={(e) => setLeagueId(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              required
+              disabled={leaguesLoading || leagues.length === 0}
+            >
+              {leagues.length === 0 && <option value="">No leagues available</option>}
+              {leagues.map((league) => (
+                <option key={league.id} value={league.id}>
+                  {league.name}
+                </option>
+              ))}
+            </select>
+            {leaguesLoading && <p className="text-sm text-gray-600 mt-1">Loading leagues...</p>}
           </div>
 
           <div className="mb-6">

@@ -88,7 +88,7 @@ apiClient.interceptors.response.use(
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password, phone, sex, smsAllowed) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed }),
+  register: (name, email, password, phone, sex, smsAllowed, leagueId) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed, league_id: leagueId }),
   forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
   refresh: (refreshToken) => apiClient.post('/auth/refresh', { refreshToken }),
@@ -131,7 +131,7 @@ export const tournamentsAPI = {
   complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   getFoursome: (tournamentId, foursome) => apiClient.get(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}`),
-  addPlayer: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId }),
+  addPlayer: (tournamentId, playerId, teeId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId, teeId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
   getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
   updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid }),

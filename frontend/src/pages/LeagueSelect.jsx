@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { Shield, ArrowRight, Mail } from 'lucide-react'
+
+const LEAGUE_FINDER_STORAGE_KEY = 'npgolf_league_finder_profile'
 
 export const LeagueSelect = () => {
   const [leagues, setLeagues] = useState([])
@@ -8,6 +10,28 @@ export const LeagueSelect = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LEAGUE_FINDER_STORAGE_KEY)
+      if (!raw) return
+
+      const saved = JSON.parse(raw)
+      const savedEmail = String(saved?.email || '').trim()
+      const savedLeagues = Array.isArray(saved?.leagues) ? saved.leagues : []
+
+      if (savedEmail) {
+        setEmail(savedEmail)
+      }
+
+      if (savedLeagues.length > 0) {
+        setLeagues(savedLeagues)
+        setSearched(true)
+      }
+    } catch (e) {
+      localStorage.removeItem(LEAGUE_FINDER_STORAGE_KEY)
+    }
+  }, [])
 
   const handleEmailSearch = async () => {
     if (!email || !email.includes('@')) {
@@ -30,6 +54,16 @@ export const LeagueSelect = () => {
       } else {
         setLeagues(validLeagues)
       }
+
+      localStorage.setItem(
+        LEAGUE_FINDER_STORAGE_KEY,
+        JSON.stringify({
+          email: email.trim(),
+          leagues: validLeagues,
+          updatedAt: new Date().toISOString(),
+        })
+      )
+
       setSearched(true)
     } catch (err) {
       console.error('Error searching leagues:', err)
@@ -71,7 +105,16 @@ export const LeagueSelect = () => {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (searched) {
+                  setSearched(false)
+                  setLeagues([])
+                }
+                if (error) {
+                  setError('')
+                }
+              }}
               onKeyPress={(e) => e.key === 'Enter' && handleEmailSearch()}
               placeholder="your@email.com"
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fairway-500 focus:border-transparent"
@@ -125,7 +168,22 @@ export const LeagueSelect = () => {
           </div>
         )}
 
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <a
+            href="/register"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
+          >
+            Join a League
+          </a>
+          <a
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
+          >
+            Find my league(s)
+          </a>
+        </div>
+
+        <div className="mt-4 text-center text-sm text-gray-600">
           <p>Don't have an account? Contact your league administrator.</p>
         </div>
       </div>
