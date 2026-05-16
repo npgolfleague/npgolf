@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { leaguesAPI } from '../api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
-
 export const League = () => {
   const navigate = useNavigate()
   const [league, setLeague] = useState(null)
@@ -21,11 +19,11 @@ export const League = () => {
   const fetchLeagueData = async () => {
     try {
       setLoading(true)
-      const leagueId = 1 // Default to league 1
-      
-      // Fetch league info
-      const leagueResponse = await leaguesAPI.get(leagueId)
-      setLeague(leagueResponse.data)
+      // Resolve league from URL alias context when present (e.g. /tgl1/*)
+      const currentLeagueResponse = await leaguesAPI.current()
+      const currentLeague = currentLeagueResponse.data
+      const leagueId = currentLeague.id
+      setLeague(currentLeague)
       
       // Fetch league settings
       const settingsResponse = await leaguesAPI.getSettings(leagueId)

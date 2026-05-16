@@ -180,7 +180,8 @@ export const leaguesAPI = {
   getSettings: (id) => apiClient.get(`/leagues/${id}/settings`),
   updateSettings: (id, data) => apiClient.put(`/leagues/${id}/settings`, data),
   getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
-  getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`)
+  getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`),
+  current: () => apiClient.get('/leagues/current'),
 }
 
 export const emailsAPI = {
@@ -200,6 +201,14 @@ export const cartTagsAPI = {
     const leaguePrefix = detectLeaguePrefix();
     return apiClient.post(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}/send`);
   }
+}
+
+export const rulesAPI = {
+  getCurrent: () => apiClient.get('/rules'),
+  listDrafts: () => apiClient.get('/rules/drafts'),
+  createDraft: (data) => apiClient.post('/rules/drafts', data),
+  updateDraft: (id, data) => apiClient.put(`/rules/${id}`, data),
+  publishDraft: (id) => apiClient.post(`/rules/${id}/publish`)
 }
 
 export default apiClient

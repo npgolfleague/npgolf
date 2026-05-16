@@ -1,36 +1,28 @@
 const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
+const { requireAdmin, isSuperAdminRole } = require('../middleware/admin');
 const router = express.Router();
 
-const requireAdmin = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
+const ALLOWED_PLAYER_ROLES = new Set(['player', 'league_admin', 'admin', 'super_admin']);
 
-    const token = authHeader.replace('Bearer ', '');
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: 'Server misconfigured' });
-    }
+function normalizeRequestedRole(role) {
+  if (role === undefined || role === null || role === '') return 'player';
+  return String(role);
+}
 
-    const decoded = jwt.verify(token, secret);
-    const [rows] = await pool.query('SELECT role FROM players WHERE id = ?', [decoded.sub]);
-    if (!rows[0] || rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+function canActorAssignRole(actorRole, requestedRole) {
+  if (!ALLOWED_PLAYER_ROLES.has(requestedRole)) return false;
+  if (requestedRole === 'super_admin') {
+    return actorRole === 'super_admin';
   }
-};
+  if (actorRole === 'league_admin' && requestedRole === 'admin') {
+    return false;
+  }
+  return true;
+}
 
 const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
   const [settingsRows] = await db.query(
@@ -153,8 +145,23 @@ router.get('/', async (req, res) => {
 // POST /api/users - create player { name, email, password?, phone?, sex?, active?, quota_18?, quota_9? }
 // If `password` is provided it will be hashed before storing. Password is nullable
 // to preserve backwards compatibility.
-router.post('/', async (req, res) => {
-  const { name, email, password, phone, sex, active, quota_18, quota_9 } = req.body;
+router.post('/', requireAdmin, async (req, res) => {
+  const {
+    name,
+    email,
+    password,
+    phone,
+    sex,
+    active,
+    quota_18,
+    quota_9,
+    fedex_points,
+    tournaments_played,
+    prize_money,
+    role,
+    sms_allowed,
+    email_allowed
+  } = req.body;
   if (!name || !email) return res.status(400).json({ error: 'name and email are required' });
 
   try {
@@ -174,6 +181,11 @@ router.post('/', async (req, res) => {
     }
 
     const activeValue = active !== undefined ? active : 1;
+    const requestedRole = normalizeRequestedRole(role);
+
+    if (!canActorAssignRole(req.user.role, requestedRole)) {
+      return res.status(403).json({ error: 'You are not allowed to assign that role' });
+    }
     
     // Get billing_entity_id from league context
     if (!req.league || !req.league.billing_entity_id) {
@@ -198,8 +210,28 @@ router.post('/', async (req, res) => {
     }
     
     const [result] = await pool.execute(
-      'INSERT INTO players (billing_entity_id, name, email, phone, sex, active, quota_18, quota_9, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.league.billing_entity_id, name, email, phone || null, sex || null, activeValue, quota_18 || null, quota_9 || null, hashed]
+      `INSERT INTO players (
+        billing_entity_id, name, email, phone, sex, active,
+        quota_18, quota_9, fedex_points, tournaments_played, prize_money,
+        role, sms_allowed, email_allowed, password
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.league.billing_entity_id,
+        name,
+        email,
+        phone || null,
+        sex || null,
+        activeValue,
+        quota_18 || null,
+        quota_9 || null,
+        fedex_points || 0,
+        tournaments_played || 0,
+        prize_money || 0,
+        requestedRole,
+        sms_allowed !== undefined ? sms_allowed : 0,
+        email_allowed !== undefined ? email_allowed : 1,
+        hashed
+      ]
     );
     const insertedId = result.insertId;
     
@@ -331,11 +363,38 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
 });
 
 // PUT /api/users/:id - update player
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, active, role } = req.body;
   
   try {
+    const leagueId = getLeagueId(req);
+    const [targetRows] = await pool.query(
+      `SELECT p.id, p.role
+       FROM players p
+       INNER JOIN league_players lp ON lp.player_id = p.id
+       WHERE p.id = ? AND lp.league_id = ?
+       LIMIT 1`,
+      [id, leagueId]
+    );
+
+    if (targetRows.length === 0) {
+      return res.status(404).json({ error: 'Player not found in this league' });
+    }
+
+    const target = targetRows[0];
+
+    if (target.role === 'super_admin' && !isSuperAdminRole(req.user.role)) {
+      return res.status(403).json({ error: 'League admins cannot edit super admin players' });
+    }
+
+    if (role !== undefined) {
+      const requestedRole = String(role);
+      if (!canActorAssignRole(req.user.role, requestedRole)) {
+        return res.status(403).json({ error: 'You are not allowed to assign that role' });
+      }
+    }
+
     // Build dynamic update query based on provided fields
     const updates = [];
     const values = [];
@@ -490,11 +549,32 @@ router.get('/:id/email-opt-in', async (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete player and all related data (admin only, permanent delete with cascade)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const connection = await pool.getConnection();
   
   try {
+    const leagueId = getLeagueId(req);
+    const [targetRows] = await connection.query(
+      `SELECT p.id, p.role
+       FROM players p
+       INNER JOIN league_players lp ON lp.player_id = p.id
+       WHERE p.id = ? AND lp.league_id = ?
+       LIMIT 1`,
+      [id, leagueId]
+    );
+
+    if (targetRows.length === 0) {
+      connection.release();
+      return res.status(404).json({ error: 'Player not found in this league' });
+    }
+
+    const target = targetRows[0];
+    if (target.role === 'super_admin' && !isSuperAdminRole(req.user.role)) {
+      connection.release();
+      return res.status(403).json({ error: 'League admins cannot delete super admin players' });
+    }
+
     await connection.beginTransaction();
     
     // Delete from all related tables in the correct order

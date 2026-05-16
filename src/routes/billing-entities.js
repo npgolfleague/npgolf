@@ -1,11 +1,11 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/admin');
+const { requireSuperAdmin } = require('../middleware/admin');
 
 const router = express.Router();
 
-// All routes require admin access
-router.use(requireAdmin);
+// All routes require super admin access
+router.use(requireSuperAdmin);
 
 // GET /api/billing-entities - List all billing entities
 router.get('/', async (req, res) => {

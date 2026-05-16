@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { tournamentsAPI, settingsAPI } from '../api';
 import { AuthContext } from '../context/AuthContext';
 import { formatDateOnly } from '../utils/date';
+import { isAdminCapable } from '../utils/roles';
 
 export function TournamentPlayers() {
   const { tournamentId } = useParams();
@@ -27,7 +28,7 @@ export function TournamentPlayers() {
   const [reconcileInput, setReconcileInput] = useState({ quota_collected: '', skins_collected: '' });
   const [reconcileSaved, setReconcileSaved] = useState(false);
   
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAdminCapable(user);
 
   useEffect(() => {
     loadData();

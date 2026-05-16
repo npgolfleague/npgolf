@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { coursesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 export const Courses = () => {
   const [courses, setCourses] = useState([])
@@ -9,7 +10,7 @@ export const Courses = () => {
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
 
   useEffect(() => {
     fetchCourses()

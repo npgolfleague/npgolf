@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect } from 'react'
 import { useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 import {
   LayoutDashboard, ClipboardList, Users, Trophy, Flag, BookOpen,
   Info, Target, Inbox, Settings, Shield, LogOut, ChevronLeft, ChevronRight, Building2, Menu
@@ -35,13 +36,20 @@ export const MainLayout = () => {
   ]
 
   const adminMenuItems = [
+    { path: '/rules/manage', label: 'Rules Manager', icon: BookOpen },
     { path: '/quota', label: 'Quota', icon: Target },
     { path: '/inbox', label: 'Inbox', icon: Inbox },
     { path: '/billing-entities', label: 'Billing Entities', icon: Building2 },
     { path: '/settings', label: 'Settings', icon: Settings }
   ]
 
-  const allMenuItems = user?.role === 'admin' ? [...menuItems, ...adminMenuItems] : menuItems
+  const adminCapable = isAdminCapable(user)
+  const superAdmin = user?.role === 'super_admin' || user?.role === 'admin'
+  const scopedAdminMenuItems = superAdmin
+    ? adminMenuItems
+    : adminMenuItems.filter((item) => item.path !== '/billing-entities')
+
+  const allMenuItems = adminCapable ? [...menuItems, ...scopedAdminMenuItems] : menuItems
 
   const isActive = (path) => {
     if (path === '/courses/add') {
@@ -149,7 +157,7 @@ export const MainLayout = () => {
                 </li>
               )
             })}
-            {user?.role === 'admin' && (
+            {adminCapable && (
               <li className="pt-3 pb-1">
                 {sidebarOpen ? (
                   <p className="px-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -160,7 +168,7 @@ export const MainLayout = () => {
                 )}
               </li>
             )}
-            {user?.role === 'admin' && adminMenuItems.map((item) => {
+            {adminCapable && scopedAdminMenuItems.map((item) => {
               const Icon = item.icon
               return (
                 <li key={item.path}>

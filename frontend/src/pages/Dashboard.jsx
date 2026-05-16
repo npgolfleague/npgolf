@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext'
 import { ToastContext } from '../context/ToastContext'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { formatDateOnly } from '../utils/date'
+import { isAdminCapable } from '../utils/roles'
 import {
   ClipboardList, Users, Flag, Plus, Lock, LayoutDashboard,
   Trophy, BookOpen, Info, CalendarDays, Activity, Disc3
@@ -14,7 +15,7 @@ export const Dashboard = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
   const { addToast } = useContext(ToastContext)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)

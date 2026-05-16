@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert default free plan
-INSERT INTO subscription_plans (name, slug, description, price_monthly, price_yearly, max_players, max_tournaments_per_year, features) VALUES
+INSERT IGNORE INTO subscription_plans (name, slug, description, price_monthly, price_yearly, max_players, max_tournaments_per_year, features) VALUES
 ('Free', 'free', 'Perfect for small groups getting started', 0.00, 0.00, 20, 12, JSON_OBJECT(
   'max_leagues', 1,
   'max_events', 2,
@@ -128,7 +128,7 @@ INSERT INTO subscription_plans (name, slug, description, price_monthly, price_ye
 ));
 
 -- Create free subscription for existing billing entity
-INSERT INTO subscriptions (billing_entity_id, plan_id, status, billing_cycle, current_period_start, current_period_end)
+INSERT IGNORE INTO subscriptions (billing_entity_id, plan_id, status, billing_cycle, current_period_start, current_period_end)
 SELECT 
   be.id,
   (SELECT id FROM subscription_plans WHERE slug = 'free'),

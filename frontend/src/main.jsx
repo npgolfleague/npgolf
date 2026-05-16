@@ -26,6 +26,7 @@ import { AddTournament } from './pages/AddTournament'
 import { EditTournament } from './pages/EditTournament'
 import { TournamentHoleScores } from './pages/TournamentHoleScores'
 import { Rules } from './pages/Rules'
+import { RulesManager } from './pages/RulesManager'
 import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
 import { Inbox } from './pages/Inbox'
@@ -99,6 +100,7 @@ try {
               <Route path="/settings" element={<Settings />} />
               <Route path="/league" element={<League />} />
               <Route path="/rules" element={<Rules />} />
+              <Route path="/rules/manage" element={<RulesManager />} />
               <Route path="/quota" element={<Quota />} />
               <Route path="/inbox" element={<Inbox />} />
               <Route path="/billing-entities" element={<BillingEntities />} />
