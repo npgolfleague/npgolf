@@ -712,24 +712,35 @@ router.post('/:id/complete', async (req, res) => {
     );
 
     // Seed quota for players who played but do not yet have a current quota
+    // Effective par: player's assigned tee -> gender-appropriate fallback tee
     const [newPlayerSeedRows] = await connection.query(
       `SELECT
          s.player_id,
          SUM(
            CASE
              WHEN CAST(s.score AS SIGNED) = 1 THEN ${pts.albatross}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) <= -3 THEN ${pts.albatross}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -2 THEN ${pts.eagle}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = -1 THEN ${pts.birdie}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 0 THEN ${pts.par}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 1 THEN ${pts.bogey}
-             WHEN CAST(s.score AS SIGNED) - CAST(CASE WHEN p.sex = 'F' THEN h.ladies_par ELSE h.mens_par END AS SIGNED) = 2 THEN ${pts.double_bogey}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) <= -3 THEN ${pts.albatross}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) = -2 THEN ${pts.eagle}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) = -1 THEN ${pts.birdie}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) = 0 THEN ${pts.par}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) = 1 THEN ${pts.bogey}
+             WHEN CAST(s.score AS SIGNED) - CAST(COALESCE(ht.par, ht_fb.par) AS SIGNED) = 2 THEN ${pts.double_bogey}
              ELSE ${pts.worse}
            END
          ) AS seeded_quota
        FROM scores s
        JOIN players p ON s.player_id = p.id
        JOIN hole h ON s.hole_id = h.id
+       LEFT JOIN tournament_players tp_inner
+         ON tp_inner.player_id = s.player_id AND tp_inner.tournament_id = s.tournament_id
+       LEFT JOIN hole_tee ht ON ht.hole_id = h.id AND ht.tee_id = tp_inner.tee_id
+       LEFT JOIN hole_tee ht_fb ON ht_fb.id = (
+         SELECT ht3.id FROM hole_tee ht3
+         JOIN course_tee ct3 ON ct3.id = ht3.tee_id
+         WHERE ht3.hole_id = h.id
+           AND ct3.gender = CASE WHEN p.sex = 'F' THEN 'F' ELSE 'M' END
+         ORDER BY ct3.id ASC LIMIT 1
+       )
        WHERE s.tournament_id = ?
          AND ${quotaColumn} IS NULL
        GROUP BY s.player_id`,
@@ -852,7 +863,6 @@ router.post('/:id/complete', async (req, res) => {
     const [ctpRows] = await connection.query(
       `SELECT h.id AS hole_id,
               h.hole_number,
-              h.mens_par,
               s.player_id,
               p.name AS player_name,
               s.ctp_feet,
@@ -864,7 +874,10 @@ router.post('/:id/complete', async (req, res) => {
        JOIN players p ON s.player_id = p.id
        JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
        WHERE s.tournament_id = ?
-         AND h.mens_par = 3
+         AND EXISTS (
+           SELECT 1 FROM hole_tee ht_p3
+           WHERE ht_p3.hole_id = h.id AND ht_p3.par = 3
+         )
          AND s.ctp_feet IS NOT NULL
          AND p.active = 1
          AND tp.skins_ctp_paid = 1

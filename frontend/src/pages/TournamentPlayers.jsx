@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tournamentsAPI, settingsAPI } from '../api';
+import { tournamentsAPI, settingsAPI, coursesAPI } from '../api';
 import { AuthContext } from '../context/AuthContext';
 import { formatDateOnly } from '../utils/date';
 import { isAdminCapable } from '../utils/roles';
@@ -16,6 +16,8 @@ export function TournamentPlayers() {
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
+  const [selectedTeeId, setSelectedTeeId] = useState('');
+  const [courseTees, setCourseTees] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [smsResult, setSmsResult] = useState(null);
@@ -62,6 +64,11 @@ export function TournamentPlayers() {
         quota_collected: tournamentRes.data.quota_collected != null ? String(tournamentRes.data.quota_collected) : '',
         skins_collected: tournamentRes.data.skins_collected != null ? String(tournamentRes.data.skins_collected) : ''
       });
+      // Load tees for the tournament's course
+      if (tournamentRes.data.course_id) {
+        const teesRes = await coursesAPI.getTees(tournamentRes.data.course_id);
+        setCourseTees(teesRes.data || []);
+      }
     } catch (err) {
       console.error('Failed to load tournament data:', err);
       setError(err.response?.data?.error || 'Failed to load tournament data');
@@ -75,9 +82,10 @@ export function TournamentPlayers() {
     
     try {
       setActionLoading(true);
-      await tournamentsAPI.addPlayer(tournamentId, selectedPlayerId);
+      await tournamentsAPI.addPlayer(tournamentId, selectedPlayerId, selectedTeeId ? Number(selectedTeeId) : undefined);
       setShowAddModal(false);
       setSelectedPlayerId('');
+      setSelectedTeeId('');
       await loadData();
     } catch (err) {
       console.error('Failed to add player:', err);
@@ -86,6 +94,20 @@ export function TournamentPlayers() {
       setActionLoading(false);
     }
   };
+
+  // Auto-select tee when player changes based on their default_tee_name
+  useEffect(() => {
+    if (!selectedPlayerId || !courseTees.length) { setSelectedTeeId(''); return; }
+    const player = availablePlayers.find(p => String(p.id) === String(selectedPlayerId));
+    if (!player) { setSelectedTeeId(''); return; }
+    if (player.default_tee_name) {
+      const match = courseTees.find(t => t.tee_name === player.default_tee_name);
+      if (match) { setSelectedTeeId(String(match.id)); return; }
+    }
+    const genderMatch = courseTees.find(t => t.gender === (player.sex === 'F' ? 'F' : 'M'));
+    const fallback = genderMatch || courseTees[0];
+    setSelectedTeeId(fallback ? String(fallback.id) : '');
+  }, [selectedPlayerId, availablePlayers, courseTees]);
 
   const handleRemovePlayer = async (playerId) => {
     if (!confirm('Are you sure you want to remove this player from the tournament?')) return;
@@ -467,6 +489,9 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Pair
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tee
+              </th>
               {isAdmin && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Email
@@ -494,7 +519,7 @@ export function TournamentPlayers() {
           <tbody className="bg-white divide-y divide-gray-200">
             {confirmedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="11" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="12" className="px-6 py-4 text-center text-gray-500">
                   No players have confirmed they are playing yet
                 </td>
               </tr>
@@ -576,6 +601,19 @@ export function TournamentPlayers() {
                       />
                     ) : (
                       <div className="text-sm text-gray-500">{player.pair == null ? '-' : player.pair}</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {player.tee_name ? (
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-3 h-3 rounded-full border border-gray-400 flex-shrink-0"
+                          style={{ backgroundColor: player.tee_color || '#ccc' }}
+                        />
+                        <span className="text-sm text-gray-900">{player.tee_name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
                     )}
                   </td>
                   {isAdmin && (
@@ -720,6 +758,26 @@ export function TournamentPlayers() {
               </select>
             </div>
 
+            {courseTees.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tee
+                </label>
+                <select
+                  value={selectedTeeId}
+                  onChange={(e) => setSelectedTeeId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="">-- No tee --</option>
+                  {courseTees.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.tee_name} ({t.gender === 'F' ? 'Ladies' : t.gender === 'M' ? 'Men' : 'All'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4 text-sm">
                 {error}
@@ -731,6 +789,7 @@ export function TournamentPlayers() {
                 onClick={() => {
                   setShowAddModal(false);
                   setSelectedPlayerId('');
+                  setSelectedTeeId('');
                   setError('');
                 }}
                 disabled={actionLoading}

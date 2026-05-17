@@ -30,6 +30,7 @@ import { Quota } from './pages/Quota'
 import { SMSConsent } from './pages/SMSConsent'
 import { Inbox } from './pages/Inbox'
 import { BillingEntities } from './pages/BillingEntities'
+import { ScorecardUpload } from './pages/ScorecardUpload'
 import { About } from './pages/About'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
@@ -99,6 +100,7 @@ try {
               <Route path="/quota" element={<Quota />} />
               <Route path="/inbox" element={<Inbox />} />
               <Route path="/billing-entities" element={<BillingEntities />} />
+              <Route path="/courses/parse-scorecard" element={<ScorecardUpload />} />
               <Route path="/app/about" element={<About />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
