@@ -15,7 +15,8 @@ router.get('/', async (req, res) => {
              t.date as tournament_date,
              c.name as course_name,
              h.hole_number,
-             h.mens_par, h.ladies_par
+             (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par,
+             (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS ladies_par
       FROM scores s
       JOIN players p ON s.player_id = p.id
       JOIN tournament t ON s.tournament_id = t.id
@@ -72,7 +73,9 @@ router.get('/tournament/:tournamentId/foursome/:group', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT s.*, 
               p.name as player_name, p.sex,
-              h.hole_number, h.mens_par, h.ladies_par
+              h.hole_number,
+              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par,
+              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS ladies_par
        FROM scores s
        JOIN players p ON s.player_id = p.id
        JOIN hole h ON s.hole_id = h.id
@@ -290,7 +293,8 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
     const [savedRows] = await pool.query(
       `SELECT w.ctp_feet, w.ctp_inches, w.ctp_image_url,
               p.id as player_id, p.name as player_name,
-              w.hole_number, h.mens_par,
+              w.hole_number,
+              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par,
               w.prize_money
        FROM tournament_ctp_winners w
        JOIN players p ON w.player_id = p.id
@@ -318,12 +322,13 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT s.ctp_feet, s.ctp_inches, s.ctp_image_url,
               p.id as player_id, p.name as player_name,
-              h.hole_number, h.mens_par
+              h.hole_number,
+              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par
        FROM scores s
        JOIN players p ON s.player_id = p.id
        JOIN hole h ON s.hole_id = h.id
+       JOIN hole_tee ht_par ON ht_par.hole_id = h.id AND ht_par.par = 3
        WHERE s.tournament_id = ? 
-         AND h.mens_par = 3
          AND s.ctp_feet IS NOT NULL
        ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC, h.hole_number ASC`,
       [tournamentId]

@@ -140,6 +140,41 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
   }
 });
 
+// PUT /api/tournaments/:tournamentId/players/:playerId/tee - Update the tee for a player in a tournament
+// body: { teeId: int }
+router.put('/:tournamentId/players/:playerId/tee', async (req, res) => {
+  const { tournamentId, playerId } = req.params;
+  const { teeId } = req.body;
+  const leagueId = getLeagueId(req);
+
+  try {
+    const [tournaments] = await pool.query('SELECT id FROM tournament WHERE id = ? AND league_id = ? LIMIT 1', [tournamentId, leagueId]);
+    if (tournaments.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found in this league' });
+    }
+
+    // Validate teeId if provided (null is allowed to clear the tee)
+    if (teeId !== null && teeId !== undefined) {
+      const [teeRows] = await pool.query('SELECT id FROM course_tee WHERE id = ?', [teeId]);
+      if (teeRows.length === 0) return res.status(404).json({ error: 'Tee not found' });
+    }
+
+    const [result] = await pool.execute(
+      'UPDATE tournament_players SET tee_id = ? WHERE tournament_id = ? AND player_id = ?',
+      [teeId || null, tournamentId, playerId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Player not found in this tournament' });
+    }
+
+    res.json({ message: 'Tee updated', teeId: teeId || null });
+  } catch (err) {
+    console.error('DB error', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome identifier to one or more tournament players
 // Body: { group: string, playerIds: [int], pairs?: { playerId: pairNumber } }
 router.post('/:tournamentId/foursome-group', async (req, res) => {
@@ -304,7 +339,7 @@ router.get('/:tournamentId/available-players', async (req, res) => {
     }
 
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role
+      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, p.default_tee_name
       FROM players p
       INNER JOIN league_players lp ON lp.player_id = p.id
       WHERE p.active = 1
