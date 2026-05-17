@@ -256,12 +256,23 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const groupsArr = {};
     groupKeys.forEach(g => {
       // groups[g] might be a Set (from scores) or an array (from tpRows)
+      let arr;
       if (Array.isArray(groups[g])) {
-        groupsArr[g] = groups[g];
+        arr = groups[g];
       } else {
         // Set of names from scores - convert to objects without pair info
-        groupsArr[g] = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
+        arr = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
       }
+      // Deduplicate by player name; prefer entries with pair info over null-pair duplicates
+      // (a player in both scores and tournament_players would otherwise appear twice)
+      const seen = new Map();
+      arr.forEach(p => {
+        const existing = seen.get(p.name);
+        if (!existing || (existing.pair == null && p.pair != null)) {
+          seen.set(p.name, p);
+        }
+      });
+      groupsArr[g] = Array.from(seen.values());
     });
     
     // Generate cart tags (2 players per cart typically)
