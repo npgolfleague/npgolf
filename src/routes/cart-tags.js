@@ -137,21 +137,21 @@ const generateCartTagsDocument = (tags) => {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 0.125in 0;
+      padding: 0.2in 0;
     }
 
     /* Cart tag compacted slightly to ensure two fit on a letter page */
     .cart-tag {
       width: 7.5in;
-      height: 5in;
+      height: 4.75in;
       border: 2px solid #1e5631;
-      padding: 0.28in;
+      padding: 0.25in;
       box-sizing: border-box;
       font-family: 'Georgia', serif;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      margin-bottom: 0.08in;
+      margin-bottom: 0.15in;
       background: white;
     }
 
@@ -230,7 +230,13 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     );
 
     tpRows.forEach(row => {
-      if (!groups[row.foursome]) groups[row.foursome] = [];
+      // Initialize as array if doesn't exist, or convert Set to array if it exists as a Set
+      if (!groups[row.foursome]) {
+        groups[row.foursome] = [];
+      } else if (groups[row.foursome] instanceof Set) {
+        // Convert Set to array of objects
+        groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null }));
+      }
       // store objects with player name and optional pair number
       groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
     });
@@ -456,9 +462,6 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
             <th style="padding: 12px; text-align: left;">Tee Time</th>
             <th style="padding: 12px; text-align: left;">Group</th>
             <th style="padding: 12px; text-align: left;">Players</th>
-            <td style="width: 80px; vertical-align: top; text-align: right; padding-left: 12px;">
-              ${qrDataURL ? `<img src="${qrDataURL}" alt="QR" style="width:72px;height:72px;border:0;"/>` : ''}
-            </td>
           </tr>
         </thead>
         <tbody>

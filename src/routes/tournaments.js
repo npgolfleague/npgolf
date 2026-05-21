@@ -565,6 +565,7 @@ router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
+              t.quota_collected, t.skins_collected,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
               CASE
                 WHEN EXISTS (
@@ -586,6 +587,25 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error fetching tournament:', err);
     res.status(500).json({ error: 'Failed to fetch tournament' });
+  }
+});
+
+// PUT /api/tournaments/:id/collected - Save actual collected amounts for reconciliation
+router.put('/:id/collected', async (req, res) => {
+  try {
+    const { quota_collected, skins_collected } = req.body;
+    await pool.query(
+      'UPDATE tournament SET quota_collected = ?, skins_collected = ? WHERE id = ?',
+      [
+        quota_collected != null && quota_collected !== '' ? Number(quota_collected) : null,
+        skins_collected != null && skins_collected !== '' ? Number(skins_collected) : null,
+        req.params.id
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating collected amounts:', err);
+    res.status(500).json({ error: 'Failed to update collected amounts' });
   }
 });
 
@@ -1276,9 +1296,12 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
 
     let sent = 0;
     const failed = [];
-    for (const player of recipients) {
+    for (let i = 0; i < recipients.length; i++) {
+      const player = recipients[i];
       try {
-        await sendEmail(player.email, subject, html);
+        // Only BCC on the first email when sending to multiple recipients
+        const includeBcc = (i === 0 && recipients.length > 1);
+        await sendEmail(player.email, subject, html, null, null, includeBcc);
         sent++;
       } catch (err) {
         failed.push({ email: player.email, error: err.message });
@@ -1560,6 +1583,9 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     
     let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
     
+    // Count email recipients for BCC logic
+    const emailPlayers = players.filter(p => (method === 'email' || method === 'both') && p.email);
+    
     for (const player of players) {
       const yesUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=yes`;
       const noUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=no`;
@@ -1634,7 +1660,9 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
           `;
           
           console.log(`Sending Email to ${player.name} (${player.email})`);
-          await sendEmail(player.email, subject, html);
+          // Only BCC on the first email when sending to multiple recipients
+          const includeBcc = (emailSent === 0 && emailPlayers.length > 1);
+          await sendEmail(player.email, subject, html, null, null, includeBcc);
           console.log(`✓ Email sent successfully to ${player.name}`);
           emailSent++;
         } catch (err) {

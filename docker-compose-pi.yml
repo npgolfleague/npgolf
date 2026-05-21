@@ -6,7 +6,7 @@ services:
     ports:
       - "3308:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
       MYSQL_DATABASE: npgolf
     volumes:
       - mysql_data:/var/lib/mysql
@@ -26,7 +26,7 @@ services:
       DB_HOST: npgolf-mysql-pi
       DB_PORT: 3306
       DB_USER: root
-      DB_PASS: root
+      DB_PASS: ${DB_PASS}
       DB_NAME: npgolf
       JWT_SECRET: 5158d3897efe5c9c44d87bbcb0fc333b399a2c5291bc12976751f8b7c46cca9e
       JWT_EXPIRES_IN: 1h
@@ -36,8 +36,9 @@ services:
       TWILIO_API_KEY: ${TWILIO_API_KEY}
       TWILIO_API_SECRET: ${TWILIO_API_SECRET}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
       APP_BASE_URL: https://npgolf.net
     networks:
       - npgolf-network

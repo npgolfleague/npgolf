@@ -3,6 +3,7 @@ import { playersAPI, tournamentsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { EditPlayerModal } from '../components/EditPlayerModal'
 import { formatDateOnly } from '../utils/date'
+import { Smartphone } from 'lucide-react'
 
 export const Users = () => {
   const { user } = useContext(AuthContext)
@@ -305,7 +306,7 @@ export const Users = () => {
                               className="text-green-600 hover:text-green-800 font-semibold ml-2"
                               title="Send SMS"
                             >
-                              📱
+                              <Smartphone className="w-4 h-4 inline" />
                             </button>
                           )}
                           {user?.role === 'admin' && (
@@ -342,7 +343,7 @@ export const Users = () => {
                         >
                           {player.quota_18 || '-'}
                           {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
-                            <div className="absolute z-10 left-0 bottom-full mb-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
+                            <div className="absolute z-10 left-0 top-full mt-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
                               <div className="font-bold mb-2">Last 7 Rounds</div>
                               {quotaTooltip.data.map((round, idx) => (
                                 <div key={idx} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
