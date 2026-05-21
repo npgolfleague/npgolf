@@ -201,14 +201,8 @@ export const emailsAPI = {
 }
 
 export const cartTagsAPI = {
-  generate: (tournamentId) => {
-    const leaguePrefix = detectLeaguePrefix();
-    return apiClient.get(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}`);
-  },
-  send: (tournamentId) => {
-    const leaguePrefix = detectLeaguePrefix();
-    return apiClient.post(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}/send`);
-  }
+  generate: (tournamentId) => apiClient.get(`/cart-tags/tournament/${tournamentId}`),
+  send: (tournamentId) => apiClient.post(`/cart-tags/tournament/${tournamentId}/send`)
 }
 
 export const rulesAPI = {
