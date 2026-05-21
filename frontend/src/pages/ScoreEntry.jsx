@@ -191,8 +191,18 @@ export const ScoreEntry = () => {
   const fetchCourseHoles = async (courseId) => {
     try {
       const response = await coursesAPI.get(courseId)
-      if (response.data.holes) {
-        setHoles(response.data.holes.sort((a, b) => a.hole_number - b.hole_number))
+      // API returns { course, tees: [{ holes: [{ hole_id, hole_number, par, handicap }] }] }
+      const firstTee = response.data.tees?.[0]
+      if (firstTee?.holes?.length > 0) {
+        const mapped = firstTee.holes.map(h => ({
+          id: h.hole_id,
+          hole_number: h.hole_number,
+          mens_par: h.par,
+          womens_par: h.par,
+          mens_handicap: h.handicap,
+          ladies_handicap: h.handicap
+        }))
+        setHoles(mapped.sort((a, b) => a.hole_number - b.hole_number))
       }
     } catch (err) {
       console.error('Error fetching holes:', err)

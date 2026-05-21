@@ -191,10 +191,10 @@ router.get('/:tournamentId', async (req, res) => {
           (s.ctp_feet * 12 + s.ctp_inches) as total_inches
         FROM scores s
         JOIN hole h ON s.hole_id = h.id
+        JOIN hole_tee ht_par ON ht_par.hole_id = h.id AND ht_par.par = 3
         JOIN players p ON s.player_id = p.id
         JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
         WHERE s.tournament_id = ? 
-          AND h.mens_par = 3 
           AND s.ctp_feet IS NOT NULL
           AND p.active = 1
           AND tp.skins_ctp_paid = 1
