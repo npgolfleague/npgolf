@@ -2,12 +2,16 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, cartTagsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { ToastContext } from '../context/ToastContext'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { formatDateOnly } from '../utils/date'
+import { isAdminCapable } from '../utils/roles'
 import { Users, Trophy, Flag, Mail, Pencil, BarChart2, Trash2, Smartphone, Check, Tag, Sparkles } from 'lucide-react'
 
 export const Tournaments = () => {
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
+  const { addToast } = useContext(ToastContext)
   const [tournaments, setTournaments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,8 +27,9 @@ export const Tournaments = () => {
   const [resultsEmailMessage, setResultsEmailMessage] = useState('')
   const [sendingCartTags, setSendingCartTags] = useState(false)
   const [cartTagsResult, setCartTagsResult] = useState(null)
+  const [confirmModal, setConfirmModal] = useState(null)
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
 
   useEffect(() => {
     fetchTournaments()
@@ -44,29 +49,46 @@ export const Tournaments = () => {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this tournament?')) return
-
-    try {
-      await tournamentsAPI.delete(id)
-      await fetchTournaments()
-    } catch (err) {
-      console.error('Error deleting tournament:', err)
-      setError(err.response?.data?.error || 'Failed to delete tournament')
-    }
+  const handleDelete = (id) => {
+    const t = tournaments.find(t => t.id === id)
+    const name = t ? `${t.course_name} (${formatDateOnly(t.date)})` : 'this tournament'
+    setConfirmModal({
+      title: 'Delete Tournament',
+      message: `Delete "${name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await tournamentsAPI.delete(id)
+          await fetchTournaments()
+        } catch (err) {
+          console.error('Error deleting tournament:', err)
+          setError(err.response?.data?.error || 'Failed to delete tournament')
+        }
+      }
+    })
   }
 
-  const handleComplete = async (id) => {
-    if (!confirm('Are you sure you want to complete this tournament? This will update all players\' quota history.')) return
-
-    try {
-      const response = await tournamentsAPI.complete(id)
-      alert(`Tournament completed! ${response.data.playersUpdated} players updated.`)
-      await fetchTournaments()
-    } catch (err) {
-      console.error('Error completing tournament:', err)
-      setError(err.response?.data?.error || 'Failed to complete tournament')
-    }
+  const handleComplete = (id) => {
+    const t = tournaments.find(t => t.id === id)
+    const name = t ? `${t.course_name} (${formatDateOnly(t.date)})` : 'this tournament'
+    setConfirmModal({
+      title: 'Complete Tournament',
+      message: `Complete "${name}"? This will update all players\' quota history.`,
+      confirmLabel: 'Complete',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          const response = await tournamentsAPI.complete(id)
+          addToast(`Tournament completed! ${response.data.playersUpdated} players updated.`, 'success')
+          await fetchTournaments()
+        } catch (err) {
+          console.error('Error completing tournament:', err)
+          setError(err.response?.data?.error || 'Failed to complete tournament')
+        }
+      }
+    })
   }
 
   const openInviteModal = (tournamentId) => {
@@ -89,19 +111,26 @@ export const Tournaments = () => {
     }
   }
 
-  const handleSendResultsEmail = async () => {
-    if (!confirm('Send results email to all players with email notifications enabled?')) return
-    try {
-      setSendingResultsEmail(true)
-      setResultsEmailSendResult(null)
-      const response = await tournamentsAPI.sendResultsEmail(resultsEmailModal.tournamentId)
-      setResultsEmailSendResult(response.data)
-      setResultsEmailModal(prev => ({ ...prev, sent_at: new Date().toISOString() }))
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send results email')
-    } finally {
-      setSendingResultsEmail(false)
-    }
+  const handleSendResultsEmail = () => {
+    setConfirmModal({
+      title: 'Send Results Email',
+      message: 'Send results email to all players with email notifications enabled?',
+      confirmLabel: 'Send',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          setSendingResultsEmail(true)
+          setResultsEmailSendResult(null)
+          const response = await tournamentsAPI.sendResultsEmail(resultsEmailModal.tournamentId)
+          setResultsEmailSendResult(response.data)
+          setResultsEmailModal(prev => ({ ...prev, sent_at: new Date().toISOString() }))
+        } catch (err) {
+          setError(err.response?.data?.error || 'Failed to send results email')
+        } finally {
+          setSendingResultsEmail(false)
+        }
+      }
+    })
   }
 
   const handleSendIndividualEmail = async () => {
@@ -152,24 +181,39 @@ export const Tournaments = () => {
   }
 
   const handleOpenCartTags = (tournamentId) => {
-    // Open cart tags in new window for printing
-    window.open(`/api/cart-tags/tournament/${tournamentId}`, '_blank')
+    // Open cart tags in new window for printing, with league prefix if present
+    const pathParts = window.location.pathname.split('/').filter(p => p.length > 0);
+    const commonRoutes = ['api', 'login', 'register', 'forgot-password', 'reset-password', 'sms-consent', 'dashboard', 'about', 'app', 'assets', 'billing-entities'];
+    let leaguePrefix = '';
+    if (pathParts.length > 0 && !commonRoutes.includes(pathParts[0])) {
+      leaguePrefix = '/' + pathParts[0];
+    }
+    window.open(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}`, '_blank');
   }
 
-  const handleSendCartTags = async (tournamentId) => {
-    if (!confirm('Send cart tags and tee sheet to the golf course email configured in settings?')) return
-    try {
-      setSendingCartTags(true)
-      setCartTagsResult(null)
-      const response = await cartTagsAPI.send(tournamentId)
-      setCartTagsResult({ tournamentId, ...response.data })
-      setTimeout(() => setCartTagsResult(null), 10000) // Clear after 10 seconds
-    } catch (err) {
-      console.error('Error sending cart tags:', err)
-      setError(err.response?.data?.error || 'Failed to send cart tags')
-    } finally {
-      setSendingCartTags(false)
-    }
+  const handleSendCartTags = (tournamentId) => {
+    const t = tournaments.find(t => t.id === tournamentId)
+    const name = t ? `${t.course_name} (${formatDateOnly(t.date)})` : 'this tournament'
+    setConfirmModal({
+      title: 'Send Cart Tags',
+      message: `Send cart tags and tee sheet for "${name}" to the golf course email configured in settings?`,
+      confirmLabel: 'Send',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          setSendingCartTags(true)
+          setCartTagsResult(null)
+          const response = await cartTagsAPI.send(tournamentId)
+          setCartTagsResult({ tournamentId, ...response.data })
+          setTimeout(() => setCartTagsResult(null), 10000)
+        } catch (err) {
+          console.error('Error sending cart tags:', err)
+          setError(err.response?.data?.error || 'Failed to send cart tags')
+        } finally {
+          setSendingCartTags(false)
+        }
+      }
+    })
   }
 
   const formatHolesLabel = (tournament) => {
@@ -183,8 +227,11 @@ export const Tournaments = () => {
   return (
     <div className="min-h-screen bg-gray-100 pb-6">
       <div className="w-full px-4 md:px-6 py-8 max-w-full">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Tournaments</h1>
+          <p className="text-slate-500 text-sm mt-1">Schedule and results</p>
+        </div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Tournaments</h2>
           {isAdmin && (
             <div className="flex gap-2">
               <button
@@ -242,18 +289,24 @@ export const Tournaments = () => {
         )}
 
         {loading ? (
-          <div className="text-center text-gray-600">Loading tournaments...</div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-pulse">
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-12 bg-slate-200 rounded-lg" />
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date</th>
-                    <th className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Course</th>
-                    <th className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Holes</th>
-                    <th className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:table-cell">Location</th>
-                    <th className="px-4 md:px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                    <th scope="col" aria-label="Tournament Date" className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                    <th scope="col" aria-label="Golf Course" className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Course</th>
+                    <th scope="col" aria-label="Number of Holes" className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Holes</th>
+                    <th scope="col" aria-label="Location" className="px-4 md:px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:table-cell">Location</th>
+                    <th scope="col" aria-label="Actions" className="px-4 md:px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -356,6 +409,16 @@ export const Tournaments = () => {
             </div>
           </div>
         )}
+
+        <ConfirmModal
+          isOpen={!!confirmModal}
+          title={confirmModal?.title}
+          message={confirmModal?.message}
+          confirmLabel={confirmModal?.confirmLabel}
+          danger={confirmModal?.danger}
+          onConfirm={confirmModal?.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
 
         {/* Results Email Modal */}
         {resultsEmailModal && (

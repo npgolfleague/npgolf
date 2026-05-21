@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { coursesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 export const Courses = () => {
   const [courses, setCourses] = useState([])
@@ -9,7 +10,7 @@ export const Courses = () => {
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const { user } = useContext(AuthContext)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminCapable(user)
 
   useEffect(() => {
     fetchCourses()
@@ -42,8 +43,11 @@ export const Courses = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Courses</h1>
+          <p className="text-slate-500 text-sm mt-1">Registered golf courses</p>
+        </div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">Golf Courses</h2>
           {isAdmin && (
             <button
               onClick={() => navigate('/courses/add')}
@@ -63,11 +67,11 @@ export const Courses = () => {
             <table className="w-full">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">ID</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Address</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
-                  {isAdmin && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>}
+                  <th scope="col" aria-label="Course ID" className="px-6 py-3 text-left text-gray-700 font-semibold">ID</th>
+                  <th scope="col" aria-label="Course Name" className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
+                  <th scope="col" aria-label="Street Address" className="px-6 py-3 text-left text-gray-700 font-semibold">Address</th>
+                  <th scope="col" aria-label="Phone Number" className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>
+                  {isAdmin && <th scope="col" aria-label="Actions" className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody>

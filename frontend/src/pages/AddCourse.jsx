@@ -120,13 +120,13 @@ export const AddCourse = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-200">
                     <tr>
-                      <th className="px-2 py-2 text-gray-700">Hole</th>
-                      <th className="px-2 py-2 text-gray-700">Mens Dist</th>
-                      <th className="px-2 py-2 text-gray-700">Mens Par</th>
-                      <th className="px-2 py-2 text-gray-700">Mens HCP</th>
-                      <th className="px-2 py-2 text-gray-700">Ladies Dist</th>
-                      <th className="px-2 py-2 text-gray-700">Ladies Par</th>
-                      <th className="px-2 py-2 text-gray-700">Ladies HCP</th>
+                      <th scope="col" aria-label="Hole Number" className="px-2 py-2 text-gray-700">Hole</th>
+                      <th scope="col" aria-label="Men's Distance (yards)" className="px-2 py-2 text-gray-700">Mens Dist</th>
+                      <th scope="col" aria-label="Men's Par" className="px-2 py-2 text-gray-700">Mens Par</th>
+                      <th scope="col" aria-label="Men's Handicap" className="px-2 py-2 text-gray-700">Mens HCP</th>
+                      <th scope="col" aria-label="Ladies' Distance (yards)" className="px-2 py-2 text-gray-700">Ladies Dist</th>
+                      <th scope="col" aria-label="Ladies' Par" className="px-2 py-2 text-gray-700">Ladies Par</th>
+                      <th scope="col" aria-label="Ladies' Handicap" className="px-2 py-2 text-gray-700">Ladies HCP</th>
                     </tr>
                   </thead>
                   <tbody>

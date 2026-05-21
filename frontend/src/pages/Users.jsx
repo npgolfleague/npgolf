@@ -2,11 +2,15 @@ import { useState, useEffect, useContext } from 'react'
 import { playersAPI, tournamentsAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { EditPlayerModal } from '../components/EditPlayerModal'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { formatDateOnly } from '../utils/date'
+import { isAdminCapable } from '../utils/roles'
 import { Smartphone } from 'lucide-react'
 
 export const Users = () => {
   const { user } = useContext(AuthContext)
+  const adminCapable = isAdminCapable(user)
+  const canManageSuperAdmins = user?.role === 'super_admin'
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,6 +23,7 @@ export const Users = () => {
   const [inviteModal, setInviteModal] = useState({ open: false, player: null })
   const [inviteSuccess, setInviteSuccess] = useState('')
   const [quotaTooltip, setQuotaTooltip] = useState({ show: false, playerId: null, data: [] })
+  const [confirmModal, setConfirmModal] = useState(null)
 
   useEffect(() => {
     fetchPlayers()
@@ -59,15 +64,22 @@ export const Users = () => {
     setEditingPlayer(null)
   }
 
-  const handleDelete = async (player) => {
-    if (!confirm(`Are you sure you want to delete ${player.name}? This will deactivate the player.`)) return
-
-    try {
-      await playersAPI.delete(player.id)
-      setPlayers(prev => prev.filter(p => p.id !== player.id))
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete player')
-    }
+  const handleDelete = (player) => {
+    setConfirmModal({
+      title: 'Delete Player',
+      message: `Delete "${player.name}"? This will deactivate the player.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await playersAPI.delete(player.id)
+          setPlayers(prev => prev.filter(p => p.id !== player.id))
+        } catch (err) {
+          setError(err.response?.data?.error || 'Failed to delete player')
+        }
+      }
+    })
   }
 
   const handleOpenSmsModal = async (player) => {
@@ -195,9 +207,13 @@ export const Users = () => {
   }
 
   const canEditPlayer = (player) => {
-    // Admin can edit all players, regular users can only edit themselves
-    const isAdmin = user?.role === 'admin'
-    return isAdmin || (user?.id === player?.id)
+    // Super admins can edit all players.
+    // League/admin users cannot edit super-admin players.
+    if (player?.role === 'super_admin' && !canManageSuperAdmins) {
+      return false
+    }
+
+    return adminCapable || (user?.id === player?.id)
   }
 
   const getInviteEligibility = (player) => {
@@ -242,9 +258,12 @@ export const Users = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="w-full px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Players</h1>
+          <p className="text-slate-500 text-sm mt-1">Active league members</p>
+        </div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">Players</h2>
-          {user?.role === 'admin' && (
+          {adminCapable && (
             <button
               onClick={() => setEditingPlayer({})}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
@@ -258,24 +277,28 @@ export const Users = () => {
         {inviteSuccess && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">{inviteSuccess}</div>}
 
         {loading ? (
-          <div className="text-center text-gray-600">Loading players...</div>
+          <div className="animate-pulse space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-12 bg-slate-200 rounded-lg" />
+            ))}
+          </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="w-full">
+          <div className="bg-white rounded-lg shadow overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full min-w-[600px]">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
-                  {user?.role === 'admin' && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>}
-                  {user?.role === 'admin' && <th className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>}
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Active</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">SMS</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">18H Quota</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">9H Quota</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Paradise Pts</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
+                  <th scope="col" aria-label="Actions" className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
+                  <th scope="col" aria-label="Player Name" className="px-6 py-3 text-left text-gray-700 font-semibold">Name</th>
+                  {adminCapable && <th scope="col" aria-label="Email Address" className="px-6 py-3 text-left text-gray-700 font-semibold">Email</th>}
+                  {adminCapable && <th scope="col" aria-label="Phone Number" className="px-6 py-3 text-left text-gray-700 font-semibold">Phone</th>}
+                  <th scope="col" aria-label="Active Status" className="px-6 py-3 text-center text-gray-700 font-semibold">Active</th>
+                  <th scope="col" aria-label="SMS Notifications Enabled" className="px-6 py-3 text-center text-gray-700 font-semibold">SMS</th>
+                  <th scope="col" aria-label="Email Notifications Enabled" className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
+                  <th scope="col" aria-label="18-Hole Quota" className="px-6 py-3 text-left text-gray-700 font-semibold">18H Quota</th>
+                  <th scope="col" aria-label="9-Hole Quota" className="px-6 py-3 text-left text-gray-700 font-semibold">9H Quota</th>
+                  <th scope="col" aria-label="Paradise Cup Points" className="px-6 py-3 text-left text-gray-700 font-semibold">Paradise Pts</th>
+                  <th scope="col" aria-label="Tournaments Played" className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
+                  <th scope="col" aria-label="Total Prize Money Year to Date" className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,7 +323,7 @@ export const Users = () => {
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
-                          {user?.role === 'admin' && player.phone && (
+                          {adminCapable && player.phone && (
                             <button 
                               onClick={() => handleOpenSmsModal(player)}
                               className="text-green-600 hover:text-green-800 font-semibold ml-2"
@@ -309,7 +332,7 @@ export const Users = () => {
                               <Smartphone className="w-4 h-4 inline" />
                             </button>
                           )}
-                          {user?.role === 'admin' && (
+                          {adminCapable && player.role !== 'super_admin' && (
                             <button
                               onClick={() => handleOpenInviteModal(player)}
                               disabled={invitingPlayerId === player.id}
@@ -319,7 +342,7 @@ export const Users = () => {
                               {invitingPlayerId === player.id ? 'Sending...' : 'Invite...'}
                             </button>
                           )}
-                          {user?.role === 'admin' && (
+                          {adminCapable && (canManageSuperAdmins || player.role !== 'super_admin') && (
                             <button 
                               onClick={() => handleDelete(player)}
                               className="text-red-600 hover:text-red-800 font-semibold ml-2"
@@ -330,8 +353,8 @@ export const Users = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-900">{player.name}</td>
-                      {user?.role === 'admin' && <td className="px-6 py-4 text-gray-900">{player.email}</td>}
-                      {user?.role === 'admin' && <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>}
+                      {adminCapable && <td className="px-6 py-4 text-gray-900">{player.email}</td>}
+                      {adminCapable && <td className="px-6 py-4 text-gray-900">{player.phone || '-'}</td>}
                       <td className="px-6 py-4 text-center">{player.active ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-center">{player.sms_allowed ? '✓' : '-'}</td>
                       <td className="px-6 py-4 text-center">{player.email_allowed ? '✓' : '-'}</td>
@@ -469,6 +492,15 @@ export const Users = () => {
             onSave={handleSave}
           />
         )}
+        <ConfirmModal
+          isOpen={!!confirmModal}
+          title={confirmModal?.title}
+          message={confirmModal?.message}
+          confirmLabel={confirmModal?.confirmLabel}
+          danger={confirmModal?.danger}
+          onConfirm={confirmModal?.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       </div>
     </div>
   )

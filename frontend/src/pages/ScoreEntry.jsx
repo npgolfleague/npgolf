@@ -1,8 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useContext } from 'react'
 import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
+import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 export const ScoreEntry = () => {
+  const { user } = useContext(AuthContext)
+  const isAdmin = isAdminCapable(user)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
   const [selectedTournament, setSelectedTournament] = useState(null)
@@ -19,6 +23,10 @@ export const ScoreEntry = () => {
   const [showCtpModal, setShowCtpModal] = useState(false)
   const [ctpPlayerId, setCtpPlayerId] = useState(null)
   const [ctpLeader, setCtpLeader] = useState(null)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [isPosted, setIsPosted] = useState(false)
+  const [postedInfo, setPostedInfo] = useState(null)
+  const [posting, setPosting] = useState(false)
   const scoreInputRefs = useRef({})
 
   // Helper to focus the next player's input for the same field
@@ -97,6 +105,7 @@ export const ScoreEntry = () => {
   useEffect(() => {
     if (selectedTournament && foursomeGroup && selectedPlayers.length > 0) {
       loadExistingScores()
+      loadPostStatus()
     }
   }, [selectedTournament, foursomeGroup, selectedPlayers])
 
@@ -119,6 +128,17 @@ export const ScoreEntry = () => {
     } catch (err) {
       console.error('Error loading CTP leader:', err)
       setCtpLeader(null)
+    }
+  }
+
+  const loadPostStatus = async () => {
+    if (!selectedTournament || !foursomeGroup) return
+    try {
+      const res = await scoresAPI.getFoursomePostStatus(selectedTournament.id, foursomeGroup)
+      setIsPosted(res.data.posted)
+      setPostedInfo(res.data.posted ? res.data : null)
+    } catch (err) {
+      console.error('Error loading post status:', err)
     }
   }
 
@@ -502,7 +522,8 @@ export const ScoreEntry = () => {
       if (currentIndex >= 0 && currentIndex < playableHoles.length - 1) {
         setCurrentHole(playableHoles[currentIndex + 1].hole_number)
       } else {
-        alert('All holes completed!')
+        // All holes done — show completion modal
+        setShowCompletionModal(true)
       }
     } catch (err) {
       console.error('Error saving scores:', err)
@@ -515,6 +536,38 @@ export const ScoreEntry = () => {
 
   const getCurrentHoleData = () => {
     return playableHoles.find(h => h.hole_number === currentHole)
+  }
+
+  const handlePostScores = async () => {
+    if (!selectedTournament || !foursomeGroup) return
+    try {
+      setPosting(true)
+      const res = await scoresAPI.postFoursomeScores(selectedTournament.id, foursomeGroup)
+      setIsPosted(true)
+      setPostedInfo(res.data)
+      setShowCompletionModal(false)
+    } catch (err) {
+      console.error('Error posting scores:', err)
+      alert('Failed to post scores. Please try again.')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  // Build full scorecard summary for completion modal
+  const getScorecardSummary = () => {
+    return selectedPlayers.map(playerId => {
+      const player = players.find(p => p.id === playerId)
+      const holeScores = playableHoles.map(hole => ({
+        hole_number: hole.hole_number,
+        score: scores[`${hole.hole_number}-${playerId}-score`] || '',
+        quota: scores[`${hole.hole_number}-${playerId}-quota`] ?? ''
+      }))
+      const totalScore = holeScores.reduce((sum, h) => sum + (parseInt(h.score) || 0), 0)
+      const totalQuota = holeScores.reduce((sum, h) => sum + (parseInt(h.quota) || 0), 0)
+      const playerQuota = getPlayerCurrentQuota(player)
+      return { player, holeScores, totalScore, totalQuota, playerQuota }
+    })
   }
 
   const getPlayerTotal = (playerId) => {
@@ -548,7 +601,26 @@ export const ScoreEntry = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Score Entry</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Score Entry</h1>
+          <p className="text-slate-500 text-sm mt-1">Enter tournament scores</p>
+        </div>
+
+        {/* Posted / Locked Banner */}
+        {isPosted && (
+          <div className="bg-green-50 border border-green-300 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <span className="text-green-700 font-semibold">✓ Scores Posted</span>
+            {postedInfo?.posted_by_name && (
+              <span className="text-green-600 text-sm">by {postedInfo.posted_by_name}</span>
+            )}
+            {!isAdmin && (
+              <span className="ml-auto text-xs text-gray-500">Contact an admin to make changes</span>
+            )}
+            {isAdmin && (
+              <span className="ml-auto text-xs text-blue-600">Admin: scores can still be edited</span>
+            )}
+          </div>
+        )}
 
         {/* Tournament Selection */}
         <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -686,6 +758,7 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           min="1"
                           max="9"
                           className={`w-full p-3 border-2 rounded-lg text-xl text-center font-bold focus:outline-none transition-colors ${
@@ -710,6 +783,7 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           min="0"
                           max="9"
                           className="w-full p-3 border-2 border-gray-200 rounded-lg text-xl text-center font-bold focus:border-fairway-500 focus:outline-none bg-white"
@@ -734,7 +808,7 @@ export const ScoreEntry = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenCtpModal(playerId)}
-                          className={`w-full py-2 px-3 rounded-lg font-semibold text-sm transition ${
+                          className={`w-full min-h-[44px] py-2 px-3 rounded-lg font-semibold text-sm transition ${
                             ctpData[playerId] 
                               ? 'bg-green-100 text-green-800 border-2 border-green-500' 
                               : 'bg-gray-100 text-gray-700 border-2 border-gray-300 hover:bg-gray-200'
@@ -787,7 +861,7 @@ export const ScoreEntry = () => {
                 <button
                   key={hole.hole_number}
                   onClick={() => setCurrentHole(hole.hole_number)}
-                  className={`p-2 rounded text-sm font-semibold ${
+                  className={`p-2 min-h-[44px] min-w-[44px] rounded text-sm font-semibold ${
                     currentHole === hole.hole_number
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700'
@@ -864,6 +938,64 @@ export const ScoreEntry = () => {
           </div>
         )}
 
+        {/* Completion / Post Scores Modal */}
+        {showCompletionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-lg max-h-screen overflow-y-auto">
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-1">All Holes Complete!</h3>
+                <p className="text-sm text-gray-600 mb-4">Review scores below, then post when ready.</p>
+
+                {/* Scorecard summary */}
+                <div className="overflow-x-auto mb-4">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="text-left p-1 font-semibold">Player</th>
+                        {playableHoles.map(h => (
+                          <th key={h.hole_number} className="p-1 text-center w-7">{h.hole_number}</th>
+                        ))}
+                        <th className="p-1 text-center font-semibold">Score</th>
+                        <th className="p-1 text-center font-semibold">Pts</th>
+                        <th className="p-1 text-center font-semibold">Quota</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getScorecardSummary().map(({ player, holeScores, totalScore, totalQuota, playerQuota }) => (
+                        <tr key={player?.id} className="border-t border-gray-100">
+                          <td className="p-1 font-medium text-gray-800 whitespace-nowrap">{player?.name}</td>
+                          {holeScores.map(h => (
+                            <td key={h.hole_number} className="p-1 text-center text-gray-700">{h.score || '-'}</td>
+                          ))}
+                          <td className="p-1 text-center font-semibold">{totalScore || '-'}</td>
+                          <td className="p-1 text-center font-semibold text-green-700">{totalQuota}</td>
+                          <td className="p-1 text-center text-gray-500">{playerQuota ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handlePostScores}
+                    disabled={posting}
+                    className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold text-base hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {posting ? 'Posting...' : '✓ Post Scores'}
+                  </button>
+                  <button
+                    onClick={() => setShowCompletionModal(false)}
+                    className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+                  >
+                    Keep Editing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CTP Modal */}
         {showCtpModal && ctpPlayerId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -878,6 +1010,7 @@ export const ScoreEntry = () => {
                     <input
                       type="number"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       min="0"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                       placeholder="0"

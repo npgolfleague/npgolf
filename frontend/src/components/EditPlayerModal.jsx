@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { AuthContext } from '../context/AuthContext'
 import { playersAPI } from '../api'
+import { isAdminCapable } from '../utils/roles'
 
 export const EditPlayerModal = ({ player, onClose, onSave }) => {
   const { user } = useContext(AuthContext)
@@ -26,8 +27,10 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
   const [success, setSuccess] = useState(false)
 
   // Determine if current user is admin and if they can edit this player
-  const isAdmin = user?.role === 'admin'
-  const canEdit = isAdmin || (user?.id === player?.id)
+  const isAdmin = isAdminCapable(user)
+  const canAssignSuperAdmin = user?.role === 'super_admin'
+  const targetIsSuperAdmin = player?.role === 'super_admin'
+  const canEdit = (isAdmin || (user?.id === player?.id)) && !(targetIsSuperAdmin && !canAssignSuperAdmin)
 
   console.log('EditPlayerModal - isAdmin:', isAdmin, 'user:', user)
   console.log('EditPlayerModal - formData.email_allowed:', formData.email_allowed)
@@ -356,7 +359,11 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="player">Player</option>
+                    <option value="league_admin">League Admin</option>
                     <option value="admin">Admin</option>
+                    {(canAssignSuperAdmin || formData.role === 'super_admin') && (
+                      <option value="super_admin" disabled={!canAssignSuperAdmin}>Super Admin</option>
+                    )}
                   </select>
                 </div>
 

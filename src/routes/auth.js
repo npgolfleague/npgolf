@@ -20,9 +20,23 @@ function isStrongPassword(password) {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+  const normalizedEmail = String(email).trim();
 
   try {
-    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota_18, quota_9, role, password FROM players WHERE email = ? LIMIT 1', [email]);
+    const leagueBillingEntityId = req.league?.billing_entity_id ?? null;
+    const [rows] = await pool.query(
+      `SELECT id, billing_entity_id, name, email, sex, active, quota_18, quota_9, role, password
+       FROM players
+       WHERE LOWER(email) = LOWER(?)
+       ORDER BY
+         CASE
+           WHEN ? IS NOT NULL AND billing_entity_id = ? THEN 0
+           ELSE 1
+         END,
+         id DESC
+       LIMIT 1`,
+      [normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
+    );
     const user = rows && rows[0];
     if (!user || !user.password) return res.status(401).json({ error: 'invalid credentials' });
 
@@ -50,9 +64,9 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9?, sms_allowed? }
+// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9?, sms_allowed?, league_id? }
 router.post('/register', async (req, res) => {
-  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed } = req.body || {};
+  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed, league_id } = req.body || {};
   if (!email || !password || !name || !phone) {
     return res.status(400).json({ error: 'email, password, name, and phone are required' });
   }
@@ -62,6 +76,33 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    const parsedLeagueId = league_id === undefined || league_id === null || league_id === ''
+      ? null
+      : Number(league_id);
+
+    if (parsedLeagueId !== null && (!Number.isInteger(parsedLeagueId) || parsedLeagueId <= 0)) {
+      return res.status(400).json({ error: 'league_id must be a positive integer' });
+    }
+
+    if (req.league && parsedLeagueId !== null && req.league.id !== parsedLeagueId) {
+      return res.status(400).json({ error: 'league_id does not match URL league context' });
+    }
+
+    const targetLeagueId = req.league?.id || parsedLeagueId;
+    if (!targetLeagueId) {
+      return res.status(400).json({ error: 'league_id is required' });
+    }
+
+    const [leagueRows] = await pool.query(
+      'SELECT id, billing_entity_id, active FROM leagues WHERE id = ? LIMIT 1',
+      [targetLeagueId]
+    );
+    const targetLeague = leagueRows && leagueRows[0];
+
+    if (!targetLeague || !targetLeague.active) {
+      return res.status(400).json({ error: 'Selected league is not available' });
+    }
+
     // Check if email already exists
     const [existing] = await pool.query('SELECT id FROM players WHERE email = ? LIMIT 1', [email]);
     if (existing && existing.length > 0) {
@@ -81,11 +122,16 @@ router.post('/register', async (req, res) => {
 
     // Insert new player
     const [result] = await pool.query(
-      'INSERT INTO players (name, email, password, phone, sex, quota_18, quota_9, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, phone, sex || 'M', normalizedQuota18, normalizedQuota9, 'player', 1, sms_allowed ? 1 : 0]
+      'INSERT INTO players (billing_entity_id, name, email, password, phone, sex, quota_18, quota_9, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [targetLeague.billing_entity_id, name, email, hashedPassword, phone, sex || 'M', normalizedQuota18, normalizedQuota9, 'player', 1, sms_allowed ? 1 : 0]
     );
 
     const userId = result.insertId;
+
+    await pool.query(
+      'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
+      [targetLeague.id, userId]
+    );
 
     // Send SMS opt-in message (only if SMS is enabled and user opted in)
     if (sms_allowed) {
@@ -120,7 +166,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       token,
       refreshToken,
-      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: normalizedQuota18, quota_9: normalizedQuota9, role: 'player' }
+      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: normalizedQuota18, quota_9: normalizedQuota9, role: 'player', league_id: targetLeague.id }
     });
   } catch (err) {
     console.error('Registration error', err);

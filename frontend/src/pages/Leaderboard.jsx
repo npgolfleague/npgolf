@@ -53,7 +53,8 @@ export function Leaderboard() {
         setLeaderboardStats({
           totalPlayers: leaderboardRes.data.totalPlayers,
           playersWithCompleteScores: leaderboardRes.data.playersWithCompleteScores,
-          expectedHoles: leaderboardRes.data.expectedHoles
+          expectedHoles: leaderboardRes.data.expectedHoles,
+          liveScoring: leaderboardRes.data.liveScoring
         });
       } else {
         // Fallback for old format
@@ -171,7 +172,20 @@ export function Leaderboard() {
         </div>
       )}
 
-      {leaderboard.length === 0 ? (
+      {/* When live scoring is off and not all players are done, hide the leaderboard */}
+      {leaderboardStats && leaderboardStats.liveScoring === false &&
+        leaderboardStats.playersWithCompleteScores < leaderboardStats.totalPlayers ? (
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-8 text-center">
+          <div className="text-4xl mb-3">🔒</div>
+          <p className="text-yellow-800 text-lg font-semibold">Leaderboard Hidden</p>
+          <p className="text-yellow-700 mt-1">
+            Scores will be revealed once all foursomes have posted their scores.
+          </p>
+          <p className="text-yellow-600 text-sm mt-2">
+            {leaderboardStats.playersWithCompleteScores} of {leaderboardStats.totalPlayers} players complete
+          </p>
+        </div>
+      ) : leaderboard.length === 0 ? (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
           <p className="text-yellow-800 text-lg">No scores recorded yet for this tournament.</p>
         </div>
