@@ -260,9 +260,58 @@ export function TournamentPlayers() {
     }
   };
 
-  const confirmedPlayers = players.filter(
-    (player) => String(player.attending_status || '').toLowerCase() === 'yes'
-  );
+  const parsePairValue = (value) => {
+    if (value == null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const getEffectiveGrouping = (player) => {
+    if (!isAdmin) {
+      return {
+        foursome: player.foursome ? String(player.foursome).trim() : '',
+        pair: parsePairValue(player.pair)
+      };
+    }
+
+    const edit = editValues[player.id];
+    return {
+      foursome: edit && edit.foursome != null
+        ? String(edit.foursome).trim()
+        : (player.foursome ? String(player.foursome).trim() : ''),
+      pair: edit && edit.pair != null
+        ? parsePairValue(edit.pair)
+        : parsePairValue(player.pair)
+    };
+  };
+
+  const compareFoursomeThenPair = (a, b) => {
+    const aGroup = getEffectiveGrouping(a);
+    const bGroup = getEffectiveGrouping(b);
+
+    const aHasFoursome = aGroup.foursome !== '';
+    const bHasFoursome = bGroup.foursome !== '';
+
+    // Players without foursome should always stay at the bottom.
+    if (aHasFoursome !== bHasFoursome) return aHasFoursome ? -1 : 1;
+
+    if (aHasFoursome && bHasFoursome) {
+      const groupCompare = aGroup.foursome.localeCompare(bGroup.foursome, undefined, { numeric: true, sensitivity: 'base' });
+      if (groupCompare !== 0) return groupCompare;
+
+      const aPair = aGroup.pair;
+      const bPair = bGroup.pair;
+      if (aPair == null && bPair != null) return 1;
+      if (aPair != null && bPair == null) return -1;
+      if (aPair != null && bPair != null && aPair !== bPair) return aPair - bPair;
+    }
+
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  };
+
+  const confirmedPlayers = [...players]
+    .filter((player) => String(player.attending_status || '').toLowerCase() === 'yes')
+    .sort(compareFoursomeThenPair);
 
   if (loading) {
     return (
