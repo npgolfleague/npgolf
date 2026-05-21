@@ -20,7 +20,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
     role: 'player',
     password: '',
     sms_allowed: 0,
-    email_allowed: 1
+    email_allowed: 1,
+    default_tee_name: ''
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -59,7 +60,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
         active: player.active !== undefined ? player.active : 1,
         role: player.role || 'player',
         sms_allowed: player.sms_allowed !== undefined ? player.sms_allowed : 0,
-        email_allowed: player.email_allowed !== undefined ? player.email_allowed : 1
+        email_allowed: player.email_allowed !== undefined ? player.email_allowed : 1,
+        default_tee_name: player.default_tee_name || ''
       })
     }
   }, [player])
@@ -128,7 +130,8 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
             active: formData.active,
             role: formData.role,
             sms_allowed: formData.sms_allowed,
-            email_allowed: formData.email_allowed
+            email_allowed: formData.email_allowed,
+            default_tee_name: formData.default_tee_name || null
           }
         } else {
           // Regular player can only update their own name, email, phone, sex
@@ -407,6 +410,22 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                     />
                     <span className="text-gray-700 font-semibold">Email Allowed</span>
                   </label>
+                </div>
+
+                {/* Default Tee Name */}
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    Default Tee
+                  </label>
+                  <input
+                    type="text"
+                    name="default_tee_name"
+                    value={formData.default_tee_name}
+                    onChange={handleChange}
+                    placeholder="e.g. White, Red, Blue"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Auto-selected when adding player to a tournament</p>
                 </div>
               </>
             )}

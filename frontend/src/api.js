@@ -115,9 +115,16 @@ export const coursesAPI = {
   list: () => apiClient.get('/courses'),
   get: (id) => apiClient.get(`/courses/${id}`),
   create: (name, address, phone) => apiClient.post('/courses', { name, address, phone }),
-  addHoles: (courseId, holes) => apiClient.post(`/courses/${courseId}/holes`, { holes }),
   update: (id, name, address, phone) => apiClient.put(`/courses/${id}`, { name, address, phone }),
-  delete: (id) => apiClient.delete(`/courses/${id}`)
+  delete: (id) => apiClient.delete(`/courses/${id}`),
+  // Tee management
+  getTees: (courseId) => apiClient.get(`/courses/${courseId}/tees`),
+  addTee: (courseId, data) => apiClient.post(`/courses/${courseId}/tees`, data),
+  updateTee: (courseId, teeId, data) => apiClient.put(`/courses/${courseId}/tees/${teeId}`, data),
+  deleteTee: (courseId, teeId) => apiClient.delete(`/courses/${courseId}/tees/${teeId}`),
+  setTeeHoles: (courseId, teeId, holes) => apiClient.put(`/courses/${courseId}/tees/${teeId}/holes`, { holes }),
+  // Scorecard parsing
+  parseScorecard: (formData) => apiClient.post('/courses/parse-scorecard', formData)
 }
 
 export const tournamentsAPI = {
@@ -133,6 +140,7 @@ export const tournamentsAPI = {
   getFoursome: (tournamentId, foursome) => apiClient.get(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}`),
   addPlayer: (tournamentId, playerId, teeId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId, teeId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
+  updatePlayerTee: (tournamentId, playerId, teeId) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/tee`, { teeId }),
   getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
   updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid }),
   updateSkinsCtpPaidStatus: (tournamentId, playerId, skins_ctp_paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/skins-ctp-paid`, { skins_ctp_paid }),
@@ -193,14 +201,8 @@ export const emailsAPI = {
 }
 
 export const cartTagsAPI = {
-  generate: (tournamentId) => {
-    const leaguePrefix = detectLeaguePrefix();
-    return apiClient.get(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}`);
-  },
-  send: (tournamentId) => {
-    const leaguePrefix = detectLeaguePrefix();
-    return apiClient.post(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}/send`);
-  }
+  generate: (tournamentId) => apiClient.get(`/cart-tags/tournament/${tournamentId}`),
+  send: (tournamentId) => apiClient.post(`/cart-tags/tournament/${tournamentId}/send`)
 }
 
 export const rulesAPI = {
