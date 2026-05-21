@@ -1187,7 +1187,7 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       over_under: Number(r.over_under)
     }));
 
-    await recalculateAllPlayersPrizeMoney(pool);
+    // Prize money is already calculated during tournament completion — no need to recalculate here.
     const rankedPlayerIds = [...new Set(rankedPlayers.map((p) => p.player_id).filter(Boolean))];
     let dashboardTotals = [];
     if (rankedPlayerIds.length > 0) {
