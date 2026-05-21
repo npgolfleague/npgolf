@@ -1,5 +1,20 @@
 // PDF generation utility using Puppeteer
 const puppeteer = require('puppeteer-core');
+const fs = require('fs');
+
+function resolveChromiumPath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
+
+  const candidates = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome'
+  ];
+
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  return found || '/usr/bin/chromium-browser';
+}
 
 /**
  * Generate a PDF from HTML content
@@ -8,17 +23,8 @@ const puppeteer = require('puppeteer-core');
  * @returns {Promise<Buffer>} PDF buffer
  */
 async function generatePDF(html, options = {}) {
-  // Use Alpine's chromium in production, or chromium package in development
-  let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  
-  if (!executablePath) {
-    try {
-      executablePath = require('chromium').path;
-    } catch (err) {
-      // Chromium package not available, try common paths
-      executablePath = '/usr/bin/chromium-browser';
-    }
-  }
+  // Use explicit path from env or common system Chromium locations.
+  const executablePath = resolveChromiumPath();
   
   console.log(`Using Chromium at: ${executablePath}`);
   
