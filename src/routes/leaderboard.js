@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
 // GET /api/leaderboard/:tournamentId - Get leaderboard for a tournament
@@ -19,11 +20,12 @@ router.get('/:tournamentId', async (req, res) => {
       WHERE t.id = ?
     `, [tournamentId, tournamentId, tournamentId]);
     
-    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM settings LIMIT 1');
+    const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, live_scoring FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     
     const tournament = tournamentInfo[0];
     const holeCount = Number(tournament?.number_of_holes);
     const settings = settingsInfo[0];
+    const liveScoring = !settings || settings.live_scoring == null ? true : Boolean(settings.live_scoring);
 
     // Calculate prize money pots up front (used by both saved and fallback winner paths)
     const tournamentFee = Number(
@@ -57,7 +59,9 @@ router.get('/:tournamentId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid quota column' });
     }
     
-    // Get all scores for the tournament with player info (including players with no scores)
+    // Always fetch all scores — frontend controls visibility based on liveScoring + completeness
+    const scoreJoinClause = `LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?`;
+
     const [rows] = await pool.query(`
       SELECT 
         p.id,
@@ -69,7 +73,7 @@ router.get('/:tournamentId', async (req, res) => {
         COALESCE(SUM(s.score), 0) as total_strokes
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
-      LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?
+      ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
       GROUP BY p.id, p.name, p.email, COALESCE(tp.tournament_quota, p.${quotaColumn})
       ORDER BY holes_played DESC, (total_quota_points - player_quota) DESC, p.name ASC
@@ -364,7 +368,8 @@ router.get('/:tournamentId', async (req, res) => {
       leaderboard,
       totalPlayers: totalPlayersCount,
       playersWithCompleteScores: completeScoresCount,
-      expectedHoles: holeCount
+      expectedHoles: holeCount,
+      liveScoring
     });
   } catch (err) {
     console.error('DB error', err);

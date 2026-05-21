@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { requireAdmin } = require('../middleware/admin');
+const { isAdminCapableRole, isSuperAdminRole } = require('../middleware/admin');
+const jwt = require('jsonwebtoken');
 
 // GET /api/scores - List all scores
 router.get('/', async (req, res) => {
@@ -92,7 +95,49 @@ router.post('/', async (req, res) => {
     if (!Array.isArray(scores) || scores.length === 0) {
       return res.status(400).json({ error: 'Scores array is required' });
     }
-    
+
+    // Check if the foursome is posted/locked — if so, require admin
+    const firstScore = scores[0];
+    const foursomeVal = firstScore.foursome || firstScore.foursome_group || null;
+    if (foursomeVal && firstScore.tournament_id) {
+      const [postRows] = await pool.query(
+        'SELECT id FROM foursome_posts WHERE tournament_id = ? AND foursome_group = ? LIMIT 1',
+        [firstScore.tournament_id, foursomeVal]
+      );
+      if (postRows.length > 0) {
+        // Scores are locked — verify admin JWT
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+        }
+        try {
+          const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
+          const [userRows] = await pool.query('SELECT id, role FROM players WHERE id = ? LIMIT 1', [decoded.sub]);
+          const user = userRows[0];
+          if (!user || !isAdminCapableRole(user.role)) {
+            return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+          }
+
+          if (!isSuperAdminRole(user.role)) {
+            if (!req.league?.id) {
+              return res.status(403).json({ error: 'Scores have been posted. League admin access requires league context.' });
+            }
+
+            const [leagueMembership] = await pool.query(
+              'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
+              [req.league.id, user.id]
+            );
+
+            if (!leagueMembership.length) {
+              return res.status(403).json({ error: 'Scores have been posted. League admin is not a member of this league.' });
+            }
+          }
+        } catch {
+          return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+        }
+      }
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -307,4 +352,74 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
   }
 });
 
+// GET /api/scores/tournament/:tournamentId/foursome/:group/post-status - Check if foursome is posted
+router.get('/tournament/:tournamentId/foursome/:group/post-status', async (req, res) => {
+  try {
+    const { tournamentId, group } = req.params;
+    const [rows] = await pool.query(
+      `SELECT fp.id, fp.posted_at, p.name as posted_by_name
+       FROM foursome_posts fp
+       JOIN players p ON fp.posted_by = p.id
+       WHERE fp.tournament_id = ? AND fp.foursome_group = ? LIMIT 1`,
+      [tournamentId, group]
+    );
+    res.json({ posted: rows.length > 0, ...(rows[0] || {}) });
+  } catch (err) {
+    console.error('Error checking foursome post status:', err);
+    res.status(500).json({ error: 'Failed to check post status' });
+  }
+});
+
+// POST /api/scores/tournament/:tournamentId/foursome/:group/post - Mark foursome scores as posted
+router.post('/tournament/:tournamentId/foursome/:group/post', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  let userId;
+  try {
+    const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
+    userId = decoded.sub;
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
+  try {
+    const { tournamentId, group } = req.params;
+    await pool.query(
+      `INSERT INTO foursome_posts (tournament_id, foursome_group, posted_by)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE posted_at = CURRENT_TIMESTAMP, posted_by = VALUES(posted_by)`,
+      [tournamentId, group, userId]
+    );
+    const [rows] = await pool.query(
+      `SELECT fp.id, fp.posted_at, p.name as posted_by_name
+       FROM foursome_posts fp
+       JOIN players p ON fp.posted_by = p.id
+       WHERE fp.tournament_id = ? AND fp.foursome_group = ? LIMIT 1`,
+      [tournamentId, group]
+    );
+    res.json({ posted: true, ...rows[0] });
+  } catch (err) {
+    console.error('Error posting foursome scores:', err);
+    res.status(500).json({ error: 'Failed to post scores' });
+  }
+});
+
+// GET /api/scores/tournament/:tournamentId/posted-groups - Get all posted foursome groups
+router.get('/tournament/:tournamentId/posted-groups', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const [rows] = await pool.query(
+      'SELECT foursome_group FROM foursome_posts WHERE tournament_id = ?',
+      [tournamentId]
+    );
+    res.json(rows.map(r => r.foursome_group));
+  } catch (err) {
+    console.error('Error fetching posted groups:', err);
+    res.status(500).json({ error: 'Failed to fetch posted groups' });
+  }
+});
+
 module.exports = router;
+

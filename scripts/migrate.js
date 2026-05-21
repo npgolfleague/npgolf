@@ -34,7 +34,7 @@ async function run() {
   const options = parseArgs();
 
   const files = fs.readdirSync(path.join(__dirname, '..', 'migrations'))
-    .filter(f => f.endsWith('.sql'))
+    .filter(f => /^\d+.*\.sql$/.test(f) && !f.endsWith('_old.sql'))
     .sort();
 
   if (files.length === 0) {

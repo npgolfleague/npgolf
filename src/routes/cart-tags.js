@@ -4,6 +4,7 @@ const pool = require('../db');
 const QRCode = require('qrcode');
 const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
+const { getLeagueId } = require('../utils/league');
 
 // Helper to format time from MySQL TIME format or add minutes
 const formatTeeTime = (baseTime, addMinutes = 0) => {
@@ -176,6 +177,12 @@ const generateCartTagsDocument = (tags) => {
 </html>`;
 };
 
+const buildScoreLink = (req, tournamentId, group) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const leaguePrefix = req.league?.alias ? `/${req.league.alias}` : '';
+  return `${baseUrl}${leaguePrefix}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(group)}`;
+};
+
 // GET /api/cart-tags/tournament/:tournamentId - Generate printable cart tags HTML
 router.get('/tournament/:tournamentId', async (req, res) => {
   try {
@@ -265,8 +272,7 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const qrMap = {};
     await Promise.all(groupNames.map(async (g) => {
       try {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(g)}`;
+        const link = buildScoreLink(req, tournamentId, g);
         qrMap[g] = await QRCode.toDataURL(link);
       } catch (err) {
         console.error('Error generating QR for group', g, err);
@@ -320,7 +326,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const { tournamentId } = req.params;
     
     // Get settings for golf course email
-    const [settingsRows] = await pool.query('SELECT golf_course_email FROM settings LIMIT 1');
+    const [settingsRows] = await pool.query('SELECT golf_course_email FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     const golfCourseEmail = settingsRows[0]?.golf_course_email;
     
     if (!golfCourseEmail) {
@@ -393,8 +399,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const qrMap2 = {};
     await Promise.all(groupNames.map(async (g) => {
       try {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(g)}`;
+        const link = buildScoreLink(req, tournamentId, g);
         qrMap2[g] = await QRCode.toDataURL(link);
       } catch (err) {
         console.error('Error generating QR for group (email):', g, err);

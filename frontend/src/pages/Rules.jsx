@@ -1,16 +1,115 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { rulesAPI } from '../api'
+
+const DEFAULT_LOCAL_RULES = [
+  "Mulligan on first hole played. If your first shot is not a good one you may without penalty play a second shot, with the caveat that you must play the second shot (you don't choose the best one).",
+  'Out of Bounds. Balls hit OB can be played as one stoke penalty with no distance penalty. The ball can NOT be played from OB but the ball may be dropped as it would if the penalty area was marked with red stakes. Either two club lengths from where the ball entered the penalty area; or as far back as desired on a line from the hole to the where the ball crossed into the penalty area.',
+  "Gimme's there are no gimme's during the championship. During regular season anything within 12 inches can be given. Gimme's must be given by a playing partner (you can't give yourself a putt)."
+]
 
 export const Rules = () => {
   const [expandedSection, setExpandedSection] = useState(null)
+  const [localRules, setLocalRules] = useState(DEFAULT_LOCAL_RULES)
+  const [sections, setSections] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchRules = async () => {
+      try {
+        const response = await rulesAPI.getCurrent()
+        const fetchedSections = response.data?.sections
+        const fetchedRules = response.data?.localRules
+
+        if (isMounted) {
+          if (Array.isArray(fetchedSections) && fetchedSections.length > 0) {
+            setSections(fetchedSections)
+          } else if (Array.isArray(fetchedRules) && fetchedRules.length > 0) {
+            setLocalRules(fetchedRules)
+          }
+        }
+      } catch (_err) {
+        // Keep built-in defaults if league-specific rules are unavailable.
+        console.warn('Failed to load league rules, using defaults')
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchRules()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section)
   }
 
+  const renderTextContent = (content) => {
+    if (!content) return null
+    return content.split('\n').map((line, idx) => (
+      <div key={idx} className="text-gray-700">
+        {line || <br />}
+      </div>
+    ))
+  }
+
+  const renderSectionContent = (section) => {
+    if (section.type === 'text') {
+      return <div className="text-gray-700">{renderTextContent(section.content)}</div>
+    } else if (section.type === 'list' && Array.isArray(section.items)) {
+      return (
+        <ol className="list-decimal list-inside space-y-4 text-gray-700">
+          {section.items.map((item, idx) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ol>
+      )
+    }
+    return null
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <p className="text-gray-600">Loading rules...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If sections are available, render them
+  if (sections.length > 0) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">League Rules</h1>
+          <p className="text-gray-600 mb-8">Paradise Golf League</p>
+
+          {sections.map((section) => (
+            <section key={section.id} className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">{section.title}</h2>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                {renderSectionContent(section)}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Fall back to hardcoded layout with local rules
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">2026 League Rules</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">League Rules</h1>
         <p className="text-gray-600 mb-8">Paradise Golf League</p>
 
         {/* Basic Information */}
@@ -32,6 +131,18 @@ export const Rules = () => {
             <p className="text-gray-700">
               <strong>Cost:</strong> $25.00 league fee + $23.00 per week greens fee
             </p>
+          </div>
+        </section>
+
+        {/* Local Rules */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Local Rules</h2>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+            <ol className="list-decimal list-inside space-y-4 text-gray-700">
+              {localRules.map((rule, idx) => (
+                <li key={`${idx}-${rule.slice(0, 20)}`}>{rule}</li>
+              ))}
+            </ol>
           </div>
         </section>
 

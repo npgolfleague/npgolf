@@ -1,14 +1,38 @@
 import axios from 'axios'
 
-// Use relative URL so it works whether accessed via localhost or IP address
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+// Detect league alias from URL path (e.g., /paradise/app/dashboard)
+// Extract the first path segment if it's not a common route
+function detectLeaguePrefix() {
+  const pathParts = window.location.pathname.split('/').filter(p => p.length > 0);
+  const commonRoutes = ['api', 'login', 'register', 'forgot-password', 'reset-password', 
+                        'sms-consent', 'dashboard', 'about', 'app', 'assets', 'billing-entities'];
+  
+  // If first segment is not a common route, it's likely a league alias
+  if (pathParts.length > 0 && !commonRoutes.includes(pathParts[0])) {
+    return '/' + pathParts[0];
+  }
+  return '';
+}
 
+// Use relative URL so it works whether accessed via localhost or IP address
 const apiClient = axios.create({
-  baseURL: API_BASE
+  baseURL: '/api'
 })
 
-// Add JWT token to requests if available
+const refreshClient = axios.create({
+  baseURL: '/api'
+})
+
+// Add league prefix and JWT token to requests
 apiClient.interceptors.request.use((config) => {
+  // Detect league prefix at request time
+  const leaguePrefix = detectLeaguePrefix();
+  if (leaguePrefix) {
+    // Update baseURL to include league prefix
+    config.baseURL = `${leaguePrefix}/api`;
+  }
+  
+  // Add JWT token if available
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -16,9 +40,55 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+
+    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error)
+    }
+
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) {
+      return Promise.reject(error)
+    }
+
+    originalRequest._retry = true
+
+    try {
+      const leaguePrefix = detectLeaguePrefix()
+      refreshClient.defaults.baseURL = leaguePrefix ? `${leaguePrefix}/api` : '/api'
+
+      const response = await refreshClient.post('/auth/refresh', { refreshToken })
+      const { token: newToken, refreshToken: newRefreshToken, user } = response.data || {}
+
+      if (newToken) {
+        localStorage.setItem('token', newToken)
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user))
+        }
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken)
+        }
+
+        originalRequest.headers = originalRequest.headers || {}
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return apiClient.request(originalRequest)
+      }
+    } catch (refreshError) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('refreshToken')
+    }
+
+    return Promise.reject(error)
+  }
+)
+
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password, phone, sex, smsAllowed) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed }),
+  register: (name, email, password, phone, sex, smsAllowed, leagueId) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed, league_id: leagueId }),
   forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
   refresh: (refreshToken) => apiClient.post('/auth/refresh', { refreshToken }),
@@ -61,7 +131,7 @@ export const tournamentsAPI = {
   complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   getFoursome: (tournamentId, foursome) => apiClient.get(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}`),
-  addPlayer: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId }),
+  addPlayer: (tournamentId, playerId, teeId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId, teeId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
   getAvailablePlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/available-players`),
   updatePaidStatus: (tournamentId, playerId, paid) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/paid`, { paid }),
@@ -90,7 +160,9 @@ export const scoresAPI = {
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
   delete: (id) => apiClient.delete(`/scores/${id}`),
   getCtpWinners: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/ctp-winners`),
-  getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`)
+  getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`),
+  getFoursomePostStatus: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post-status`),
+  postFoursomeScores: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post`)
 }
 
 export const leaderboardAPI = {
@@ -102,6 +174,16 @@ export const settingsAPI = {
   update: (data) => apiClient.put('/settings', data)
 }
 
+export const leaguesAPI = {
+  list: () => apiClient.get('/leagues'),
+  get: (id) => apiClient.get(`/leagues/${id}`),
+  getSettings: (id) => apiClient.get(`/leagues/${id}/settings`),
+  updateSettings: (id, data) => apiClient.put(`/leagues/${id}/settings`, data),
+  getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
+  getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`),
+  current: () => apiClient.get('/leagues/current'),
+}
+
 export const emailsAPI = {
   list: () => apiClient.get('/emails'),
   get: (id) => apiClient.get(`/emails/${id}`),
@@ -111,8 +193,22 @@ export const emailsAPI = {
 }
 
 export const cartTagsAPI = {
-  generate: (tournamentId) => apiClient.get(`/cart-tags/tournament/${tournamentId}`),
-  send: (tournamentId) => apiClient.post(`/cart-tags/tournament/${tournamentId}/send`)
+  generate: (tournamentId) => {
+    const leaguePrefix = detectLeaguePrefix();
+    return apiClient.get(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}`);
+  },
+  send: (tournamentId) => {
+    const leaguePrefix = detectLeaguePrefix();
+    return apiClient.post(`${leaguePrefix}/api/cart-tags/tournament/${tournamentId}/send`);
+  }
+}
+
+export const rulesAPI = {
+  getCurrent: () => apiClient.get('/rules'),
+  listDrafts: () => apiClient.get('/rules/drafts'),
+  createDraft: (data) => apiClient.post('/rules/drafts', data),
+  updateDraft: (id, data) => apiClient.put(`/rules/${id}`, data),
+  publishDraft: (id) => apiClient.post(`/rules/${id}/publish`)
 }
 
 export default apiClient
