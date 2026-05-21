@@ -105,9 +105,12 @@ router.post('/send', upload.single('attachment'), async (req, res) => {
 
     const htmlBody = body.replace(/\n/g, '<br>');
     let sent = 0, failed = 0;
-    for (const email of recipients) {
+    for (let i = 0; i < recipients.length; i++) {
+      const email = recipients[i];
       try {
-        await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null);
+        // Only BCC on the first email when sending to multiple recipients
+        const includeBcc = (i === 0 && recipients.length > 1);
+        await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null, includeBcc);
         sent++;
       } catch (e) {
         console.error(`Failed to send to ${email}:`, e.message);

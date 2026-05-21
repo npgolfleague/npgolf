@@ -122,6 +122,23 @@ export const ScoreEntry = () => {
     }
   }
 
+  const renderSkeleton = () => (
+    <div className="space-y-4 animate-pulse">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="bg-white rounded-xl p-5 border border-slate-200">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-10 h-10 bg-slate-200 rounded-full" />
+            <div className="h-5 bg-slate-200 rounded w-32" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-12 bg-slate-100 rounded-lg" />
+            <div className="h-12 bg-slate-100 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   const fetchTournaments = async () => {
     try {
       const response = await tournamentsAPI.list()
@@ -294,6 +311,20 @@ export const ScoreEntry = () => {
     if (relative >= 2) return 0
     
     return 0
+  }
+
+  const getScoreColor = (score, par) => {
+    if (!score || !par) return 'bg-white'
+    const scoreInt = parseInt(score)
+    const parInt = parseInt(par)
+    const relative = scoreInt - parInt
+
+    if (scoreInt === 1) return 'bg-amber-100 border-amber-500 text-amber-900' // Ace
+    if (relative <= -2) return 'bg-amber-50 border-amber-400 text-amber-800' // Eagle
+    if (relative === -1) return 'bg-blue-50 border-blue-400 text-blue-800' // Birdie
+    if (relative === 0) return 'bg-fairway-50 border-fairway-400 text-fairway-800' // Par
+    if (relative === 1) return 'bg-slate-50 border-slate-300 text-slate-700' // Bogey
+    return 'bg-red-50 border-red-300 text-red-700' // Double+
   }
 
   // Calculate score based on quota points and par
@@ -641,7 +672,7 @@ export const ScoreEntry = () => {
             </div>
 
             <div className="space-y-3">
-              {selectedPlayers.map(playerId => {
+              {loading ? renderSkeleton() : selectedPlayers.map((playerId) => {
                 const player = players.find(p => p.id === playerId)
                 const playerHasQuota = hasCurrentQuota(player)
                 return (
@@ -657,7 +688,11 @@ export const ScoreEntry = () => {
                           inputMode="numeric"
                           min="1"
                           max="9"
-                          className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-blue-500 focus:outline-none"
+                          className={`w-full p-3 border-2 rounded-lg text-xl text-center font-bold focus:outline-none transition-colors ${
+                            getScoreColor(scores[`${currentHole}-${playerId}-score`], holeData?.mens_par)
+                          } ${
+                            scores[`${currentHole}-${playerId}-score`] ? '' : 'border-gray-200'
+                          }`}
                           placeholder="#"
                           ref={el => { scoreInputRefs.current[`${currentHole}-${playerId}-score`] = el }}
                           value={scores[`${currentHole}-${playerId}-score`] || ''}
@@ -675,15 +710,15 @@ export const ScoreEntry = () => {
                         <input
                           type="number"
                           inputMode="numeric"
-                          min="1"
+                          min="0"
                           max="9"
-                          className="w-full p-3 border-2 border-gray-300 rounded-lg text-xl text-center font-bold focus:border-green-500 focus:outline-none"
+                          className="w-full p-3 border-2 border-gray-200 rounded-lg text-xl text-center font-bold focus:border-fairway-500 focus:outline-none bg-white"
                           placeholder="#"
                           ref={el => { scoreInputRefs.current[`${currentHole}-${playerId}-quota`] = el }}
                           value={scores[`${currentHole}-${playerId}-quota`] ?? ''}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 9)) {
+                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 9)) {
                               handleScoreChange(playerId, 'quota', val)
                               if (val !== '') focusNext(playerId, 'quota')
                             }

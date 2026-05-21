@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { formatDateOnly } from '../utils/date'
+import {
+  ClipboardList, Users, Flag, Plus, Lock, LayoutDashboard,
+  Trophy, BookOpen, Info, CalendarDays, Disc3
+} from 'lucide-react'
 
 export const Dashboard = () => {
   const navigate = useNavigate()
@@ -45,20 +49,20 @@ export const Dashboard = () => {
   }
 
   const menuItems = [
-    { path: '/scores', label: 'Score Entry', icon: '📝', color: 'blue' },
-    { path: '/users', label: 'Players', icon: '👥', color: 'green' },
-    { path: '/courses', label: 'Courses', icon: '⛳', color: 'yellow' },
-    ...(isAdmin ? [{ path: '/courses/add', label: 'Add Course', icon: '➕', color: 'purple' }] : [])
+    { path: '/scores', label: 'Score Entry', icon: ClipboardList, color: 'blue' },
+    { path: '/users', label: 'Players', icon: Users, color: 'green' },
+    { path: '/courses', label: 'Courses', icon: Flag, color: 'yellow' },
+    ...(isAdmin ? [{ path: '/courses/add', label: 'Add Course', icon: Plus, color: 'purple' }] : [])
   ]
 
   const publicMenuItems = [
-    { path: '/app/dashboard', label: 'Dashboard', icon: '🏠', enabled: false },
-    { path: '/scores', label: 'Score Entry', icon: '📝', enabled: false },
-    { path: '/users', label: 'Players', icon: '👥', enabled: false },
-    { path: '/tournaments', label: 'Tournaments', icon: '🏆', enabled: false },
-    { path: '/courses', label: 'Courses', icon: '⛳', enabled: false },
-    { path: '/rules', label: 'Rules', icon: '📋', enabled: false },
-    { path: '/about', label: 'About', icon: 'ℹ️', enabled: true }
+    { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: false },
+    { path: '/scores', label: 'Score Entry', icon: ClipboardList, enabled: false },
+    { path: '/users', label: 'Players', icon: Users, enabled: false },
+    { path: '/tournaments', label: 'Tournaments', icon: Trophy, enabled: false },
+    { path: '/courses', label: 'Courses', icon: Flag, enabled: false },
+    { path: '/rules', label: 'Rules', icon: BookOpen, enabled: false },
+    { path: '/about', label: 'About', icon: Info, enabled: true }
   ]
 
   const handleRefreshQuotas = async () => {
@@ -99,28 +103,31 @@ export const Dashboard = () => {
                     onClick={() => navigate('/register')}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition font-medium"
                   >
-                    <span>➕</span>
+                    <Plus className="w-4 h-4" />
                     <span>Join</span>
                   </button>
                   <button
                     onClick={() => navigate('/login')}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition font-medium"
                   >
-                    <span>🔐</span>
+                    <Lock className="w-4 h-4" />
                     <span>Sign In</span>
                   </button>
                 </>
               )}
-              {user && menuItems.map(item => (
-                <button
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-${item.color}-500 hover:bg-${item.color}-600 text-white transition font-medium`}
-                >
-                  <span>{item.icon}</span>
-                  <span className="hidden sm:inline">{item.label}</span>
-                </button>
-              ))}
+              {user && menuItems.map(item => {
+                const Icon = item.icon
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-${item.color}-500 hover:bg-${item.color}-600 text-white transition font-medium`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -128,82 +135,114 @@ export const Dashboard = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Priority 5: Dashboard Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* Card 1: Next Event */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-fairway-100 flex items-center justify-center text-fairway-600 shrink-0">
+              <CalendarDays className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Next Event</p>
+              <h3 className="text-lg font-bold text-slate-900 truncate">
+                {tournaments.length > 0 ? formatDate(tournaments[0].date) : 'TBD'}
+              </h3>
+              <p className="text-xs text-slate-500 truncate">
+                {tournaments.length > 0 ? tournaments[0].course_name : 'No scheduled events'}
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: Field Strength */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Active Field</p>
+              <h3 className="text-2xl font-bold text-slate-900">{players.length}</h3>
+              <p className="text-xs text-slate-500">Registered Players</p>
+            </div>
+          </div>
+
+          {/* Card 3: League Leader */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Points Leader</p>
+              <h3 className="text-lg font-bold text-slate-900 truncate">
+                {players.length > 0 ? players[0].name : '---'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {players.length > 0 ? `${Math.round(players[0].fedex_points || 0)} Points` : 'No results yet'}
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: Prize Pool Estimate */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+              <Disc3 className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Season Status</p>
+              <h3 className="text-lg font-bold text-slate-900">Active</h3>
+              <p className="text-xs text-slate-500">Tournament Mode</p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Upcoming Tournaments */}
           <div className="lg:col-span-1">
-            {!user && (
-              <div className="bg-white rounded-lg shadow p-4 mb-4 sticky top-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Menu</h2>
-                <div className="space-y-2">
-                  {publicMenuItems.map((item) => (
-                    item.enabled ? (
-                      <button
-                        key={item.path}
-                        onClick={() => navigate(item.path)}
-                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
-                      >
-                        <span>{item.icon}</span>
-                        <span>{item.label}</span>
-                      </button>
-                    ) : (
-                      <div
-                        key={item.path}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded bg-gray-100 text-gray-400 cursor-not-allowed"
-                      >
-                        <span>{item.icon}</span>
-                        <span>{item.label}</span>
-                      </div>
-                    )
-                  ))}
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 sticky top-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-fairway-600" />
+                  Upcoming
+                </h2>
+                <button 
+                  onClick={() => navigate('/tournaments')}
+                  className="text-xs font-semibold text-fairway-700 hover:text-fairway-800"
+                >
+                  View All
+                </button>
               </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow p-4 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Upcoming Tournaments</h2>
               
               {loading ? (
-                <div className="text-center py-4 text-gray-600 text-sm">Loading...</div>
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-20 bg-slate-50 animate-pulse rounded-lg" />
+                  ))}
+                </div>
               ) : tournaments.length === 0 ? (
-                <div className="text-center py-4 text-gray-600 text-sm">
-                  No upcoming tournaments
+                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                  <Flag className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm italic">No upcoming events</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {tournaments.map((tournament, index) => (
+                <div className="space-y-4">
+                  {tournaments.slice(0, 3).map((tournament) => (
                     <div 
                       key={tournament.id} 
-                      className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow hover:border-blue-500"
+                      className="group relative bg-slate-50 hover:bg-white border border-transparent hover:border-fairway-200 rounded-xl p-4 transition-all duration-200 hover:shadow-md cursor-pointer"
+                      onClick={() => navigate(`/tournaments/${tournament.id}/leaderboard`)}
                     >
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">
-                          {index === 0 ? '🏆' : index === 1 ? '🥈' : '🥉'}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 text-sm truncate">
-                            {tournament.course_name}
-                          </h3>
-                          <p className="text-xs text-gray-600 mt-1">
-                            📅 {formatDate(tournament.date)}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            ⛳ {tournament.number_of_holes} holes
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => navigate(`/tournaments/${tournament.id}/players`)}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              👥 Players
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                              onClick={() => navigate(`/tournaments/${tournament.id}/leaderboard`)}
-                              className="text-xs text-green-600 hover:text-green-800 font-medium"
-                            >
-                              🏆 Leaderboard
-                            </button>
-                          </div>
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-fairway-700 bg-fairway-50 px-2 py-0.5 rounded uppercase">
+                            {formatDate(tournament.date)}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-slate-900 text-sm truncate group-hover:text-fairway-700 transition-colors">
+                          {tournament.course_name}
+                        </h3>
+                        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Disc3 className="w-3 h-3" /> {tournament.number_of_holes} Holes
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -215,20 +254,23 @@ export const Dashboard = () => {
 
           {/* Main Section - Player Rankings */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-xl font-semibold text-gray-800">Paradise Cup Standings</h2>
-                  {isAdmin && (
-                    <button
-                      onClick={handleRefreshQuotas}
-                      disabled={refreshingQuotas}
-                      className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50"
-                    >
-                      {refreshingQuotas ? 'Refreshing...' : 'Refresh Quotas'}
-                    </button>
-                  )}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Paradise Cup Standings</h2>
                 </div>
+                {isAdmin && (
+                  <button
+                    onClick={handleRefreshQuotas}
+                    disabled={refreshingQuotas}
+                    className="btn-secondary btn-sm"
+                  >
+                    {refreshingQuotas ? 'Refreshing...' : 'Refresh Quotas'}
+                  </button>
+                )}
               </div>
 
               {quotaRefreshMessage && (
@@ -244,28 +286,28 @@ export const Dashboard = () => {
               ) : (
                 <div className="overflow-x-auto w-full">
                   <table className="w-full min-w-[920px]">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-slate-50 border-y border-slate-200">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Rank
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Player
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Paradise Pts
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 18H
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 9H
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Tournaments
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          Total Prize Money YTD
+                        <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Prize Money YTD
                         </th>
                       </tr>
                     </thead>
@@ -275,9 +317,13 @@ export const Dashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               {index < 3 ? (
-                                <span className="text-2xl">
-                                  {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                </span>
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  index === 0 ? 'bg-amber-100 text-amber-600' :
+                                  index === 1 ? 'bg-slate-200 text-slate-600' :
+                                  'bg-orange-100 text-orange-500'
+                                }`}>
+                                  {index + 1}
+                                </div>
                               ) : (
                                 <span className="text-sm font-medium text-gray-900">
                                   #{index + 1}
