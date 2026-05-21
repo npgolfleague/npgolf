@@ -9,8 +9,8 @@ const POLL_INTERVAL_MS = 2 * 60 * 1000; // every 2 minutes
 
 function createImapConnection() {
   return new Imap({
-    user: process.env.IMAP_USER || process.env.SMTP_USER,
-    password: process.env.IMAP_PASSWORD || process.env.SMTP_PASSWORD,
+    user: process.env.IMAP_USER,
+    password: process.env.IMAP_PASSWORD,
     host: process.env.IMAP_HOST || 'imap.zoho.com',
     port: parseInt(process.env.IMAP_PORT || '993'),
     tls: true,
@@ -136,12 +136,12 @@ function startEmailPoller() {
     return;
   }
 
-  if (!process.env.SMTP_USER && !process.env.IMAP_USER) {
-    console.log('[EmailPoller] No IMAP credentials configured, skipping email poller');
+  if (!process.env.IMAP_USER || !process.env.IMAP_PASSWORD) {
+    console.log('[EmailPoller] IMAP settings not configured (IMAP_USER/IMAP_PASSWORD), skipping email poller');
     return;
   }
 
-  console.log(`[EmailPoller] Starting — polling every ${POLL_INTERVAL_MS / 1000}s for ${process.env.IMAP_USER || process.env.SMTP_USER}`);
+  console.log(`[EmailPoller] Starting — polling every ${POLL_INTERVAL_MS / 1000}s for ${process.env.IMAP_USER}`);
 
   // Run immediately on startup, then on interval
   pollInbox();
