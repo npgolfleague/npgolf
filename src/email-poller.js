@@ -1,22 +1,25 @@
 // IMAP email poller for commish@npgolf.net (Zoho Mail)
 // Polls the inbox periodically and stores new emails in the database
 
-const Imap = require('imap');
+const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const pool = require('./db');
 
 const POLL_INTERVAL_MS = 2 * 60 * 1000; // every 2 minutes
 
 function createImapConnection() {
-  return new Imap({
-    user: process.env.IMAP_USER,
-    password: process.env.IMAP_PASSWORD,
+  return new ImapFlow({
     host: process.env.IMAP_HOST || 'imap.zoho.com',
-    port: parseInt(process.env.IMAP_PORT || '993'),
-    tls: true,
-    tlsOptions: { rejectUnauthorized: true },
-    connTimeout: 15000,
-    authTimeout: 10000,
+    port: parseInt(process.env.IMAP_PORT || '993', 10),
+    secure: true,
+    auth: {
+      user: process.env.IMAP_USER,
+      pass: process.env.IMAP_PASSWORD
+    },
+    tls: {
+      rejectUnauthorized: true
+    },
+    logger: false
   });
 }
 
@@ -58,75 +61,49 @@ async function storeEmail(parsed) {
   return true;
 }
 
-function pollInbox() {
+async function pollInbox() {
   const imap = createImapConnection();
   let processed = 0;
 
-  imap.once('ready', () => {
-    imap.openBox('INBOX', false, (err, box) => {
-      if (err) {
-        console.error('[EmailPoller] Failed to open inbox:', err.message);
-        imap.end();
-        return;
-      }
+  try {
+    await imap.connect();
+    const lock = await imap.getMailboxLock('INBOX');
 
-      // Search for unseen emails
-      imap.search(['UNSEEN'], (err, uids) => {
-        if (err) {
-          console.error('[EmailPoller] Search error:', err.message);
-          imap.end();
-          return;
-        }
+    try {
+      const unseenUids = await imap.search({ seen: false });
+      if (!unseenUids || unseenUids.length === 0) return;
 
-        if (!uids || uids.length === 0) {
-          imap.end();
-          return;
-        }
+      console.log(`[EmailPoller] Found ${unseenUids.length} unseen email(s)`);
 
-        console.log(`[EmailPoller] Found ${uids.length} unseen email(s)`);
-
-        const fetch = imap.fetch(uids, { bodies: '', markSeen: true });
-        const promises = [];
-
-        fetch.on('message', (msg) => {
-          const promise = new Promise((resolve) => {
-            msg.on('body', async (stream) => {
-              try {
-                const parsed = await processMessage(stream);
-                const stored = await storeEmail(parsed);
-                if (stored) {
-                  processed++;
-                  console.log(`[EmailPoller] Stored email from ${parsed.from?.text}: ${parsed.subject}`);
-                }
-              } catch (e) {
-                console.error('[EmailPoller] Error processing message:', e.message);
-              }
-              resolve();
-            });
-          });
-          promises.push(promise);
-        });
-
-        fetch.once('error', (err) => {
-          console.error('[EmailPoller] Fetch error:', err.message);
-        });
-
-        fetch.once('end', async () => {
-          await Promise.all(promises);
-          if (processed > 0) {
-            console.log(`[EmailPoller] Stored ${processed} new email(s)`);
+      for await (const message of imap.fetch(unseenUids, { uid: true, source: true })) {
+        try {
+          const parsed = await processMessage(message.source);
+          const stored = await storeEmail(parsed);
+          if (stored) {
+            processed++;
+            console.log(`[EmailPoller] Stored email from ${parsed.from?.text}: ${parsed.subject}`);
           }
-          imap.end();
-        });
-      });
-    });
-  });
+          await imap.messageFlagsAdd(message.uid, ['\\Seen']);
+        } catch (e) {
+          console.error('[EmailPoller] Error processing message:', e.message);
+        }
+      }
+    } finally {
+      lock.release();
+    }
 
-  imap.once('error', (err) => {
+    if (processed > 0) {
+      console.log(`[EmailPoller] Stored ${processed} new email(s)`);
+    }
+  } catch (err) {
     console.error('[EmailPoller] IMAP connection error:', err.message);
-  });
-
-  imap.connect();
+  } finally {
+    try {
+      await imap.logout();
+    } catch (_) {
+      // noop: safe cleanup path when connection was never established
+    }
+  }
 }
 
 function startEmailPoller() {
@@ -145,7 +122,9 @@ function startEmailPoller() {
 
   // Run immediately on startup, then on interval
   pollInbox();
-  setInterval(pollInbox, POLL_INTERVAL_MS);
+  setInterval(() => {
+    pollInbox();
+  }, POLL_INTERVAL_MS);
 }
 
 module.exports = { startEmailPoller };
