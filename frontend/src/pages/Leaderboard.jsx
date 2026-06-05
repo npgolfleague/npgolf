@@ -1,16 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { leaderboardAPI, tournamentsAPI, scoresAPI } from '../api';
+import { AuthContext } from '../context/AuthContext';
+import { isAdminCapable } from '../utils/roles';
 import { formatDateOnly } from '../utils/date';
 
 export function Leaderboard() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const canManageCtp = isAdminCapable(user);
   const [tournament, setTournament] = useState(null);
   const [tournamentPlayers, setTournamentPlayers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardStats, setLeaderboardStats] = useState(null);
   const [ctpWinners, setCtpWinners] = useState([]);
+  const [ctpAdminOptions, setCtpAdminOptions] = useState({ holes: [], players: [] });
+  const [ctpDraftRows, setCtpDraftRows] = useState([]);
+  const [savingCtp, setSavingCtp] = useState(false);
+  const [ctpAdminError, setCtpAdminError] = useState('');
+  const [ctpAdminSuccess, setCtpAdminSuccess] = useState('');
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [selectedPlayerScores, setSelectedPlayerScores] = useState([]);
   const [loadingPlayerScores, setLoadingPlayerScores] = useState(false);
@@ -22,7 +31,7 @@ export function Leaderboard() {
 
   useEffect(() => {
     loadData();
-  }, [tournamentId]);
+  }, [tournamentId, canManageCtp]);
 
   useEffect(() => {
     if (!selectedPlayerId || !tournamentId) {
@@ -34,16 +43,37 @@ export function Leaderboard() {
     loadSelectedPlayerScores(selectedPlayerId);
   }, [selectedPlayerId, tournamentId]);
 
+  const buildCtpDraftRows = (holes, winners) => {
+    const winnerMap = new Map((winners || []).map(w => [Number(w.hole_number), w]));
+    return (holes || []).map(hole => {
+      const existing = winnerMap.get(Number(hole.hole_number));
+      return {
+        hole_number: Number(hole.hole_number),
+        player_id: existing?.player_id != null ? String(existing.player_id) : '',
+        ctp_feet: existing?.ctp_feet ?? '',
+        ctp_inches: existing?.ctp_inches ?? ''
+      };
+    });
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
       setError('');
-      const [tournamentRes, playersRes, leaderboardRes, ctpRes] = await Promise.all([
+      const requests = [
         tournamentsAPI.get(tournamentId),
         tournamentsAPI.getPlayers(tournamentId),
         leaderboardAPI.get(tournamentId),
         scoresAPI.getCtpWinners(tournamentId)
-      ]);
+      ];
+
+      if (canManageCtp) {
+        requests.push(scoresAPI.getCtpAdminOptions(tournamentId));
+      }
+
+      const responses = await Promise.all(requests);
+      const [tournamentRes, playersRes, leaderboardRes, ctpRes, ctpAdminRes] = responses;
+
       setTournament(tournamentRes.data);
       setTournamentPlayers(playersRes.data || []);
       
@@ -63,9 +93,23 @@ export function Leaderboard() {
       }
       
       setCtpWinners(ctpRes.data);
+
+      if (canManageCtp && ctpAdminRes?.data) {
+        const holes = ctpAdminRes.data.holes || [];
+        const players = ctpAdminRes.data.players || [];
+        const winners = ctpAdminRes.data.winners || [];
+        setCtpAdminOptions({ holes, players });
+        setCtpDraftRows(buildCtpDraftRows(holes, winners));
+      } else {
+        setCtpAdminOptions({ holes: [], players: [] });
+        setCtpDraftRows([]);
+      }
+
       setSelectedPlayerId('');
       setSelectedPlayerScores([]);
       setPlayerScoresError('');
+      setCtpAdminError('');
+      setCtpAdminSuccess('');
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
       setError(err.response?.data?.error || 'Failed to load leaderboard data');
@@ -86,6 +130,39 @@ export function Leaderboard() {
     if (overUnder > 0) return 'text-green-600 font-bold';
     if (overUnder < 0) return 'text-red-600 font-bold';
     return 'text-gray-600 font-bold';
+  };
+
+  const handleCtpDraftChange = (holeNumber, field, value) => {
+    setCtpDraftRows(prev => prev.map(row => {
+      if (row.hole_number !== holeNumber) return row;
+      return { ...row, [field]: value };
+    }));
+  };
+
+  const handleSaveCtpWinners = async () => {
+    try {
+      setSavingCtp(true);
+      setCtpAdminError('');
+      setCtpAdminSuccess('');
+
+      const payload = ctpDraftRows.map(row => ({
+        hole_number: row.hole_number,
+        player_id: row.player_id ? Number(row.player_id) : null,
+        ctp_feet: row.ctp_feet === '' ? null : Number(row.ctp_feet),
+        ctp_inches: row.ctp_inches === '' ? null : Number(row.ctp_inches)
+      }));
+
+      const response = await scoresAPI.updateCtpWinners(tournamentId, payload);
+      const updatedWinners = response.data || [];
+      setCtpWinners(updatedWinners);
+      setCtpDraftRows(buildCtpDraftRows(ctpAdminOptions.holes, updatedWinners));
+      setCtpAdminSuccess('Closest-to-the-pin winners updated.');
+    } catch (err) {
+      console.error('Failed to update CTP winners:', err);
+      setCtpAdminError(err.response?.data?.error || 'Failed to update CTP winners');
+    } finally {
+      setSavingCtp(false);
+    }
   };
 
   const loadSelectedPlayerScores = async (playerId) => {
@@ -386,6 +463,93 @@ export function Leaderboard() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {canManageCtp && ctpAdminOptions.holes.length > 0 && (
+        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-6">
+          <h2 className="text-2xl font-bold text-amber-900 mb-1">Manage Closest to the Pin</h2>
+          <p className="text-sm text-amber-800 mb-4">League admins and super admins can assign or update winners by CTP hole.</p>
+
+          {ctpAdminError && (
+            <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {ctpAdminError}
+            </div>
+          )}
+
+          {ctpAdminSuccess && (
+            <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+              {ctpAdminSuccess}
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-[820px] w-full divide-y divide-amber-200 bg-white rounded-lg">
+              <thead className="bg-amber-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-900 uppercase tracking-wider">Hole</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-900 uppercase tracking-wider">Winner</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-900 uppercase tracking-wider">Feet</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-900 uppercase tracking-wider">Inches</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {ctpDraftRows.map(row => (
+                  <tr key={`ctp-admin-${row.hole_number}`}>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">Hole {row.hole_number}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={row.player_id}
+                        onChange={(e) => handleCtpDraftChange(row.hole_number, 'player_id', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">-- No winner --</option>
+                        {ctpAdminOptions.players.map(player => (
+                          <option key={`ctp-player-${player.id}`} value={player.id}>
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        min="0"
+                        value={row.ctp_feet}
+                        disabled={!row.player_id}
+                        onChange={(e) => handleCtpDraftChange(row.hole_number, 'ctp_feet', e.target.value)}
+                        className="w-24 p-2 border border-gray-300 rounded-lg disabled:bg-gray-100"
+                        placeholder="-"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        min="0"
+                        max="11.9"
+                        step="0.1"
+                        value={row.ctp_inches}
+                        disabled={!row.player_id}
+                        onChange={(e) => handleCtpDraftChange(row.hole_number, 'ctp_inches', e.target.value)}
+                        className="w-24 p-2 border border-gray-300 rounded-lg disabled:bg-gray-100"
+                        placeholder="-"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleSaveCtpWinners}
+              disabled={savingCtp}
+              className="px-5 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-300 font-semibold"
+            >
+              {savingCtp ? 'Saving...' : 'Save CTP Winners'}
+            </button>
           </div>
         </div>
       )}

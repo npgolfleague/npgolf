@@ -557,8 +557,26 @@ export const ScoreEntry = () => {
       setPostedInfo(res.data)
       setShowCompletionModal(false)
     } catch (err) {
-      console.error('Error posting scores:', err)
-      alert('Failed to post scores. Please try again.')
+      const status = err?.response?.status
+      const serverError = err?.response?.data?.error
+      const requestUrl = err?.config?.url
+      const code = err?.code
+      const message = serverError || err?.message || 'Unknown error'
+
+      console.error('Error posting scores:', {
+        status,
+        code,
+        message,
+        serverError,
+        requestUrl,
+        foursomeGroup,
+        tournamentId: selectedTournament?.id
+      })
+
+      const detail = status
+        ? `(${status}) ${message}`
+        : `${message}${code ? ` [${code}]` : ''}`
+      alert(`Failed to post scores: ${detail}`)
     } finally {
       setPosting(false)
     }
