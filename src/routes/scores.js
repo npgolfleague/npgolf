@@ -5,6 +5,41 @@ const { requireAdmin } = require('../middleware/admin');
 const { isAdminCapableRole, isSuperAdminRole } = require('../middleware/admin');
 const jwt = require('jsonwebtoken');
 
+async function getPar3HolesForCourse(courseId) {
+  try {
+    const [holeRows] = await pool.query(
+      `SELECT h.id AS hole_id, h.hole_number, 3 AS mens_par
+       FROM hole h
+       WHERE h.course_id = ?
+         AND EXISTS (
+           SELECT 1
+           FROM hole_tee ht
+           WHERE ht.hole_id = h.id
+             AND ht.par = 3
+         )
+       ORDER BY h.hole_number ASC`,
+      [courseId]
+    );
+
+    return holeRows;
+  } catch (err) {
+    // Backward compatibility for databases that still use hole.mens_par.
+    if (err && (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_FIELD_ERROR')) {
+      const [legacyHoleRows] = await pool.query(
+        `SELECT h.id AS hole_id, h.hole_number, h.mens_par
+         FROM hole h
+         WHERE h.course_id = ? AND h.mens_par = 3
+         ORDER BY h.hole_number ASC`,
+        [courseId]
+      );
+
+      return legacyHoleRows;
+    }
+
+    throw err;
+  }
+}
+
 // GET /api/scores - List all scores
 router.get('/', async (req, res) => {
   try {
@@ -301,13 +336,7 @@ router.get('/tournament/:tournamentId/ctp-admin-options', requireAdmin, async (r
 
     const tournament = tournamentRows[0];
 
-    const [holeRows] = await pool.query(
-      `SELECT h.id AS hole_id, h.hole_number, h.mens_par
-       FROM hole h
-       WHERE h.course_id = ? AND h.mens_par = 3
-       ORDER BY h.hole_number ASC`,
-      [tournament.course_id]
-    );
+    const holeRows = await getPar3HolesForCourse(tournament.course_id);
 
     let ctpHoles = holeRows;
     if (Number(tournament.number_of_holes) === 9) {
@@ -366,13 +395,7 @@ router.put('/tournament/:tournamentId/ctp-winners', requireAdmin, async (req, re
 
     const tournament = tournamentRows[0];
 
-    const [holeRows] = await pool.query(
-      `SELECT h.id AS hole_id, h.hole_number, h.mens_par
-       FROM hole h
-       WHERE h.course_id = ? AND h.mens_par = 3
-       ORDER BY h.hole_number ASC`,
-      [tournament.course_id]
-    );
+    const holeRows = await getPar3HolesForCourse(tournament.course_id);
 
     let allowedHoles = holeRows;
     if (Number(tournament.number_of_holes) === 9) {

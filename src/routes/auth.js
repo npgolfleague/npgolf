@@ -7,6 +7,7 @@ const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 
 const router = express.Router();
+const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
 
 function isStrongPassword(password) {
   const minLen = 8;
@@ -50,7 +51,7 @@ router.post('/login', async (req, res) => {
     }
 
     const payload = { sub: user.id, email: user.email };
-    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn });
     // create refresh token (30 days)
     const refreshToken = crypto.randomBytes(48).toString('hex')
     const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
@@ -156,7 +157,7 @@ router.post('/register', async (req, res) => {
     }
 
     const payload = { sub: userId, email };
-    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn });
     // create refresh token (30 days)
     const refreshToken = crypto.randomBytes(48).toString('hex')
     const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
@@ -189,7 +190,7 @@ router.post('/refresh', async (req, res) => {
     if (!secret) return res.status(500).json({ error: 'server misconfigured' })
 
     const payload = { sub: user.id, email: user.email }
-    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' })
+    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn })
 
     // rotate refresh token
     const newRefreshToken = crypto.randomBytes(48).toString('hex')
