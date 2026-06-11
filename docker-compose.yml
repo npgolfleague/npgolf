@@ -34,7 +34,7 @@ services:
       DB_PASS: root
       DB_NAME: npgolf
       JWT_SECRET: your-secret-key-change-in-production
-      JWT_EXPIRES_IN: 1h
+      JWT_EXPIRES_IN: 8h
       BCRYPT_ROUNDS: 10
       SMS_ENABLED: ${SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
