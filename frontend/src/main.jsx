@@ -97,6 +97,8 @@ try {
               <Route path="/league" element={<League />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/manage" element={<RulesManager />} />
+              <Route path="/rules/edit" element={<Navigate to="/rules/manage" replace />} />
+              <Route path="/rules-manager" element={<Navigate to="/rules/manage" replace />} />
               <Route path="/quota" element={<Quota />} />
               <Route path="/inbox" element={<Inbox />} />
               <Route path="/billing-entities" element={<BillingEntities />} />

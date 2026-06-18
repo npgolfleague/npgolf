@@ -98,7 +98,7 @@ router.get('/:tournamentId', async (req, res) => {
       [tournamentId]
     );
 
-    if (savedSkinWinners.length > 0 || savedCtpWinners.length > 0) {
+    if (savedSkinWinners.length > 0) {
       savedSkinWinners.forEach((winner) => {
         if (!skins[winner.player_id]) {
           skins[winner.player_id] = {
@@ -110,22 +110,20 @@ router.get('/:tournamentId', async (req, res) => {
 
         skins[winner.player_id].count++;
         skins[winner.player_id].holes.push(winner.hole_number);
-        skins[winner.player_id].prize += Number(winner.prize_money || 0);
       });
 
-      savedCtpWinners.forEach((winner) => {
-        if (!ctpPrizes[winner.player_id]) {
-          ctpPrizes[winner.player_id] = {
-            count: 0,
-            prize: 0,
-            holes: []
-          };
-        }
-
-        ctpPrizes[winner.player_id].count++;
-        ctpPrizes[winner.player_id].prize += Number(winner.prize_money || 0);
-        ctpPrizes[winner.player_id].holes.push(winner.hole_number);
-      });
+      const hasExplicitSkinPrizes = savedSkinWinners.some((winner) => Number(winner.prize_money || 0) > 0);
+      if (hasExplicitSkinPrizes) {
+        savedSkinWinners.forEach((winner) => {
+          skins[winner.player_id].prize += Number(winner.prize_money || 0);
+        });
+      } else {
+        const totalSkins = Object.values(skins).reduce((sum, skin) => sum + skin.count, 0);
+        const skinPricePerSkin = totalSkins > 0 ? Math.floor(skinPrizePot / totalSkins) : 0;
+        Object.keys(skins).forEach((playerId) => {
+          skins[playerId].prize = skins[playerId].count * skinPricePerSkin;
+        });
+      }
     } else {
       const [holeScores] = await pool.query(`
         SELECT 
@@ -180,6 +178,65 @@ router.get('/:tournamentId', async (req, res) => {
         }
       });
 
+      const totalSkins = Object.values(skins).reduce((sum, skin) => sum + skin.count, 0);
+      const skinPricePerSkin = totalSkins > 0 ? Math.floor(skinPrizePot / totalSkins) : 0;
+      Object.keys(skins).forEach((playerId) => {
+        skins[playerId].prize = skins[playerId].count * skinPricePerSkin;
+      });
+    }
+
+    if (savedCtpWinners.length > 0) {
+      const normalizedSavedCtpWinners = [];
+      const seenCtpHoles = new Set();
+      const sortedSavedCtpWinners = [...savedCtpWinners].sort(
+        (a, b) => Number(a.hole_number) - Number(b.hole_number)
+      );
+
+      for (const winner of sortedSavedCtpWinners) {
+        const holeNumber = Number(winner.hole_number);
+        if (!Number.isFinite(holeNumber) || seenCtpHoles.has(holeNumber)) {
+          continue;
+        }
+
+        seenCtpHoles.add(holeNumber);
+        normalizedSavedCtpWinners.push(winner);
+
+        if (holeCount === 9 && normalizedSavedCtpWinners.length >= 2) {
+          break;
+        }
+      }
+
+      normalizedSavedCtpWinners.forEach((winner) => {
+        if (!ctpPrizes[winner.player_id]) {
+          ctpPrizes[winner.player_id] = {
+            count: 0,
+            prize: 0,
+            holes: []
+          };
+        }
+
+        ctpPrizes[winner.player_id].count++;
+        ctpPrizes[winner.player_id].holes.push(winner.hole_number);
+      });
+
+      const explicitCtpPrizeTotal = normalizedSavedCtpWinners.reduce(
+        (sum, winner) => sum + Number(winner.prize_money || 0),
+        0
+      );
+      const hasExplicitCtpPrizes = explicitCtpPrizeTotal > 0;
+      const canUseExplicitCtpPrizes = hasExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
+      if (canUseExplicitCtpPrizes) {
+        normalizedSavedCtpWinners.forEach((winner) => {
+          ctpPrizes[winner.player_id].prize += Number(winner.prize_money || 0);
+        });
+      } else {
+        const ctpWinnerCount = normalizedSavedCtpWinners.length;
+        const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
+        Object.keys(ctpPrizes).forEach((playerId) => {
+          ctpPrizes[playerId].prize = ctpPrizes[playerId].count * ctpPrizePerWinner;
+        });
+      }
+    } else {
       const [ctpWinners] = await pool.query(`
         SELECT 
           h.id as hole_id,
@@ -232,14 +289,7 @@ router.get('/:tournamentId', async (req, res) => {
         ctpPrizes[winner.player_id].prize += ctpPrizePerWinner;
         ctpPrizes[winner.player_id].holes.push(winner.hole_number);
       });
-
-      const totalSkins = Object.values(skins).reduce((sum, skin) => sum + skin.count, 0);
-      const skinPricePerSkin = totalSkins > 0 ? Math.floor(skinPrizePot / totalSkins) : 0;
-      Object.keys(skins).forEach((playerId) => {
-        skins[playerId].prize = skins[playerId].count * skinPricePerSkin;
-      });
     }
-    
     // Calculate over/under for each player first
     const playersWithOverUnder = rows.map((player) => {
       const playerSkins = skins[player.id]?.count || 0;

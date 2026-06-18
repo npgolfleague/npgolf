@@ -6,6 +6,16 @@ const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
 const { getLeagueId } = require('../utils/league');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const parseSemicolonEmails = (value) => {
+  if (value == null) return [];
+  return String(value)
+    .split(';')
+    .map(v => v.trim())
+    .filter(Boolean);
+};
+
 // Helper to format time from MySQL TIME format or add minutes
 const formatTeeTime = (baseTime, addMinutes = 0) => {
   if (!baseTime) return '';
@@ -183,6 +193,108 @@ const buildScoreLink = (req, tournamentId, group) => {
   return `${baseUrl}${leaguePrefix}/scores?tid=${encodeURIComponent(tournamentId)}&foursome=${encodeURIComponent(group)}`;
 };
 
+const getNormalizedTournamentGroups = async (tournamentId) => {
+  const groups = {};
+
+  // From scores table
+  const [scoreRows] = await pool.query(
+    `SELECT s.foursome_group, p.name as player_name
+     FROM scores s
+     JOIN players p ON s.player_id = p.id
+     WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
+     GROUP BY s.foursome_group, p.id
+     ORDER BY s.foursome_group, p.name`,
+    [tournamentId]
+  );
+
+  scoreRows.forEach(row => {
+    if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
+    groups[row.foursome_group].add(row.player_name);
+  });
+
+  // From tournament_players table (allows assigning groups without scores)
+  // Use `foursome` and `pair` columns on tournament_players
+  const [tpRows] = await pool.query(
+    `SELECT tp.foursome, tp.pair, p.name as player_name, tp.player_id
+     FROM tournament_players tp
+     JOIN players p ON tp.player_id = p.id
+     WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
+     GROUP BY tp.foursome, tp.pair, p.id
+     ORDER BY tp.foursome, tp.pair, p.name`,
+    [tournamentId]
+  );
+
+  tpRows.forEach(row => {
+    // Initialize as array if doesn't exist, or convert Set to array if it exists as a Set
+    if (!groups[row.foursome]) {
+      groups[row.foursome] = [];
+    } else if (groups[row.foursome] instanceof Set) {
+      // Convert Set to array of objects
+      groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null }));
+    }
+    // store objects with player name and optional pair number
+    groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
+  });
+
+  const groupKeys = Object.keys(groups);
+  const groupsByName = {};
+  groupKeys.forEach(g => {
+    // groups[g] might be a Set (from scores) or an array (from tpRows)
+    let arr;
+    if (Array.isArray(groups[g])) {
+      arr = groups[g];
+    } else {
+      // Set of names from scores - convert to objects without pair info
+      arr = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
+    }
+
+    // Deduplicate by player name; prefer entries with pair info over null-pair duplicates
+    // (a player in both scores and tournament_players would otherwise appear twice)
+    const seen = new Map();
+    arr.forEach(p => {
+      const existing = seen.get(p.name);
+      if (!existing || (existing.pair == null && p.pair != null)) {
+        seen.set(p.name, p);
+      }
+    });
+    groupsByName[g] = Array.from(seen.values());
+  });
+
+  return {
+    groupNames: Object.keys(groupsByName).sort(),
+    groupsByName
+  };
+};
+
+const buildCartAssignments = (players) => {
+  const carts = [];
+
+  // If players have pair numbers, group by pair; otherwise fall back to sequential pairing
+  const hasPairs = players.some(p => p.pair != null);
+  if (hasPairs) {
+    // group by pair number (nulls get their own unique index by order)
+    const byPair = {};
+    let noPairIdx = 1000; // large offset for null pairs
+    players.forEach(p => {
+      const key = p.pair == null ? `nopair_${noPairIdx++}` : `pair_${p.pair}`;
+      if (!byPair[key]) byPair[key] = [];
+      byPair[key].push(p.name);
+    });
+
+    Object.values(byPair).forEach(pairArr => {
+      for (let i = 0; i < pairArr.length; i += 2) {
+        carts.push(pairArr.slice(i, i + 2));
+      }
+    });
+  } else {
+    for (let i = 0; i < players.length; i += 2) {
+      carts.push(players.slice(i, i + 2).map(p => p.name));
+    }
+  }
+
+  return carts;
+};
+
 // GET /api/cart-tags/tournament/:tournamentId - Generate printable cart tags HTML
 router.get('/tournament/:tournamentId', async (req, res) => {
   try {
@@ -205,79 +317,15 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const courseName = tournament.course_name;
     const firstTeeTime = tournament.first_tee_time;
     
-    // Get all foursome groups with players from both scores and tournament_players
-    const groups = {};
+    const { groupNames, groupsByName } = await getNormalizedTournamentGroups(tournamentId);
 
-    // From scores table
-    const [scoreRows] = await pool.query(
-      `SELECT s.foursome_group, p.name as player_name
-       FROM scores s
-       JOIN players p ON s.player_id = p.id
-       WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
-       GROUP BY s.foursome_group, p.id
-       ORDER BY s.foursome_group, p.name`,
-      [tournamentId]
-    );
-
-    scoreRows.forEach(row => {
-      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
-      groups[row.foursome_group].add(row.player_name);
-    });
-
-    // From tournament_players table (allows assigning groups without scores)
-    // Use `foursome` and `pair` columns on tournament_players
-    const [tpRows] = await pool.query(
-      `SELECT tp.foursome, tp.pair, p.name as player_name, tp.player_id
-       FROM tournament_players tp
-       JOIN players p ON tp.player_id = p.id
-       WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
-       GROUP BY tp.foursome, tp.pair, p.id
-       ORDER BY tp.foursome, tp.pair, p.name`,
-      [tournamentId]
-    );
-
-    tpRows.forEach(row => {
-      // Initialize as array if doesn't exist, or convert Set to array if it exists as a Set
-      if (!groups[row.foursome]) {
-        groups[row.foursome] = [];
-      } else if (groups[row.foursome] instanceof Set) {
-        // Convert Set to array of objects
-        groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null }));
-      }
-      // store objects with player name and optional pair number
-      groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
-    });
-
-    // Ensure we have at least one group and normalize groups into arrays of player objects
-    const groupKeys = Object.keys(groups);
-    if (groupKeys.length === 0) {
+    // Ensure we have at least one group
+    if (groupNames.length === 0) {
       return res.status(404).json({ error: 'No foursome groups found for this tournament' });
     }
-    const groupsArr = {};
-    groupKeys.forEach(g => {
-      // groups[g] might be a Set (from scores) or an array (from tpRows)
-      let arr;
-      if (Array.isArray(groups[g])) {
-        arr = groups[g];
-      } else {
-        // Set of names from scores - convert to objects without pair info
-        arr = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
-      }
-      // Deduplicate by player name; prefer entries with pair info over null-pair duplicates
-      // (a player in both scores and tournament_players would otherwise appear twice)
-      const seen = new Map();
-      arr.forEach(p => {
-        const existing = seen.get(p.name);
-        if (!existing || (existing.pair == null && p.pair != null)) {
-          seen.set(p.name, p);
-        }
-      });
-      groupsArr[g] = Array.from(seen.values());
-    });
     
     // Generate cart tags (2 players per cart typically)
     const tags = [];
-    const groupNames = Object.keys(groupsArr).sort();
     
     // Pre-generate QR codes for each group linking to the score entry path
     const qrMap = {};
@@ -292,34 +340,14 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     }));
 
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groupsArr[groupName];
+      const players = groupsByName[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8); // 8 minute intervals
       const startingHole = parseInt(groupName) || 1;
 
-      // If players have pair numbers, group by pair; otherwise fall back to sequential pairing
-      const hasPairs = players.some(p => p.pair != null);
-      if (hasPairs) {
-        // group by pair number (nulls get their own unique index by order)
-        const byPair = {};
-        let noPairIdx = 1000; // large offset for null pairs
-        players.forEach(p => {
-          const key = p.pair == null ? `nopair_${noPairIdx++}` : `pair_${p.pair}`;
-          if (!byPair[key]) byPair[key] = [];
-          byPair[key].push(p.name);
-        });
-
-        Object.values(byPair).forEach(pairArr => {
-          for (let i = 0; i < pairArr.length; i += 2) {
-            const cartPlayers = pairArr.slice(i, i + 2);
-            tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
-          }
-        });
-      } else {
-        for (let i = 0; i < players.length; i += 2) {
-          const cartPlayers = players.slice(i, i + 2).map(p => p.name);
-          tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
-        }
-      }
+      const carts = buildCartAssignments(players);
+      carts.forEach(cartPlayers => {
+        tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
+      });
     });
     
     const html = generateCartTagsDocument(tags);
@@ -338,10 +366,16 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     
     // Get settings for golf course email
     const [settingsRows] = await pool.query('SELECT golf_course_email FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
-    const golfCourseEmail = settingsRows[0]?.golf_course_email;
-    
-    if (!golfCourseEmail) {
+    const configuredGolfCourseEmail = settingsRows[0]?.golf_course_email;
+    const golfCourseEmails = parseSemicolonEmails(configuredGolfCourseEmail);
+
+    if (golfCourseEmails.length === 0) {
       return res.status(400).json({ error: 'Golf course email not configured in settings' });
+    }
+
+    const invalidEmail = golfCourseEmails.find(email => !EMAIL_REGEX.test(email));
+    if (invalidEmail) {
+      return res.status(400).json({ error: `Invalid golf course email configured: ${invalidEmail}` });
     }
     
     // Get tournament and course details
@@ -368,44 +402,11 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       day: 'numeric'
     });
     
-    // Get all foursome groups with players from both scores and tournament_players
-    const groups = {};
+    const { groupNames, groupsByName } = await getNormalizedTournamentGroups(tournamentId);
+    if (groupNames.length === 0) {
+      return res.status(404).json({ error: 'No foursome groups found for this tournament' });
+    }
 
-    // From scores table
-    const [scoreRows2] = await pool.query(
-      `SELECT s.foursome_group, p.name as player_name
-       FROM scores s
-       JOIN players p ON s.player_id = p.id
-       WHERE s.tournament_id = ? AND s.foursome_group IS NOT NULL
-       GROUP BY s.foursome_group, p.id
-       ORDER BY s.foursome_group, p.name`,
-      [tournamentId]
-    );
-
-    scoreRows2.forEach(row => {
-      if (!groups[row.foursome_group]) groups[row.foursome_group] = new Set();
-      groups[row.foursome_group].add(row.player_name);
-    });
-
-    // From tournament_players table
-    const [tpRows2] = await pool.query(
-      `SELECT tp.foursome, p.name as player_name
-       FROM tournament_players tp
-       JOIN players p ON tp.player_id = p.id
-       WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
-       GROUP BY tp.foursome, p.id
-       ORDER BY tp.foursome, p.name`,
-      [tournamentId]
-    );
-
-    tpRows2.forEach(row => {
-      if (!groups[row.foursome]) groups[row.foursome] = new Set();
-      groups[row.foursome].add(row.player_name);
-    });
-
-    const groupsArr2 = {};
-    Object.keys(groups).forEach(g => { groupsArr2[g] = Array.from(groups[g]); });
-    const groupNames = Object.keys(groupsArr2).sort();
     // Pre-generate QR codes for email/pdf tags
     const qrMap2 = {};
     await Promise.all(groupNames.map(async (g) => {
@@ -421,7 +422,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     // Build foursome list HTML
     let foursomeListHTML = '';
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groupsArr2[groupName];
+      const players = groupsByName[groupName].map(p => p.name);
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
       
       foursomeListHTML += `
@@ -437,17 +438,17 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const emailTags = [];
     const pdfTags = []; // For PDF generation
     groupNames.forEach((groupName, groupIndex) => {
-      const players = groupsArr2[groupName];
+      const players = groupsByName[groupName];
       const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
       
       // Extract starting hole from group name (e.g., "1" -> 1)
       const startingHole = parseInt(groupName) || 1;
-      
-      for (let i = 0; i < players.length; i += 2) {
-        const cartPlayers = players.slice(i, i + 2);
+
+      const carts = buildCartAssignments(players);
+      carts.forEach(cartPlayers => {
         emailTags.push(generateCartTagEmailHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
         pdfTags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
-      }
+      });
     });
     
     // Create email
@@ -545,11 +546,11 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       // Continue without attachment - email will just have the tee sheet
     }
     
-    await sendEmail(golfCourseEmail, subject, emailHTML, null, attachments);
+    await sendEmail(golfCourseEmails, subject, emailHTML, null, attachments);
     
     res.json({ 
       success: true, 
-      message: `Tee sheet sent to ${golfCourseEmail}`,
+      message: `Tee sheet sent to ${golfCourseEmails.join('; ')}`,
       groups: groupNames.length
     });
     

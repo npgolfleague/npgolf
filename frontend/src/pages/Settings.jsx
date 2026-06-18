@@ -18,6 +18,8 @@ const DEFAULT_SETTINGS = {
   live_scoring: 1
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function settingsFromResponse(data) {
   return {
     tournament_fee_18_holes: data.tournament_fee_18_holes ?? DEFAULT_SETTINGS.tournament_fee_18_holes,
@@ -114,6 +116,15 @@ export const Settings = () => {
     setSaving(true)
 
     try {
+      const rawEmails = String(settings.golf_course_email || '').trim()
+      if (rawEmails) {
+        const emails = rawEmails.split(';').map(v => v.trim()).filter(Boolean)
+        const invalid = emails.find(email => !EMAIL_REGEX.test(email))
+        if (invalid) {
+          throw new Error(`Invalid email address: ${invalid}`)
+        }
+      }
+
       const response = await leaguesAPI.updateSettings(selectedLeagueId, settings)
       setSettings(settingsFromResponse(response.data))
       const leagueName = leagues.find(l => l.id === selectedLeagueId)?.name || 'League'
@@ -181,7 +192,7 @@ export const Settings = () => {
           <div className="text-gray-500">Loading settings...</div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
+        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg shadow-md p-6">
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -220,15 +231,15 @@ export const Settings = () => {
                 Golf Course Email
               </label>
               <input
-                type="email"
+                type="text"
                 name="golf_course_email"
                 value={settings.golf_course_email}
                 onChange={handleChange}
-                placeholder="course@example.com"
+                placeholder="course@example.com; proshop@example.com"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-sm text-gray-500 mt-1">
-                Email address to send cart tags and tee sheets to the golf course
+                One or more emails separated by a semicolon (;)
               </p>
             </div>
 

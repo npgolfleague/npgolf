@@ -3,6 +3,28 @@ const pool = require('../db');
 const { requireAdmin } = require('../middleware/admin');
 const router = express.Router();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeSemicolonEmails(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const emails = raw
+    .split(';')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  if (emails.length === 0) return null;
+
+  const invalid = emails.find(email => !EMAIL_REGEX.test(email));
+  if (invalid) {
+    return { error: `Invalid email address: ${invalid}` };
+  }
+
+  return { normalized: emails.join('; ') };
+}
+
 function ensureLeagueScope(req, res, id) {
   if (!req.league?.id) return true;
 
@@ -159,6 +181,12 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     live_scoring
   } = req.body;
 
+  const normalizedEmailResult = normalizeSemicolonEmails(golf_course_email);
+  if (normalizedEmailResult && normalizedEmailResult.error) {
+    return res.status(400).json({ error: normalizedEmailResult.error });
+  }
+  const normalizedGolfCourseEmail = normalizedEmailResult?.normalized ?? null;
+
   try {
     // Verify league exists
     const [leagueRows] = await pool.query('SELECT id FROM leagues WHERE id = ? LIMIT 1', [id]);
@@ -194,7 +222,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         id,
         tournament_fee_18_holes ?? 20.00, tournament_fee_9_holes ?? 10.00,
         skins_ctp_fee_18_holes ?? 10.00, skins_ctp_fee_9_holes ?? 5.00,
-        golf_course_email ?? null,
+        normalizedGolfCourseEmail,
         quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
         quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
         quota_points_worse ?? 0,

@@ -29,7 +29,7 @@ services:
       DB_PASS: ${DB_PASS}
       DB_NAME: npgolf
       JWT_SECRET: 5158d3897efe5c9c44d87bbcb0fc333b399a2c5291bc12976751f8b7c46cca9e
-      JWT_EXPIRES_IN: 1h
+      JWT_EXPIRES_IN: 8h
       BCRYPT_ROUNDS: 10
       SMS_ENABLED: ${SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}

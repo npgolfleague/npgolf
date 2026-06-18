@@ -191,7 +191,8 @@ export const RulesManager = () => {
 
     const payload = {
       title: title.trim(),
-      sections: sections.filter(s => s.visible).map(s => {
+      // Persist all sections, including hidden ones, so admins can re-enable them later.
+      sections: sections.map(s => {
         const section = { ...s }
         if (Array.isArray(section.items)) {
           section.items = section.items.map(item => (typeof item === 'string' ? item.trim() : '')).filter(item => item.length > 0)
