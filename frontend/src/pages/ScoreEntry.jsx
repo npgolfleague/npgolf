@@ -27,6 +27,7 @@ export const ScoreEntry = () => {
   const [isPosted, setIsPosted] = useState(false)
   const [postedInfo, setPostedInfo] = useState(null)
   const [posting, setPosting] = useState(false)
+  const [isFivesome, setIsFivesome] = useState(false)
   const scoreInputRefs = useRef({})
 
   // Helper to focus the next player's input for the same field
@@ -907,7 +908,7 @@ export const ScoreEntry = () => {
           <div className="bg-white rounded-lg shadow p-4 mt-4">
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-semibold text-gray-700">
-                Select Players (up to 4)
+                Select Players (up to {isFivesome ? 5 : 4})
               </label>
               {selectedPlayers.length > 0 && (
                 <button
@@ -924,8 +925,22 @@ export const ScoreEntry = () => {
               </div>
             ) : (
               <>
+                <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-blue-600"
+                    checked={isFivesome}
+                    onChange={(e) => {
+                      setIsFivesome(e.target.checked)
+                      if (!e.target.checked) {
+                        setSelectedPlayers(prev => prev.slice(0, 4))
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">This is a fivesome</span>
+                </label>
                 <div className="flex flex-col gap-2">
-                  {[0, 1, 2, 3].map(slot => (
+                  {(isFivesome ? [0, 1, 2, 3, 4] : [0, 1, 2, 3]).map(slot => (
                     <div key={slot} className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 w-16">Player {slot + 1}</span>
                       <select
@@ -958,7 +973,7 @@ export const ScoreEntry = () => {
                 </div>
                 <div className="mt-2">
                   <div className="text-sm text-gray-600">
-                    Selected: {selectedPlayers.length}/4
+                    Selected: {selectedPlayers.length}/{isFivesome ? 5 : 4}
                   </div>
                 </div>
               </>
