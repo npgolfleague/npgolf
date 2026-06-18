@@ -5,6 +5,41 @@ const { requireAdmin } = require('../middleware/admin');
 const { isAdminCapableRole, isSuperAdminRole } = require('../middleware/admin');
 const jwt = require('jsonwebtoken');
 
+async function getPar3HolesForCourse(courseId) {
+  try {
+    const [holeRows] = await pool.query(
+      `SELECT h.id AS hole_id, h.hole_number, 3 AS mens_par
+       FROM hole h
+       WHERE h.course_id = ?
+         AND EXISTS (
+           SELECT 1
+           FROM hole_tee ht
+           WHERE ht.hole_id = h.id
+             AND ht.par = 3
+         )
+       ORDER BY h.hole_number ASC`,
+      [courseId]
+    );
+
+    return holeRows;
+  } catch (err) {
+    // Backward compatibility for databases that still use hole.mens_par.
+    if (err && (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_FIELD_ERROR')) {
+      const [legacyHoleRows] = await pool.query(
+        `SELECT h.id AS hole_id, h.hole_number, h.mens_par
+         FROM hole h
+         WHERE h.course_id = ? AND h.mens_par = 3
+         ORDER BY h.hole_number ASC`,
+        [courseId]
+      );
+
+      return legacyHoleRows;
+    }
+
+    throw err;
+  }
+}
+
 // GET /api/scores - List all scores
 router.get('/', async (req, res) => {
   try {
@@ -285,6 +320,183 @@ router.get('/tournament/:tournamentId/hole/:holeId/ctp-leader', async (req, res)
   }
 });
 
+// GET /api/scores/tournament/:tournamentId/ctp-admin-options - Get par-3 holes, tournament players, and saved CTP winners
+router.get('/tournament/:tournamentId/ctp-admin-options', requireAdmin, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+
+    const [tournamentRows] = await pool.query(
+      'SELECT id, course_id, number_of_holes, nine_hole_side FROM tournament WHERE id = ? LIMIT 1',
+      [tournamentId]
+    );
+
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const tournament = tournamentRows[0];
+
+    const holeRows = await getPar3HolesForCourse(tournament.course_id);
+
+    let ctpHoles = holeRows;
+    if (Number(tournament.number_of_holes) === 9) {
+      const useBackNine = tournament.nine_hole_side === 'back';
+      ctpHoles = holeRows.filter(h => useBackNine ? h.hole_number > 9 : h.hole_number <= 9);
+    }
+
+    const [playerRows] = await pool.query(
+      `SELECT DISTINCT p.id, p.name
+       FROM tournament_players tp
+       JOIN players p ON tp.player_id = p.id
+       WHERE tp.tournament_id = ?
+       ORDER BY p.name ASC`,
+      [tournamentId]
+    );
+
+    const [winnerRows] = await pool.query(
+      `SELECT w.hole_id, w.hole_number, w.player_id, w.ctp_feet, w.ctp_inches,
+              p.name AS player_name
+       FROM tournament_ctp_winners w
+       JOIN players p ON p.id = w.player_id
+       WHERE w.tournament_id = ?
+       ORDER BY w.hole_number ASC`,
+      [tournamentId]
+    );
+
+    return res.json({
+      holes: ctpHoles,
+      players: playerRows,
+      winners: winnerRows
+    });
+  } catch (err) {
+    console.error('Error fetching CTP admin options:', err);
+    return res.status(500).json({ error: 'Failed to fetch CTP admin options' });
+  }
+});
+
+// PUT /api/scores/tournament/:tournamentId/ctp-winners - Upsert/remove CTP winners (admin only)
+router.put('/tournament/:tournamentId/ctp-winners', requireAdmin, async (req, res) => {
+  const { tournamentId } = req.params;
+  const { winners } = req.body || {};
+
+  if (!Array.isArray(winners)) {
+    return res.status(400).json({ error: 'winners array is required' });
+  }
+
+  try {
+    const [tournamentRows] = await pool.query(
+      'SELECT id, course_id, number_of_holes, nine_hole_side FROM tournament WHERE id = ? LIMIT 1',
+      [tournamentId]
+    );
+
+    if (tournamentRows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const tournament = tournamentRows[0];
+
+    const holeRows = await getPar3HolesForCourse(tournament.course_id);
+
+    let allowedHoles = holeRows;
+    if (Number(tournament.number_of_holes) === 9) {
+      const useBackNine = tournament.nine_hole_side === 'back';
+      allowedHoles = holeRows.filter(h => useBackNine ? h.hole_number > 9 : h.hole_number <= 9);
+    }
+
+    const holeByNumber = new Map(allowedHoles.map(h => [Number(h.hole_number), h]));
+
+    const [playerRows] = await pool.query(
+      `SELECT DISTINCT tp.player_id
+       FROM tournament_players tp
+       WHERE tp.tournament_id = ?`,
+      [tournamentId]
+    );
+    const validPlayerIds = new Set(playerRows.map(r => Number(r.player_id)));
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const entry of winners) {
+        const holeNumber = Number(entry?.hole_number);
+        if (!Number.isInteger(holeNumber)) {
+          throw new Error('Each winner entry must include a valid hole_number');
+        }
+
+        const hole = holeByNumber.get(holeNumber);
+        if (!hole) {
+          throw new Error(`Hole ${holeNumber} is not a valid CTP hole for this tournament`);
+        }
+
+        const playerId = entry?.player_id == null || entry.player_id === ''
+          ? null
+          : Number(entry.player_id);
+
+        if (playerId == null) {
+          // Empty player means clear winner for this hole
+          await connection.query(
+            'DELETE FROM tournament_ctp_winners WHERE tournament_id = ? AND hole_id = ?',
+            [tournamentId, hole.hole_id]
+          );
+          continue;
+        }
+
+        if (!Number.isInteger(playerId) || !validPlayerIds.has(playerId)) {
+          throw new Error(`Player ${entry.player_id} is not a valid player for this tournament`);
+        }
+
+        const ctpFeet = entry?.ctp_feet == null || entry.ctp_feet === '' ? null : Number(entry.ctp_feet);
+        const ctpInches = entry?.ctp_inches == null || entry.ctp_inches === '' ? null : Number(entry.ctp_inches);
+
+        if (ctpFeet != null && (!Number.isFinite(ctpFeet) || ctpFeet < 0)) {
+          throw new Error(`Invalid feet value for hole ${holeNumber}`);
+        }
+        if (ctpInches != null && (!Number.isFinite(ctpInches) || ctpInches < 0 || ctpInches >= 12)) {
+          throw new Error(`Invalid inches value for hole ${holeNumber}`);
+        }
+
+        await connection.query(
+          `INSERT INTO tournament_ctp_winners
+            (tournament_id, hole_id, hole_number, player_id, ctp_feet, ctp_inches, ctp_image_url, prize_money)
+           VALUES (?, ?, ?, ?, ?, ?, NULL, 0.00)
+           ON DUPLICATE KEY UPDATE
+             player_id = VALUES(player_id),
+             ctp_feet = VALUES(ctp_feet),
+             ctp_inches = VALUES(ctp_inches),
+             ctp_image_url = VALUES(ctp_image_url)`,
+          [tournamentId, hole.hole_id, holeNumber, playerId, ctpFeet, ctpInches]
+        );
+      }
+
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    const [updatedRows] = await pool.query(
+      `SELECT w.ctp_feet, w.ctp_inches, w.ctp_image_url,
+              p.id as player_id, p.name as player_name,
+              w.hole_number,
+              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par,
+              w.prize_money
+       FROM tournament_ctp_winners w
+       JOIN players p ON w.player_id = p.id
+       LEFT JOIN hole h ON w.hole_id = h.id
+       WHERE w.tournament_id = ?
+       ORDER BY w.hole_number ASC`,
+      [tournamentId]
+    );
+
+    return res.json(updatedRows);
+  } catch (err) {
+    console.error('Error updating CTP winners:', err);
+    return res.status(400).json({ error: err.message || 'Failed to update CTP winners' });
+  }
+});
+
 // GET /api/scores/tournament/:tournamentId/ctp-winners - Get CTP winners
 router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
   try {
@@ -377,20 +589,31 @@ router.get('/tournament/:tournamentId/foursome/:group/post-status', async (req, 
 
 // POST /api/scores/tournament/:tournamentId/foursome/:group/post - Mark foursome scores as posted
 router.post('/tournament/:tournamentId/foursome/:group/post', async (req, res) => {
+  const requestId = `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const { tournamentId, group } = req.params;
+  console.log(`[${requestId}] Post foursome request`, {
+    tournamentId,
+    group,
+    hasAuthHeader: Boolean(req.headers.authorization),
+    hasLeagueContext: Boolean(req.league?.id)
+  });
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authentication required' });
+    console.warn(`[${requestId}] Missing or invalid auth header`);
+    return res.status(401).json({ error: 'Authentication required', request_id: requestId });
   }
+
   let userId;
   try {
     const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
     userId = decoded.sub;
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch (err) {
+    console.warn(`[${requestId}] Token verification failed:`, err.message);
+    return res.status(401).json({ error: 'Invalid token', request_id: requestId });
   }
 
   try {
-    const { tournamentId, group } = req.params;
     await pool.query(
       `INSERT INTO foursome_posts (tournament_id, foursome_group, posted_by)
        VALUES (?, ?, ?)
@@ -404,10 +627,23 @@ router.post('/tournament/:tournamentId/foursome/:group/post', async (req, res) =
        WHERE fp.tournament_id = ? AND fp.foursome_group = ? LIMIT 1`,
       [tournamentId, group]
     );
+    console.log(`[${requestId}] Post foursome success`, {
+      tournamentId,
+      group,
+      postedBy: userId
+    });
     res.json({ posted: true, ...rows[0] });
   } catch (err) {
-    console.error('Error posting foursome scores:', err);
-    res.status(500).json({ error: 'Failed to post scores' });
+    console.error(`[${requestId}] Error posting foursome scores:`, {
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+      sqlState: err.sqlState,
+      tournamentId,
+      group,
+      userId
+    });
+    res.status(500).json({ error: 'Failed to post scores', request_id: requestId });
   }
 });
 

@@ -19,6 +19,11 @@ const apiClient = axios.create({
   baseURL: '/api'
 })
 
+// Dedicated client for global endpoints (no league prefix)
+const globalApiClient = axios.create({
+  baseURL: '/api'
+})
+
 const refreshClient = axios.create({
   baseURL: '/api'
 })
@@ -35,7 +40,12 @@ apiClient.interceptors.request.use((config) => {
   // Add JWT token if available
   const token = localStorage.getItem('token')
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    if (config.headers && typeof config.headers.set === 'function') {
+      config.headers.set('Authorization', `Bearer ${token}`)
+    } else {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
   return config
 })
@@ -72,8 +82,12 @@ apiClient.interceptors.response.use(
           localStorage.setItem('refreshToken', newRefreshToken)
         }
 
-        originalRequest.headers = originalRequest.headers || {}
-        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+          originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
+        } else {
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        }
         return apiClient.request(originalRequest)
       }
     } catch (refreshError) {
@@ -112,19 +126,20 @@ export const playersAPI = {
 export const usersAPI = playersAPI
 
 export const coursesAPI = {
-  list: () => apiClient.get('/courses'),
-  get: (id) => apiClient.get(`/courses/${id}`),
-  create: (name, address, phone) => apiClient.post('/courses', { name, address, phone }),
-  update: (id, name, address, phone) => apiClient.put(`/courses/${id}`, { name, address, phone }),
-  delete: (id) => apiClient.delete(`/courses/${id}`),
-  // Tee management
-  getTees: (courseId) => apiClient.get(`/courses/${courseId}/tees`),
-  addTee: (courseId, data) => apiClient.post(`/courses/${courseId}/tees`, data),
-  updateTee: (courseId, teeId, data) => apiClient.put(`/courses/${courseId}/tees/${teeId}`, data),
-  deleteTee: (courseId, teeId) => apiClient.delete(`/courses/${courseId}/tees/${teeId}`),
-  setTeeHoles: (courseId, teeId, holes) => apiClient.put(`/courses/${courseId}/tees/${teeId}/holes`, { holes }),
+  // Always use globalApiClient to avoid league prefix
+  list: () => globalApiClient.get('/courses'),
+  get: (id) => globalApiClient.get(`/courses/${id}`),
+  create: (name, address, phone) => globalApiClient.post('/courses', { name, address, phone }),
+  update: (id, name, address, phone) => globalApiClient.put(`/courses/${id}`, { name, address, phone }),
+  delete: (id) => globalApiClient.delete(`/courses/${id}`),
+  // Tee management (these may need to be global as well)
+  getTees: (courseId) => globalApiClient.get(`/courses/${courseId}/tees`),
+  addTee: (courseId, data) => globalApiClient.post(`/courses/${courseId}/tees`, data),
+  updateTee: (courseId, teeId, data) => globalApiClient.put(`/courses/${courseId}/tees/${teeId}`, data),
+  deleteTee: (courseId, teeId) => globalApiClient.delete(`/courses/${courseId}/tees/${teeId}`),
+  setTeeHoles: (courseId, teeId, holes) => globalApiClient.put(`/courses/${courseId}/tees/${teeId}/holes`, { holes }),
   // Scorecard parsing
-  parseScorecard: (formData) => apiClient.post('/courses/parse-scorecard', formData)
+  parseScorecard: (formData) => globalApiClient.post('/courses/parse-scorecard', formData)
 }
 
 export const tournamentsAPI = {
@@ -168,6 +183,8 @@ export const scoresAPI = {
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
   delete: (id) => apiClient.delete(`/scores/${id}`),
   getCtpWinners: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/ctp-winners`),
+  getCtpAdminOptions: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/ctp-admin-options`),
+  updateCtpWinners: (tournamentId, winners) => apiClient.put(`/scores/tournament/${tournamentId}/ctp-winners`, { winners }),
   getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`),
   getFoursomePostStatus: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post-status`),
   postFoursomeScores: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post`)

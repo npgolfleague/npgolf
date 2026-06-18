@@ -4,6 +4,28 @@ const { requireAdmin } = require('../middleware/admin');
 const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeSemicolonEmails(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const emails = raw
+    .split(';')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  if (emails.length === 0) return null;
+
+  const invalid = emails.find(email => !EMAIL_REGEX.test(email));
+  if (invalid) {
+    return { error: `Invalid email address: ${invalid}` };
+  }
+
+  return { normalized: emails.join('; ') };
+}
+
 // GET /api/settings - Get current settings
 router.get('/', async (req, res) => {
   try {
@@ -39,6 +61,12 @@ router.put('/', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'No settings provided to update' });
   }
 
+  const normalizedEmailResult = normalizeSemicolonEmails(golf_course_email);
+  if (normalizedEmailResult && normalizedEmailResult.error) {
+    return res.status(400).json({ error: normalizedEmailResult.error });
+  }
+  const normalizedGolfCourseEmail = normalizedEmailResult?.normalized ?? null;
+
   try {
     const updates = [];
     const values = [];
@@ -65,7 +93,7 @@ router.put('/', requireAdmin, async (req, res) => {
 
     if (golf_course_email !== undefined) {
       updates.push('golf_course_email = ?');
-      values.push(golf_course_email);
+      values.push(normalizedGolfCourseEmail);
     }
 
     if (quota_points_albatross !== undefined) { updates.push('quota_points_albatross = ?'); values.push(quota_points_albatross); }

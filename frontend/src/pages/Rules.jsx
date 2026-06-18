@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { rulesAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_LOCAL_RULES = [
   "Mulligan on first hole played. If your first shot is not a good one you may without penalty play a second shot, with the caveat that you must play the second shot (you don't choose the best one).",
@@ -8,6 +11,8 @@ const DEFAULT_LOCAL_RULES = [
 ]
 
 export const Rules = () => {
+  const { user } = useContext(AuthContext)
+  const canManageRules = isAdminCapable(user)
   const [expandedSection, setExpandedSection] = useState(null)
   const [localRules, setLocalRules] = useState(DEFAULT_LOCAL_RULES)
   const [sections, setSections] = useState([])
@@ -89,10 +94,20 @@ export const Rules = () => {
     return (
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-8">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">League Rules</h1>
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <h1 className="text-2xl font-bold text-slate-900">League Rules</h1>
+            {canManageRules && (
+              <Link
+                to="/rules/manage"
+                className="shrink-0 inline-flex items-center px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+              >
+                Edit Rules
+              </Link>
+            )}
+          </div>
           <p className="text-gray-600 mb-8">Paradise Golf League</p>
 
-          {sections.map((section) => (
+          {sections.filter((section) => section.visible !== false).map((section) => (
             <section key={section.id} className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">{section.title}</h2>
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
@@ -109,7 +124,17 @@ export const Rules = () => {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">League Rules</h1>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h1 className="text-2xl font-bold text-slate-900">League Rules</h1>
+          {canManageRules && (
+            <Link
+              to="/rules/manage"
+              className="shrink-0 inline-flex items-center px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+            >
+              Edit Rules
+            </Link>
+          )}
+        </div>
         <p className="text-gray-600 mb-8">Paradise Golf League</p>
 
         {/* Basic Information */}
