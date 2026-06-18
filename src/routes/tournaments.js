@@ -302,7 +302,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rank
             <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
             <td style="padding:8px 12px;">${w.player_name}</td>
             <td style="padding:8px 12px;text-align:center;">${w.ctp_feet}'${w.ctp_inches}"</td>
-            <td style="padding:8px 12px;text-align:right;">$${ctpPrizePerWinner}</td>
+            <td style="padding:8px 12px;text-align:right;">$${Number(w.prize_money ?? ctpPrizePerWinner ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
           </tr>`).join('')}</tbody>
       </table>
     </div>` : '';
