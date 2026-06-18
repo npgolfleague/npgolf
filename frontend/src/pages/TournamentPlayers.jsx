@@ -339,6 +339,9 @@ export function TournamentPlayers() {
               Holes: {tournament.number_of_holes}
             </p>
           )}
+          <p className="text-sm font-semibold text-blue-700 mt-1">
+            Total Players: {players.length}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {isAdmin && (
@@ -633,6 +636,8 @@ export function TournamentPlayers() {
                         onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
                         className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
                         placeholder="e.g. 1"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                       />
                     ) : (
                       <div className="text-sm text-gray-500">{player.foursome || '-'}</div>
@@ -647,6 +652,8 @@ export function TournamentPlayers() {
                         onKeyDown={(e) => { if (e.key === 'Enter') saveFoursomePair(player.id) }}
                         className="w-16 border border-gray-300 rounded px-2 py-1 text-sm"
                         placeholder="-"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                       />
                     ) : (
                       <div className="text-sm text-gray-500">{player.pair == null ? '-' : player.pair}</div>

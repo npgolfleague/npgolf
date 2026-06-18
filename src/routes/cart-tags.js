@@ -492,6 +492,12 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
           Print and place one tag per golf cart. Each tag shows the players, tee time, and starting hole.
         </p>
       </div>
+
+      <div style="margin-top: 16px; padding: 20px; background: #fff8e1; border-left: 4px solid #f59e0b;">
+        <p style="margin: 0; font-size: 14px; color: #92400e;">
+          <strong>📍 Closest to the Pin Markers:</strong> Please provide Closest to the Pin markers on the designated par-3 holes for our tournament. Thank you!
+        </p>
+      </div>
       
       <p style="margin-top: 24px; font-size: 14px; color: #999;">
         If you have any questions, please contact us.<br>
