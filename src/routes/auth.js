@@ -104,10 +104,22 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Selected league is not available' });
     }
 
-    // Check if email already exists
-    const [existing] = await pool.query('SELECT id FROM players WHERE email = ? LIMIT 1', [email]);
+    if (!targetLeague.billing_entity_id) {
+      return res.status(400).json({ error: 'Selected league is not configured for registration yet' });
+    }
+
+    // Check if email is already registered in this league (case-insensitive)
+    const [existing] = await pool.query(
+      `SELECT p.id
+       FROM players p
+       JOIN league_players lp ON lp.player_id = p.id
+       WHERE lp.league_id = ?
+         AND LOWER(p.email) = LOWER(?)
+       LIMIT 1`,
+      [targetLeague.id, email]
+    );
     if (existing && existing.length > 0) {
-      return res.status(400).json({ error: 'Email already registered' });
+      return res.status(400).json({ error: 'Email already registered for this league' });
     }
 
     // Hash password
@@ -171,6 +183,15 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     console.error('Registration error', err);
+
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    if (err && (err.code === 'ER_BAD_NULL_ERROR' || err.code === 'ER_NO_REFERENCED_ROW_2')) {
+      return res.status(400).json({ error: 'Selected league is not configured for registration yet' });
+    }
+
     res.status(500).json({ error: 'Registration failed' });
   }
 });

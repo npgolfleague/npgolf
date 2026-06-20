@@ -59,6 +59,9 @@ router.get('/all', async (req, res) => {
       if (!contextLeague.active) {
         return res.status(403).json({ error: 'League alias is not active' });
       }
+      if (!contextLeague.billing_entity_id) {
+        return res.status(400).json({ error: 'League alias is not configured for registration' });
+      }
 
       const [rows] = await pool.query(`
         SELECT
@@ -72,6 +75,7 @@ router.get('/all', async (req, res) => {
         WHERE l.active = 1
           AND l.alias IS NOT NULL
           AND TRIM(l.alias) <> ''
+          AND l.billing_entity_id IS NOT NULL
           AND l.billing_entity_id = ?
         ORDER BY l.name
       `, [contextLeague.billing_entity_id]);
@@ -91,6 +95,7 @@ router.get('/all', async (req, res) => {
       WHERE l.active = 1
         AND l.alias IS NOT NULL
         AND TRIM(l.alias) <> ''
+        AND l.billing_entity_id IS NOT NULL
       ORDER BY l.name
     `);
 
