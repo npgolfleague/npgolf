@@ -58,7 +58,8 @@ const leagueAliasMiddleware = async (req, res, next) => {
 const commonRoutes = [
   'api', 'login', 'register', 'forgot-password', 'reset-password',
   'sms-consent', 'dashboard', 'about', 'robots.txt', 'favicon.svg',
-  'favicon.ico', 'assets', 'npgolf-logo.svg', 'league-select', 'billing-entities'
+  'favicon.ico', 'assets', 'npgolf-logo.svg', 'league-select', 'billing-entities',
+  'sitemap.xml', 'wp-login.php', 'wp-admin'
 ];
 
 function isCommonRoute(segment) {
