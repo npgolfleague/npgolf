@@ -33,6 +33,13 @@ const getTournamentQuotaColumn = (numberOfHoles) => (
 
 const getLeagueId = (req) => req.league?.id || 1;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isProviderThrottleError = (err) => {
+  const details = `${err?.message || ''} ${err?.response || ''}`.toLowerCase();
+  return details.includes('5.4.6') || details.includes('unusual sending activity detected');
+};
+
 const ensureTournamentResultsEmailTable = async (db) => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS tournament_results_email (
@@ -309,11 +316,11 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rank
 
   const dashboardSection = dashboardTotals.length > 0 ? `
     <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
-      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 Paradise Cup & YTD Totals</h2>
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 ${req.league?.cup_name || 'Paradise Cup'} & YTD Totals</h2>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead><tr style="background:#f0f4f8;">
           <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
-          <th style="padding:8px 12px;text-align:center;color:#555;">Paradise Pts</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">${req.league?.cup_name || 'Paradise Cup'} Pts</th>
           <th style="padding:8px 12px;text-align:right;color:#555;">Total Prize Money YTD</th>
         </tr></thead>
         <tbody>${dashboardTotals.map((p, idx) =>
@@ -548,7 +555,7 @@ router.get('/:id', async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.first_tee_time, t.shotgun_start, t.created_at,
               t.quota_collected, t.skins_collected,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
               CASE
@@ -596,15 +603,26 @@ router.put('/:id/collected', async (req, res) => {
 // POST /api/tournaments - Create tournament
 router.post('/', async (req, res) => {
   try {
-    const { date, course_id, number_of_holes, nine_hole_side } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start } = req.body;
     const leagueId = getLeagueId(req);
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
+    const teeTime = first_tee_time && String(first_tee_time).trim() !== '' ? String(first_tee_time).trim() : null;
+    const shotgunStart = Boolean(shotgun_start);
     const [result] = await pool.query(
-      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, league_id) VALUES (?, ?, ?, ?, ?)',
-      [date, course_id, holeCount, side, leagueId]
+      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, league_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, leagueId]
     );
-    res.status(201).json({ id: result.insertId, date, course_id, number_of_holes: holeCount, nine_hole_side: side, league_id: leagueId });
+    res.status(201).json({
+      id: result.insertId,
+      date,
+      course_id,
+      number_of_holes: holeCount,
+      nine_hole_side: side,
+      first_tee_time: teeTime,
+      shotgun_start: shotgunStart,
+      league_id: leagueId
+    });
   } catch (err) {
     console.error('Error creating tournament:', err);
     res.status(500).json({ error: 'Failed to create tournament' });
@@ -615,14 +633,24 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
-    const { date, course_id, number_of_holes, nine_hole_side } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start } = req.body;
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
+    const teeTime = first_tee_time && String(first_tee_time).trim() !== '' ? String(first_tee_time).trim() : null;
+    const shotgunStart = Boolean(shotgun_start);
     await pool.query(
-      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ? WHERE id = ? AND league_id = ?',
-      [date, course_id, holeCount, side, req.params.id, leagueId]
+      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ?, first_tee_time = ?, shotgun_start = ? WHERE id = ? AND league_id = ?',
+      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, req.params.id, leagueId]
     );
-    res.json({ id: req.params.id, date, course_id, number_of_holes: holeCount, nine_hole_side: side });
+    res.json({
+      id: req.params.id,
+      date,
+      course_id,
+      number_of_holes: holeCount,
+      nine_hole_side: side,
+      first_tee_time: teeTime,
+      shotgun_start: shotgunStart
+    });
   } catch (err) {
     console.error('Error updating tournament:', err);
     res.status(500).json({ error: 'Failed to update tournament' });
@@ -1306,6 +1334,18 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
     if (emailRows.length === 0) return res.status(404).json({ error: 'No results email found for this tournament' });
     const { subject, html } = emailRows[0];
 
+    const [tournamentRows] = await pool.query(
+      'SELECT league_id FROM tournament WHERE id = ? LIMIT 1',
+      [tournamentId]
+    );
+    const tournamentLeagueId = tournamentRows[0]?.league_id || getLeagueId(req);
+
+    const [settingsRows] = await pool.query(
+      'SELECT outgoing_email_from FROM league_settings WHERE league_id = ? LIMIT 1',
+      [tournamentLeagueId]
+    );
+    const outgoingEmailFrom = settingsRows[0]?.outgoing_email_from || null;
+
     let recipients;
     if (singleEmail) {
       recipients = [{ email: singleEmail }];
@@ -1323,7 +1363,7 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
       try {
         // Only BCC on the first email when sending to multiple recipients
         const includeBcc = (i === 0 && recipients.length > 1);
-        await sendEmail(player.email, subject, html, null, null, includeBcc);
+        await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
         sent++;
       } catch (err) {
         failed.push({ email: player.email, error: err.message });
@@ -1452,13 +1492,22 @@ router.post('/:id/invite-sms', async (req, res) => {
   const tournamentId = req.params.id;
   try {
     // Get tournament info
-    const [tournamentRows] = await pool.query('SELECT id, date FROM tournament WHERE id = ?', [tournamentId]);
+    const [tournamentRows] = await pool.query('SELECT id, date, league_id FROM tournament WHERE id = ?', [tournamentId]);
     if (tournamentRows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
-    // Get all active players with sms_allowed and phone
-    const [players] = await pool.query('SELECT id, name, phone FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""');
+    const leagueId = tournamentRows[0].league_id || getLeagueId(req);
+
+    // Get all active players in this league with sms_allowed and phone
+    const [players] = await pool.query(
+      `SELECT p.id, p.name, p.phone
+       FROM players p
+       INNER JOIN league_players lp ON p.id = lp.player_id
+       WHERE lp.league_id = ? AND p.active = 1 AND p.sms_allowed = 1
+         AND p.phone IS NOT NULL AND p.phone != ''`,
+      [leagueId]
+    );
     if (players.length === 0) {
       return res.status(400).json({ error: 'No active players with SMS allowed and phone numbers' });
     }
@@ -1490,7 +1539,7 @@ router.post('/:id/send-sms', async (req, res) => {
   try {
     // Get tournament info with course details
     const [tournamentRows] = await pool.query(
-      `SELECT t.id, t.date, c.name as course_name 
+      `SELECT t.id, t.date, t.league_id, c.name as course_name 
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
@@ -1508,9 +1557,16 @@ router.post('/:id/send-sms', async (req, res) => {
       day: 'numeric'
     });
     
-    // Get all active players with sms_allowed and phone
+    const leagueId = tournament.league_id || getLeagueId(req);
+
+    // Get all active players in this league with sms_allowed and phone
     const [players] = await pool.query(
-      'SELECT id, name, phone FROM players WHERE active = 1 AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""'
+      `SELECT p.id, p.name, p.phone
+       FROM players p
+       INNER JOIN league_players lp ON p.id = lp.player_id
+       WHERE lp.league_id = ? AND p.active = 1 AND p.sms_allowed = 1
+         AND p.phone IS NOT NULL AND p.phone != ''`,
+      [leagueId]
     );
     if (players.length === 0) {
       return res.status(400).json({ error: 'No active players with SMS allowed and phone numbers' });
@@ -1553,7 +1609,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
   try {
     // Get tournament info with course details
     const [tournamentRows] = await pool.query(
-      `SELECT t.id, t.date, c.name as course_name, c.address as course_address
+      `SELECT t.id, t.date, t.league_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
@@ -1574,16 +1630,27 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     // Get base URL for RSVP links
     const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
     
-    // Query players based on method (and optional single-player filter)
-    let playersQuery = 'SELECT id, name, phone, email FROM players WHERE active = 1';
-    const playersParams = [];
+    const leagueId = tournament.league_id || getLeagueId(req);
+
+    const [settingsRows] = await pool.query(
+      'SELECT outgoing_email_from FROM league_settings WHERE league_id = ? LIMIT 1',
+      [leagueId]
+    );
+    const outgoingEmailFrom = settingsRows[0]?.outgoing_email_from || null;
+
+    // Query active players in this league based on method (and optional single-player filter)
+    let playersQuery = `SELECT p.id, p.name, p.phone, p.email, p.sms_allowed, p.email_allowed
+       FROM players p
+       INNER JOIN league_players lp ON p.id = lp.player_id
+       WHERE lp.league_id = ? AND p.active = 1`;
+    const playersParams = [leagueId];
 
     if (method === 'sms' || !method) {
-      playersQuery += ' AND sms_allowed = 1 AND phone IS NOT NULL AND phone != ""';
+      playersQuery += ' AND p.sms_allowed = 1 AND p.phone IS NOT NULL AND p.phone != ""';
     } else if (method === 'email') {
-      playersQuery += ' AND email_allowed = 1 AND email IS NOT NULL AND email != ""';
+      playersQuery += ' AND p.email_allowed = 1 AND p.email IS NOT NULL AND p.email != ""';
     } else if (method === 'both') {
-      playersQuery += ' AND ((sms_allowed = 1 AND phone IS NOT NULL AND phone != "") OR (email_allowed = 1 AND email IS NOT NULL AND email != ""))';
+      playersQuery += ' AND ((p.sms_allowed = 1 AND p.phone IS NOT NULL AND p.phone != "") OR (p.email_allowed = 1 AND p.email IS NOT NULL AND p.email != ""))';
     } else {
       return res.status(400).json({ error: 'Invalid method. Use "sms", "email", or "both"' });
     }
@@ -1594,7 +1661,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Invalid playerId' });
       }
 
-      playersQuery += ' AND id = ?';
+      playersQuery += ' AND p.id = ?';
       playersParams.push(parsedPlayerId);
     }
     
@@ -1604,16 +1671,20 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     }
     
     let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
+    let emailProviderBlocked = false;
+    const emailDelayMs = Math.max(Number(process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
     
     // Count email recipients for BCC logic
-    const emailPlayers = players.filter(p => (method === 'email' || method === 'both') && p.email);
+    const emailPlayers = players.filter(
+      p => (method === 'email' || method === 'both') && p.email_allowed === 1 && p.email
+    );
     
     for (const player of players) {
       const yesUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=yes`;
       const noUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=no`;
       
       // Send SMS if applicable
-      if ((method === 'sms' || method === 'both') && player.phone) {
+      if ((method === 'sms' || method === 'both') && player.sms_allowed === 1 && player.phone) {
         try {
           let smsMessage = `Hi ${player.name}! Are you playing ${tournament.course_name} on ${tournamentDate}?`;
           if (customMessage) {
@@ -1631,7 +1702,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
       }
       
       // Send Email if applicable
-      if ((method === 'email' || method === 'both') && player.email) {
+      if ((method === 'email' || method === 'both') && player.email_allowed === 1 && player.email) {
         try {
           const subject = `Tournament Invitation - ${tournament.course_name}`;
           const html = `
@@ -1684,21 +1755,35 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
           console.log(`Sending Email to ${player.name} (${player.email})`);
           // Only BCC on the first email when sending to multiple recipients
           const includeBcc = (emailSent === 0 && emailPlayers.length > 1);
-          await sendEmail(player.email, subject, html, null, null, includeBcc);
+          await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
           console.log(`✓ Email sent successfully to ${player.name}`);
           emailSent++;
+          if (emailDelayMs > 0) {
+            await sleep(emailDelayMs);
+          }
         } catch (err) {
           console.error(`✗ Failed to send Email to ${player.name}: ${err.message}`);
           emailFailed.push({ id: player.id, name: player.name, email: player.email, error: err.message });
+          if (isProviderThrottleError(err)) {
+            emailProviderBlocked = true;
+            console.error('Email provider is temporarily throttling/blocked. Stopping additional email sends for this request.');
+            break;
+          }
         }
       }
     }
-    
-    res.json({ 
+
+    const response = {
       sms: { sent: smsSent, failed: smsFailed },
       email: { sent: emailSent, failed: emailFailed },
       total: players.length
-    });
+    };
+
+    if (emailProviderBlocked) {
+      response.warning = 'Email provider temporarily blocked sends (550 5.4.6). Try again later or contact provider support to lift the block.';
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('Error sending tournament invitations:', err);
     res.status(500).json({ error: 'Failed to send tournament invitations' });

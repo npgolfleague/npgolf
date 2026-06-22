@@ -13,12 +13,25 @@ router.get('/', async (req, res) => {
     const [entities] = await pool.query(`
       SELECT 
         be.*,
-        COUNT(DISTINCT ber.player_id) as member_count,
-        COUNT(DISTINCT l.id) as league_count
+        (
+          SELECT COUNT(*)
+          FROM (
+            SELECT ber.player_id
+            FROM billing_entity_roles ber
+            WHERE ber.billing_entity_id = be.id
+            UNION
+            SELECT lp.player_id
+            FROM leagues l2
+            JOIN league_players lp ON lp.league_id = l2.id
+            WHERE l2.billing_entity_id = be.id
+          ) members
+        ) as member_count,
+        (
+          SELECT COUNT(*)
+          FROM leagues l
+          WHERE l.billing_entity_id = be.id
+        ) as league_count
       FROM billing_entities be
-      LEFT JOIN billing_entity_roles ber ON be.id = ber.billing_entity_id
-      LEFT JOIN leagues l ON be.id = l.billing_entity_id
-      GROUP BY be.id
       ORDER BY be.created_at DESC
     `);
     
@@ -46,13 +59,34 @@ router.get('/:id', async (req, res) => {
     
     // Get members
     const [members] = await pool.query(`
-      SELECT 
-        p.id, p.name, p.email, ber.role, ber.joined_at
-      FROM billing_entity_roles ber
-      JOIN players p ON ber.player_id = p.id
-      WHERE ber.billing_entity_id = ?
-      ORDER BY ber.role, p.name
-    `, [id]);
+      SELECT
+        p.id,
+        p.name,
+        p.email,
+        COALESCE(ber.role, 'member') as role,
+        MIN(lp.joined_at) as joined_at
+      FROM players p
+      JOIN (
+        SELECT ber.player_id
+        FROM billing_entity_roles ber
+        WHERE ber.billing_entity_id = ?
+        UNION
+        SELECT lp.player_id
+        FROM leagues l
+        JOIN league_players lp ON lp.league_id = l.id
+        WHERE l.billing_entity_id = ?
+      ) m ON m.player_id = p.id
+      LEFT JOIN billing_entity_roles ber
+        ON ber.billing_entity_id = ?
+       AND ber.player_id = p.id
+      LEFT JOIN leagues l
+        ON l.billing_entity_id = ?
+      LEFT JOIN league_players lp
+        ON lp.league_id = l.id
+       AND lp.player_id = p.id
+      GROUP BY p.id, p.name, p.email, ber.role
+      ORDER BY p.name
+    `, [id, id, id, id]);
     
     // Get leagues
     const [leagues] = await pool.query(`

@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI, playersAPI } from '../api'
+import { tournamentsAPI, playersAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { ToastContext } from '../context/ToastContext'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -18,6 +18,7 @@ export const Dashboard = () => {
   const isAdmin = isAdminCapable(user)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
+  const [currentLeague, setCurrentLeague] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshingQuotas, setRefreshingQuotas] = useState(false)
@@ -36,6 +37,10 @@ export const Dashboard = () => {
       ])
       setTournaments(tournamentsRes.data)
       setPlayers(playersRes.data.filter(p => p.active).sort((a, b) => (b.fedex_points || 0) - (a.fedex_points || 0)))
+
+      leaguesAPI.current()
+        .then(response => setCurrentLeague(response.data))
+        .catch(() => {})
       setError(null)
     } catch (err) {
       console.error('Error fetching data:', err)
@@ -51,6 +56,8 @@ export const Dashboard = () => {
       day: 'numeric'
     })
   }
+
+  const cupName = currentLeague?.cup_name || 'Paradise Cup'
 
   const menuItems = [
     { path: '/scores', label: 'Score Entry', icon: ClipboardList, color: 'blue' },
@@ -152,7 +159,7 @@ export const Dashboard = () => {
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">Paradise Cup — 2026 Season</p>
+          <p className="text-slate-500 text-sm mt-1">{cupName} — 2026 Season</p>
         </div>
         {/* Priority 5: Dashboard Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -279,7 +286,7 @@ export const Dashboard = () => {
                   <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                     <Trophy className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Paradise Cup Standings</h2>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">{cupName} Standings</h2>
                 </div>
                 {isAdmin && (
                   <button
@@ -311,8 +318,8 @@ export const Dashboard = () => {
                         <th scope="col" aria-label="Player" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Player
                         </th>
-                        <th scope="col" aria-label="Paradise Cup Points" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Paradise Pts
+                        <th scope="col" aria-label={`${cupName} Points`} className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {cupName} Pts
                         </th>
                         <th scope="col" aria-label="18-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 18H

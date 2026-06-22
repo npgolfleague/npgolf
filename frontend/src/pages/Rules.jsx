@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { rulesAPI } from '../api'
+import { rulesAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
 
@@ -16,6 +16,7 @@ export const Rules = () => {
   const [expandedSection, setExpandedSection] = useState(null)
   const [localRules, setLocalRules] = useState(DEFAULT_LOCAL_RULES)
   const [sections, setSections] = useState([])
+  const [currentLeague, setCurrentLeague] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -23,11 +24,17 @@ export const Rules = () => {
 
     const fetchRules = async () => {
       try {
-        const response = await rulesAPI.getCurrent()
-        const fetchedSections = response.data?.sections
-        const fetchedRules = response.data?.localRules
+        const [rulesResult, leagueResult] = await Promise.allSettled([
+          rulesAPI.getCurrent(),
+          leaguesAPI.current()
+        ])
+        const fetchedSections = rulesResult.status === 'fulfilled' ? rulesResult.value.data?.sections : null
+        const fetchedRules = rulesResult.status === 'fulfilled' ? rulesResult.value.data?.localRules : null
 
         if (isMounted) {
+          if (leagueResult.status === 'fulfilled') {
+            setCurrentLeague(leagueResult.value.data)
+          }
           if (Array.isArray(fetchedSections) && fetchedSections.length > 0) {
             setSections(fetchedSections)
           } else if (Array.isArray(fetchedRules) && fetchedRules.length > 0) {
@@ -50,6 +57,9 @@ export const Rules = () => {
       isMounted = false
     }
   }, [])
+
+  const leagueName = currentLeague?.name || 'Paradise Golf League'
+  const cupName = currentLeague?.cup_name || 'Paradise Cup'
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section)
@@ -105,7 +115,7 @@ export const Rules = () => {
               </Link>
             )}
           </div>
-          <p className="text-gray-600 mb-8">Paradise Golf League</p>
+          <p className="text-gray-600 mb-8">{leagueName}</p>
 
           {sections.filter((section) => section.visible !== false).map((section) => (
             <section key={section.id} className="mb-8">
@@ -135,7 +145,7 @@ export const Rules = () => {
             </Link>
           )}
         </div>
-        <p className="text-gray-600 mb-8">Paradise Golf League</p>
+        <p className="text-gray-600 mb-8">{leagueName}</p>
 
         {/* Basic Information */}
         <section className="mb-8">
@@ -252,11 +262,11 @@ export const Rules = () => {
         </section>
 
 
-        {/* Paradise Cup Points */}
+        {/* Cup Points */}
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Paradise Cup Points</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">{cupName} Points</h2>
           <p className="text-gray-700 mb-4">
-            Once you have a quota, you can start earning Paradise Cup points. Points are earned weekly as follows:
+            Once you have a quota, you can start earning {cupName} points. Points are earned weekly as follows:
           </p>
           <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -333,7 +343,7 @@ export const Rules = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Second 9 Holes - Championship</h3>
               <ul className="list-disc list-inside space-y-2 text-gray-700">
                 <li>Top 4 + ties from the semi-finals compete</li>
-                <li>Paradise Points carried over from first 9 holes</li>
+                <li>{cupName} points carried over from first 9 holes</li>
                 <li>1st place points doubled to 200 (2nd: 90, 3rd: 80, 4th: 70)</li>
                 <li><strong>Win the last 9 holes = Win the championship!</strong></li>
               </ul>

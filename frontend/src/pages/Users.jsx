@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
-import { playersAPI, tournamentsAPI } from '../api'
+import { playersAPI, tournamentsAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { EditPlayerModal } from '../components/EditPlayerModal'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -12,6 +12,7 @@ export const Users = () => {
   const adminCapable = isAdminCapable(user)
   const canManageSuperAdmins = user?.role === 'super_admin'
   const [players, setPlayers] = useState([])
+  const [currentLeague, setCurrentLeague] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [editingPlayer, setEditingPlayer] = useState(null)
@@ -27,7 +28,10 @@ export const Users = () => {
 
   useEffect(() => {
     fetchPlayers()
+    leaguesAPI.current().then(response => setCurrentLeague(response.data)).catch(() => {})
   }, [])
+
+  const cupName = currentLeague?.cup_name || 'Paradise Cup'
 
   const fetchPlayers = async () => {
     setLoading(true)
@@ -296,7 +300,7 @@ export const Users = () => {
                   <th scope="col" aria-label="Email Notifications Enabled" className="px-6 py-3 text-center text-gray-700 font-semibold">Email OK</th>
                   <th scope="col" aria-label="18-Hole Quota" className="px-6 py-3 text-left text-gray-700 font-semibold">18H Quota</th>
                   <th scope="col" aria-label="9-Hole Quota" className="px-6 py-3 text-left text-gray-700 font-semibold">9H Quota</th>
-                  <th scope="col" aria-label="Paradise Cup Points" className="px-6 py-3 text-left text-gray-700 font-semibold">Paradise Pts</th>
+                  <th scope="col" aria-label={`${cupName} Points`} className="px-6 py-3 text-left text-gray-700 font-semibold">{cupName} Pts</th>
                   <th scope="col" aria-label="Tournaments Played" className="px-6 py-3 text-left text-gray-700 font-semibold">Tournaments</th>
                   <th scope="col" aria-label="Total Prize Money Year to Date" className="px-6 py-3 text-left text-gray-700 font-semibold">Total Prize Money YTD</th>
                 </tr>

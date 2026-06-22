@@ -5,6 +5,8 @@ import { tournamentsAPI, coursesAPI } from '../api'
 export const AddTournament = () => {
   const navigate = useNavigate()
   const [date, setDate] = useState('')
+  const [firstTeeTime, setFirstTeeTime] = useState('')
+  const [shotgunStart, setShotgunStart] = useState(false)
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
   const [nineHoleSide, setNineHoleSide] = useState('front')
@@ -30,14 +32,14 @@ export const AddTournament = () => {
     e.preventDefault()
     setError('')
 
-    if (!date || !courseId) {
+    if (!date || !courseId || !firstTeeTime) {
       setError('Please fill in all required fields')
       return
     }
 
     setLoading(true)
     try {
-      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide)
+      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error creating tournament:', err)
@@ -76,6 +78,31 @@ export const AddTournament = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Tournament Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={firstTeeTime}
+                  onChange={(e) => setFirstTeeTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={shotgunStart}
+                    onChange={(e) => setShotgunStart(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Shotgun Start (all groups start at the same time)
+                </label>
               </div>
 
               <div>

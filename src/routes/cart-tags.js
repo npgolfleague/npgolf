@@ -39,18 +39,38 @@ const formatTeeTime = (baseTime, addMinutes = 0) => {
   return `${displayHours}:${displayMinutes} ${period}`;
 };
 
+const getStartingHoleLabel = (groupName) => {
+  const normalized = String(groupName || '').trim();
+  const match = normalized.match(/^(\d{1,2})(?:\s*([a-zA-Z]))?/);
+  if (!match) return '1';
+
+  const holeNumber = parseInt(match[1], 10);
+  if (Number.isNaN(holeNumber) || holeNumber < 1 || holeNumber > 18) return '1';
+
+  const suffix = match[2] ? ` ${match[2]}` : '';
+  return `${holeNumber}${suffix}`;
+};
+
+const getGroupTeeTime = (baseTime, groupIndex, shotgunStart) => {
+  if (!baseTime) return '';
+  return formatTeeTime(baseTime, shotgunStart ? 0 : groupIndex * 8);
+};
+
 // Generate HTML for a single cart tag (styled to fit two-per-page)
-const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
+const generateCartTagHTML = (leagueName, courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
   return `
     <div class="cart-tag">
       <div style="text-align: center;">
-        <div class="cg-title">PG/PARADISE GOLF<sup style="font-size: 12px;">®</sup></div>
+        <div class="cg-title">${leagueName}</div>
         <div class="cg-course">${courseName}</div>
       </div>
       <div class="cg-players">
-        ${playerNames.map(name => `
-          <div class="cg-player">${name}</div>
-        `).join('')}
+        ${playerNames.map(player => {
+          const displayName = typeof player === 'string' ? player : (player.tee_name ? `${player.name} <span style="font-size: 0.65em;">(${player.tee_name})</span>` : player.name);
+          return `
+          <div class="cg-player">${displayName}</div>
+        `;
+        }).join('')}
       </div>
       <div class="cg-footer" style="align-items: center;">
         <div style="flex:1"><span style="font-weight: normal;">Time:</span> ${teeTime}</div>
@@ -64,7 +84,7 @@ const generateCartTagHTML = (courseName, playerNames, teeTime, startingHole = 1,
 };
 
 // Generate email-friendly cart tag using tables (email clients don't support flexbox)
-const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
+const generateCartTagEmailHTML = (leagueName, courseName, playerNames, teeTime, startingHole = 1, qrDataURL = '') => {
   return `
     <table style="
       width: 100%;
@@ -78,7 +98,7 @@ const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole
       <tr>
         <td style="padding: 20px; text-align: center;">
           <div style="font-size: 24px; font-weight: bold; color: #1e5631; letter-spacing: 1px;">
-            PG/PARADISE GOLF<sup style="font-size: 12px;">®</sup>
+            ${leagueName}
           </div>
           <div style="font-size: 14px; color: #333; font-style: italic; margin-top: 8px;">
             ${courseName}
@@ -87,11 +107,14 @@ const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole
       </tr>
       <tr>
         <td style="padding: 40px 20px; text-align: center;">
-          ${playerNames.map(name => `
+          ${playerNames.map(player => {
+            const displayName = typeof player === 'string' ? player : (player.tee_name ? `${player.name} <span style="font-size: 0.65em;">(${player.tee_name})</span>` : player.name);
+            return `
             <div style="font-size: 36px; font-weight: bold; color: #1e5631; margin: 15px 0; line-height: 1.2;">
-              ${name}
+              ${displayName}
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </td>
       </tr>
       <tr>
@@ -113,7 +136,7 @@ const generateCartTagEmailHTML = (courseName, playerNames, teeTime, startingHole
 };
 
 // Generate full printable page with all cart tags
-const generateCartTagsDocument = (tags) => {
+const generateCartTagsDocument = (leagueName, tags) => {
   // Group tags two-per-page and include shared print CSS
   const pages = [];
   for (let i = 0; i < tags.length; i += 2) {
@@ -126,7 +149,7 @@ const generateCartTagsDocument = (tags) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Cart Tags - Paradise Golf</title>
+  <title>Cart Tags - ${leagueName}</title>
   <style>
     @page {
       size: letter;
@@ -215,9 +238,10 @@ const getNormalizedTournamentGroups = async (tournamentId) => {
   // From tournament_players table (allows assigning groups without scores)
   // Use `foursome` and `pair` columns on tournament_players
   const [tpRows] = await pool.query(
-    `SELECT tp.foursome, tp.pair, p.name as player_name, tp.player_id
+    `SELECT tp.foursome, tp.pair, p.name as player_name, tp.player_id, ct.tee_name
      FROM tournament_players tp
      JOIN players p ON tp.player_id = p.id
+     LEFT JOIN course_tee ct ON ct.id = tp.tee_id
      WHERE tp.tournament_id = ? AND tp.foursome IS NOT NULL
      GROUP BY tp.foursome, tp.pair, p.id
      ORDER BY tp.foursome, tp.pair, p.name`,
@@ -230,10 +254,10 @@ const getNormalizedTournamentGroups = async (tournamentId) => {
       groups[row.foursome] = [];
     } else if (groups[row.foursome] instanceof Set) {
       // Convert Set to array of objects
-      groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null }));
+      groups[row.foursome] = Array.from(groups[row.foursome]).map(name => ({ name, playerId: null, pair: null, tee_name: null }));
     }
-    // store objects with player name and optional pair number
-    groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair) });
+    // store objects with player name, optional pair number, and tee name
+    groups[row.foursome].push({ name: row.player_name, playerId: row.player_id, pair: row.pair == null ? null : Number(row.pair), tee_name: row.tee_name });
   });
 
   const groupKeys = Object.keys(groups);
@@ -245,7 +269,7 @@ const getNormalizedTournamentGroups = async (tournamentId) => {
       arr = groups[g];
     } else {
       // Set of names from scores - convert to objects without pair info
-      arr = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null }));
+      arr = Array.from(groups[g]).map(name => ({ name, playerId: null, pair: null, tee_name: null }));
     }
 
     // Deduplicate by player name; prefer entries with pair info over null-pair duplicates
@@ -278,7 +302,7 @@ const buildCartAssignments = (players) => {
     players.forEach(p => {
       const key = p.pair == null ? `nopair_${noPairIdx++}` : `pair_${p.pair}`;
       if (!byPair[key]) byPair[key] = [];
-      byPair[key].push(p.name);
+      byPair[key].push(p);
     });
 
     Object.values(byPair).forEach(pairArr => {
@@ -288,7 +312,7 @@ const buildCartAssignments = (players) => {
     });
   } else {
     for (let i = 0; i < players.length; i += 2) {
-      carts.push(players.slice(i, i + 2).map(p => p.name));
+      carts.push(players.slice(i, i + 2));
     }
   }
 
@@ -316,6 +340,9 @@ router.get('/tournament/:tournamentId', async (req, res) => {
     const tournament = tournamentRows[0];
     const courseName = tournament.course_name;
     const firstTeeTime = tournament.first_tee_time;
+    const shotgunStart = Number(tournament.shotgun_start) === 1;
+    const [leagueRows] = await pool.query('SELECT name FROM leagues WHERE id = ? LIMIT 1', [tournament.league_id]);
+    const leagueName = req.league?.name || leagueRows[0]?.name || 'Paradise Golf';
     
     const { groupNames, groupsByName } = await getNormalizedTournamentGroups(tournamentId);
 
@@ -341,16 +368,16 @@ router.get('/tournament/:tournamentId', async (req, res) => {
 
     groupNames.forEach((groupName, groupIndex) => {
       const players = groupsByName[groupName];
-      const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8); // 8 minute intervals
-      const startingHole = parseInt(groupName) || 1;
+      const teeTime = getGroupTeeTime(firstTeeTime, groupIndex, shotgunStart);
+      const startingHole = getStartingHoleLabel(groupName);
 
       const carts = buildCartAssignments(players);
       carts.forEach(cartPlayers => {
-        tags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
+        tags.push(generateCartTagHTML(leagueName, courseName, cartPlayers, teeTime, startingHole, qrMap[groupName]));
       });
     });
     
-    const html = generateCartTagsDocument(tags);
+    const html = generateCartTagsDocument(leagueName, tags);
     res.type('html').send(html);
     
   } catch (err) {
@@ -395,6 +422,9 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     
     const courseName = tournament.course_name;
     const firstTeeTime = tournament.first_tee_time;
+    const shotgunStart = Number(tournament.shotgun_start) === 1;
+    const [leagueRows] = await pool.query('SELECT name FROM leagues WHERE id = ? LIMIT 1', [tournament.league_id]);
+    const leagueName = req.league?.name || leagueRows[0]?.name || 'Paradise Golf';
     const tournamentDate = new Date(tournament.date).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -423,7 +453,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     let foursomeListHTML = '';
     groupNames.forEach((groupName, groupIndex) => {
       const players = groupsByName[groupName].map(p => p.name);
-      const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
+      const teeTime = getGroupTeeTime(firstTeeTime, groupIndex, shotgunStart);
       
       foursomeListHTML += `
         <tr style="background: ${groupIndex % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
@@ -439,27 +469,25 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     const pdfTags = []; // For PDF generation
     groupNames.forEach((groupName, groupIndex) => {
       const players = groupsByName[groupName];
-      const teeTime = formatTeeTime(firstTeeTime, groupIndex * 8);
-      
-      // Extract starting hole from group name (e.g., "1" -> 1)
-      const startingHole = parseInt(groupName) || 1;
+      const teeTime = getGroupTeeTime(firstTeeTime, groupIndex, shotgunStart);
+      const startingHole = getStartingHoleLabel(groupName);
 
       const carts = buildCartAssignments(players);
       carts.forEach(cartPlayers => {
-        emailTags.push(generateCartTagEmailHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
-        pdfTags.push(generateCartTagHTML(courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
+        emailTags.push(generateCartTagEmailHTML(leagueName, courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
+        pdfTags.push(generateCartTagHTML(leagueName, courseName, cartPlayers, teeTime, startingHole, qrMap2[groupName]));
       });
     });
     
     // Create email
-    const subject = `Paradise Golf - Tournament Tee Sheet for ${tournamentDate}`;
+    const subject = `${leagueName} - Tournament Tee Sheet for ${tournamentDate}`;
     const emailHTML = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5;">
   <div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden;">
     <div style="background: #1e5631; color: white; padding: 30px 24px; text-align: center;">
-      <h1 style="margin: 0; font-size: 28px;">PG/PARADISE GOLF</h1>
+      <h1 style="margin: 0; font-size: 28px;">${leagueName}</h1>
       <p style="margin: 8px 0 0 0; font-size: 16px;">Tournament Tee Sheet</p>
     </div>
     
@@ -506,7 +534,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     </div>
     
     <div style="background: #f5f5f5; padding: 16px 24px; text-align: center; color: #999; font-size: 12px;">
-      Paradise Golf &bull; ${new Date().getFullYear()}
+        ${leagueName} &bull; ${new Date().getFullYear()}
     </div>
   </div>
 </body>

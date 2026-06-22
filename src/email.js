@@ -25,14 +25,27 @@ const transporter = nodemailer.createTransport({
  * @param {boolean} includeBcc - Whether to include BCC (default: true)
  * @returns {Promise} Nodemailer response
  */
-async function sendEmail(to, subject, html, text = null, attachments = null, includeBcc = true) {
-  const mailOptions = {
-    from: fromEmail,
-    to,
-    subject,
-    html,
-    text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
+async function sendEmail(to, subject, html, text = null, attachments = null, includeBcc = true, fromAddress = null) {
+  const normalizedFromAddress = fromAddress ? String(fromAddress).trim() : null;
+
+  const buildMailOptions = (useCustomFrom) => {
+    const options = {
+      from: (useCustomFrom && normalizedFromAddress) ? normalizedFromAddress : fromEmail,
+      to,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
+    };
+
+    // Keep replies going to the league-specific mailbox even when SMTP requires a different envelope From.
+    if (normalizedFromAddress) {
+      options.replyTo = normalizedFromAddress;
+    }
+
+    return options;
   };
+
+  const mailOptions = buildMailOptions(true);
 
   if (includeBcc) {
     mailOptions.bcc = bccEmail;
@@ -56,6 +69,21 @@ async function sendEmail(to, subject, html, text = null, attachments = null, inc
     console.log(`Email sent to ${to}: ${subject} (MessageId: ${info.messageId})`);
     return info;
   } catch (error) {
+    const details = `${error?.message || ''} ${error?.response || ''}`.toLowerCase();
+    const relayRejected = details.includes('553') && details.includes('sender is not allowed to relay emails');
+
+    if (normalizedFromAddress && relayRejected) {
+      try {
+        console.warn(`Custom FROM ${normalizedFromAddress} rejected by provider. Falling back to authenticated sender ${fromEmail}.`);
+        const fallbackInfo = await transporter.sendMail(buildMailOptions(false));
+        console.log(`Email sent to ${to} with fallback sender: ${subject} (MessageId: ${fallbackInfo.messageId})`);
+        return fallbackInfo;
+      } catch (fallbackError) {
+        console.error('Fallback email send failed:', fallbackError);
+        throw fallbackError;
+      }
+    }
+
     console.error('Error sending email:', error);
     throw error;
   }

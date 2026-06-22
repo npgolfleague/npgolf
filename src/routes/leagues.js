@@ -25,6 +25,24 @@ function normalizeSemicolonEmails(value) {
   return { normalized: emails.join('; ') };
 }
 
+function normalizeOptionalText(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  return raw ? raw : null;
+}
+
+function normalizeSingleEmail(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (!EMAIL_REGEX.test(raw)) {
+    return { error: `Invalid email address: ${raw}` };
+  }
+
+  return { normalized: raw };
+}
+
 function ensureLeagueScope(req, res, id) {
   if (!req.league?.id) return true;
 
@@ -145,11 +163,13 @@ router.get('/:id/settings', async (req, res) => {
       // Return defaults — settings row will be created on first save
       return res.json({
         league_id: Number(id),
+        cup_name: 'Paradise Cup',
         tournament_fee_18_holes: 20.00,
         tournament_fee_9_holes: 10.00,
         skins_ctp_fee_18_holes: 10.00,
         skins_ctp_fee_9_holes: 5.00,
         golf_course_email: null,
+        outgoing_email_from: null,
         quota_points_albatross: 8,
         quota_points_eagle: 8,
         quota_points_birdie: 6,
@@ -176,6 +196,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     tournament_fee_18_holes, tournament_fee_9_holes,
     skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
     golf_course_email,
+    outgoing_email_from,
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
     live_scoring
@@ -186,6 +207,12 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: normalizedEmailResult.error });
   }
   const normalizedGolfCourseEmail = normalizedEmailResult?.normalized ?? null;
+
+  const normalizedOutgoingFromResult = normalizeSingleEmail(outgoing_email_from);
+  if (normalizedOutgoingFromResult && normalizedOutgoingFromResult.error) {
+    return res.status(400).json({ error: normalizedOutgoingFromResult.error });
+  }
+  const normalizedOutgoingEmailFrom = normalizedOutgoingFromResult?.normalized ?? null;
 
   try {
     // Verify league exists
@@ -200,16 +227,18 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         tournament_fee_18_holes, tournament_fee_9_holes,
         skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
         golf_course_email,
+        outgoing_email_from,
         quota_points_albatross, quota_points_eagle, quota_points_birdie,
         quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
         live_scoring
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         tournament_fee_18_holes = VALUES(tournament_fee_18_holes),
         tournament_fee_9_holes = VALUES(tournament_fee_9_holes),
         skins_ctp_fee_18_holes = VALUES(skins_ctp_fee_18_holes),
         skins_ctp_fee_9_holes = VALUES(skins_ctp_fee_9_holes),
         golf_course_email = VALUES(golf_course_email),
+        outgoing_email_from = VALUES(outgoing_email_from),
         quota_points_albatross = VALUES(quota_points_albatross),
         quota_points_eagle = VALUES(quota_points_eagle),
         quota_points_birdie = VALUES(quota_points_birdie),
@@ -223,6 +252,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         tournament_fee_18_holes ?? 20.00, tournament_fee_9_holes ?? 10.00,
         skins_ctp_fee_18_holes ?? 10.00, skins_ctp_fee_9_holes ?? 5.00,
         normalizedGolfCourseEmail,
+        normalizedOutgoingEmailFrom,
         quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
         quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
         quota_points_worse ?? 0,
@@ -321,9 +351,9 @@ router.post('/', requireAdmin, async (req, res) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO leagues (billing_entity_id, name, slug, alias, description, season_year, start_date, end_date, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [billing_entity_id, name, slug, slug, description, season_year, start_date || null, end_date || null, active]
+      `INSERT INTO leagues (billing_entity_id, name, slug, alias, cup_name, description, season_year, start_date, end_date, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [billing_entity_id, name, slug, slug, normalizeOptionalText(cup_name) || 'Paradise Cup', description, season_year, start_date || null, end_date || null, active]
     );
 
     const leagueId = result.insertId;
@@ -357,6 +387,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   const {
     name,
     slug,
+    cup_name,
     description,
     season_year,
     start_date,
@@ -399,6 +430,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
       updates.push('alias = ?'); 
       values.push(slug);
     }
+    if (cup_name !== undefined) { updates.push('cup_name = ?'); values.push(normalizeOptionalText(cup_name) || 'Paradise Cup'); }
     if (description !== undefined) { updates.push('description = ?'); values.push(description); }
     if (season_year !== undefined) { updates.push('season_year = ?'); values.push(season_year); }
     if (start_date !== undefined) { updates.push('start_date = ?'); values.push(start_date || null); }
