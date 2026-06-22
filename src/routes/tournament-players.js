@@ -95,6 +95,30 @@ router.post('/:tournamentId/players', async (req, res) => {
       }
     }
 
+    // If the player already has a tournament row (for example previously RSVP'd "no"),
+    // reactivate them instead of failing on duplicate key.
+    const [existingRows] = await pool.query(
+      `SELECT id
+       FROM tournament_players
+       WHERE tournament_id = ? AND player_id = ?
+       LIMIT 1`,
+      [tournamentId, playerId]
+    );
+
+    if (existingRows.length > 0) {
+      await pool.query(
+        `UPDATE tournament_players
+         SET attending_status = 'yes',
+             response_date = NOW(),
+             tournament_quota = ?,
+             tee_id = COALESCE(?, tee_id)
+         WHERE tournament_id = ? AND player_id = ?`,
+        [tournamentQuota, resolvedTeeId, tournamentId, playerId]
+      );
+
+      return res.json({ message: 'Player re-added to tournament successfully' });
+    }
+
     // Add player to tournament as actively playing (yes)
     // so admin-added players appear in confirmed lists immediately
     await pool.query(
@@ -102,7 +126,7 @@ router.post('/:tournamentId/players', async (req, res) => {
        VALUES (?, ?, 'yes', NOW(), ?, ?)`,
       [tournamentId, playerId, tournamentQuota, resolvedTeeId]
     );
-    
+
     res.status(201).json({ message: 'Player added to tournament successfully' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -327,7 +351,7 @@ router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) =
   }
 });
 
-// GET /api/tournaments/:tournamentId/available-players - Get players NOT in the tournament
+// GET /api/tournaments/:tournamentId/available-players - Get players that can be added to the tournament
 router.get('/:tournamentId/available-players', async (req, res) => {
   const { tournamentId } = req.params;
   const leagueId = getLeagueId(req);
@@ -342,15 +366,14 @@ router.get('/:tournamentId/available-players', async (req, res) => {
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, p.default_tee_name
       FROM players p
       INNER JOIN league_players lp ON lp.player_id = p.id
+      LEFT JOIN tournament_players tp
+        ON tp.player_id = p.id
+       AND tp.tournament_id = ?
       WHERE p.active = 1
         AND lp.league_id = ?
-        AND p.id NOT IN (
-          SELECT player_id 
-          FROM tournament_players 
-          WHERE tournament_id = ?
-        )
+        AND (tp.player_id IS NULL OR tp.attending_status = 'no')
       ORDER BY p.name ASC
-    `, [leagueId, tournamentId]);
+    `, [tournamentId, leagueId]);
     
     res.json(rows);
   } catch (err) {

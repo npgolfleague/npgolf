@@ -180,11 +180,11 @@ export const League = () => {
                 <h3 className="text-xl font-bold text-gray-900 mb-4">League Settings</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">18 Hole Tournament Fee</p>
+                    <p className="text-sm text-gray-600">18 Hole Quota Fee</p>
                     <p className="text-lg font-semibold">{formatCurrency(settings.tournament_fee_18_holes)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">9 Hole Tournament Fee</p>
+                    <p className="text-sm text-gray-600">9 Hole Quota Fee</p>
                     <p className="text-lg font-semibold">{formatCurrency(settings.tournament_fee_9_holes)}</p>
                   </div>
                   <div>

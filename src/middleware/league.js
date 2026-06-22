@@ -14,7 +14,7 @@ const leagueAliasMiddleware = async (req, res, next) => {
     try {
       // Lookup league by alias
       const [rows] = await pool.query(
-        'SELECT id, billing_entity_id, name, alias, active FROM leagues WHERE alias = ? LIMIT 1',
+          'SELECT id, billing_entity_id, name, alias, cup_name, active FROM leagues WHERE alias = ? LIMIT 1',
         [alias]
       );
       

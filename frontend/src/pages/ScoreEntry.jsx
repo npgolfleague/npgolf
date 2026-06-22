@@ -41,6 +41,42 @@ export const ScoreEntry = () => {
     }
   }
 
+  const getDefaultStartHole = (tournament) => {
+    if (!tournament) return 1
+    return tournament.number_of_holes === 9 && tournament.nine_hole_side === 'back' ? 10 : 1
+  }
+
+  const getStartingHoleFromGroupName = (groupName) => {
+    if (!groupName) return null
+    const match = String(groupName).trim().match(/^(\d{1,2})/)
+    if (!match) return null
+
+    const hole = Number(match[1])
+    return hole >= 1 && hole <= 18 ? hole : null
+  }
+
+  const isHolePlayableForTournament = (tournament, holeNumber) => {
+    if (!tournament || !holeNumber) return false
+
+    if (tournament.number_of_holes === 9) {
+      const side = tournament.nine_hole_side || 'front'
+      if (side === 'back') {
+        return holeNumber >= 10 && holeNumber <= 18
+      }
+      return holeNumber >= 1 && holeNumber <= 9
+    }
+
+    return holeNumber >= 1 && holeNumber <= 18
+  }
+
+  const resolveStartHoleForGroup = (tournament, groupName) => {
+    const parsedStartHole = getStartingHoleFromGroupName(groupName)
+    if (parsedStartHole && isHolePlayableForTournament(tournament, parsedStartHole)) {
+      return parsedStartHole
+    }
+    return getDefaultStartHole(tournament)
+  }
+
   const getPlayableHoles = () => {
     if (!selectedTournament) return holes
 
@@ -75,6 +111,7 @@ export const ScoreEntry = () => {
       try {
         const tResp = await tournamentsAPI.get(tid)
         setSelectedTournament(tResp.data)
+        setCurrentHole(resolveStartHoleForGroup(tResp.data, fq))
         await fetchTournamentPlayers(tid)
         if (fq) {
           setFoursomeGroup(fq)
@@ -222,6 +259,7 @@ export const ScoreEntry = () => {
 
   const handleGroupSelect = async (groupName) => {
     setFoursomeGroup(groupName)
+    setCurrentHole(resolveStartHoleForGroup(selectedTournament, groupName))
     if (groupName && selectedTournament) {
       try {
         // Get the scores for this group to find the players
@@ -533,8 +571,14 @@ export const ScoreEntry = () => {
       if (currentIndex >= 0 && currentIndex < playableHoles.length - 1) {
         setCurrentHole(playableHoles[currentIndex + 1].hole_number)
       } else {
-        // All holes done — show completion modal
-        setShowCompletionModal(true)
+        // Last playable hole was saved. If anything is missing, jump to the earliest missing hole.
+        const earliestIncompleteHole = findEarliestIncompleteHole(playableHoles, selectedPlayers, scores)
+        if (earliestIncompleteHole != null) {
+          setCurrentHole(earliestIncompleteHole)
+        } else {
+          // All holes done — show completion modal
+          setShowCompletionModal(true)
+        }
       }
     } catch (err) {
       console.error('Error saving scores:', err)
@@ -547,6 +591,21 @@ export const ScoreEntry = () => {
 
   const getCurrentHoleData = () => {
     return playableHoles.find(h => h.hole_number === currentHole)
+  }
+
+  const findEarliestIncompleteHole = (holeList, playerIds, scoreMap) => {
+    for (const hole of holeList) {
+      const hasMissingEntry = playerIds.some(playerId => {
+        const scoreValue = scoreMap[`${hole.hole_number}-${playerId}-score`]
+        return scoreValue === undefined || scoreValue === null || scoreValue === ''
+      })
+
+      if (hasMissingEntry) {
+        return hole.hole_number
+      }
+    }
+
+    return null
   }
 
   const handlePostScores = async () => {
@@ -662,8 +721,7 @@ export const ScoreEntry = () => {
             onChange={(e) => {
               const tournament = tournaments.find(t => t.id === parseInt(e.target.value))
               setSelectedTournament(tournament)
-              const startHole = tournament?.number_of_holes === 9 && tournament?.nine_hole_side === 'back' ? 10 : 1
-              setCurrentHole(startHole)
+              setCurrentHole(getDefaultStartHole(tournament))
             }}
           >
             <option value="">Choose a tournament...</option>
