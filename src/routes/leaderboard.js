@@ -3,6 +3,34 @@ const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
+function calculateRecentAverageQuota(playerRow, holeCount) {
+  const points = [];
+
+  for (let i = 1; i <= 7; i++) {
+    const pointsRaw = playerRow[`points_${i}`];
+    const holesRaw = playerRow[`holes_${i}`];
+
+    if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
+      continue;
+    }
+
+    const pointsValue = Number(pointsRaw);
+    const holesValue = Number(holesRaw);
+
+    if (Number.isNaN(pointsValue) || holesValue !== holeCount) {
+      continue;
+    }
+
+    points.push(pointsValue);
+  }
+
+  if (points.length === 0) {
+    return null;
+  }
+
+  return Math.floor(points.reduce((sum, value) => sum + value, 0) / points.length);
+}
+
 // GET /api/leaderboard/:tournamentId - Get leaderboard for a tournament
 // Calculates total quota points earned vs player's quota and skins
 router.get('/:tournamentId', async (req, res) => {
@@ -67,16 +95,33 @@ router.get('/:tournamentId', async (req, res) => {
         p.id,
         p.name,
         p.email,
-        COALESCE(tp.tournament_quota, p.${quotaColumn}) as player_quota,
+        tp.tournament_quota,
+        p.${quotaColumn} as default_player_quota,
+        q.points_1,
+        q.points_2,
+        q.points_3,
+        q.points_4,
+        q.points_5,
+        q.points_6,
+        q.points_7,
+        q.holes_1,
+        q.holes_2,
+        q.holes_3,
+        q.holes_4,
+        q.holes_5,
+        q.holes_6,
+        q.holes_7,
         COALESCE(SUM(s.quota), 0) as total_quota_points,
         COUNT(DISTINCT s.hole_id) as holes_played,
         COALESCE(SUM(s.score), 0) as total_strokes
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
+      LEFT JOIN quota q ON q.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
-      GROUP BY p.id, p.name, p.email, COALESCE(tp.tournament_quota, p.${quotaColumn})
-      ORDER BY holes_played DESC, (total_quota_points - player_quota) DESC, p.name ASC
+      GROUP BY p.id, p.name, p.email, tp.tournament_quota, p.${quotaColumn},
+               q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
+               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7
     `, [tournamentId, tournamentId]);
     
     const skins = {};
@@ -293,13 +338,16 @@ router.get('/:tournamentId', async (req, res) => {
     // Calculate over/under for each player first
     const playersWithOverUnder = rows.map((player) => {
       const playerSkins = skins[player.id]?.count || 0;
-      const overUnder = (parseFloat(player.total_quota_points) || 0) - (parseFloat(player.player_quota) || 0);
+      const recentAverageQuota = calculateRecentAverageQuota(player, holeCount);
+      const fallbackQuota = parseFloat(player.tournament_quota ?? player.default_player_quota) || 0;
+      const playerQuota = recentAverageQuota ?? fallbackQuota;
+      const overUnder = (parseFloat(player.total_quota_points) || 0) - playerQuota;
       
       return {
         id: player.id,
         name: player.name,
         email: player.email,
-        player_quota: parseFloat(player.player_quota) || 0,
+        player_quota: playerQuota,
         total_quota_points: parseFloat(player.total_quota_points) || 0,
         over_under: overUnder,
         holes_played: player.holes_played,
@@ -307,6 +355,12 @@ router.get('/:tournamentId', async (req, res) => {
         skins: playerSkins,
         skin_holes: skins[player.id]?.holes || []
       };
+    });
+
+    playersWithOverUnder.sort((a, b) => {
+      if (b.holes_played !== a.holes_played) return b.holes_played - a.holes_played;
+      if (b.over_under !== a.over_under) return b.over_under - a.over_under;
+      return String(a.name).localeCompare(String(b.name));
     });
 
     // Count players with complete scores vs total players

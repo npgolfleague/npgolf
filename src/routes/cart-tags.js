@@ -6,6 +6,8 @@ const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
 const { getLeagueId } = require('../utils/league');
 
+const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
@@ -590,7 +592,15 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       await sleep(emailDelayMs);
     }
     
-    await sendEmail(golfCourseEmails, subject, emailHTML, null, attachments);
+    await sendEmail(golfCourseEmails, subject, emailHTML, null, attachments, false);
+
+    if (Array.isArray(golfCourseEmails) && golfCourseEmails.length > 1) {
+      try {
+        await sendEmail(GROUP_EMAIL_COPY_TO, subject, emailHTML, null, attachments, false);
+      } catch (copyErr) {
+        console.error('Failed to send single cart-tag email copy:', copyErr.message);
+      }
+    }
     
     res.json({ 
       success: true, 
