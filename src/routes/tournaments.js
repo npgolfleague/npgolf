@@ -34,6 +34,7 @@ const getTournamentQuotaColumn = (numberOfHoles) => (
 const getLeagueId = (req) => req.league?.id || 1;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
 const isProviderThrottleError = (err) => {
   const details = `${err?.message || ''} ${err?.response || ''}`.toLowerCase();
@@ -1358,6 +1359,7 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
 
     let sent = 0;
     const failed = [];
+    const emailDelayMs = getOutgoingEmailDelayMs();
     for (let i = 0; i < recipients.length; i++) {
       const player = recipients[i];
       try {
@@ -1365,6 +1367,9 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
         const includeBcc = (i === 0 && recipients.length > 1);
         await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
         sent++;
+        if (emailDelayMs > 0 && i < recipients.length - 1) {
+          await sleep(emailDelayMs);
+        }
       } catch (err) {
         failed.push({ email: player.email, error: err.message });
       }
@@ -1672,7 +1677,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     
     let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
     let emailProviderBlocked = false;
-    const emailDelayMs = Math.max(Number(process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
+    const emailDelayMs = getOutgoingEmailDelayMs();
     
     // Count email recipients for BCC logic
     const emailPlayers = players.filter(
@@ -1758,7 +1763,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
           await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
           console.log(`✓ Email sent successfully to ${player.name}`);
           emailSent++;
-          if (emailDelayMs > 0) {
+          if (emailDelayMs > 0 && emailSent < emailPlayers.length) {
             await sleep(emailDelayMs);
           }
         } catch (err) {

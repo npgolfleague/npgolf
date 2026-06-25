@@ -7,6 +7,8 @@ const { generatePDF } = require('../pdf');
 const { getLeagueId } = require('../utils/league');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
 const parseSemicolonEmails = (value) => {
   if (value == null) return [];
@@ -136,7 +138,10 @@ const generateCartTagEmailHTML = (leagueName, courseName, playerNames, teeTime, 
 };
 
 // Generate full printable page with all cart tags
-const generateCartTagsDocument = (leagueName, tags) => {
+const generateCartTagsDocument = (leagueNameOrTags, maybeTags) => {
+  const leagueName = Array.isArray(leagueNameOrTags) ? 'Cart Tags' : leagueNameOrTags;
+  const tags = Array.isArray(leagueNameOrTags) ? leagueNameOrTags : (Array.isArray(maybeTags) ? maybeTags : []);
+
   // Group tags two-per-page and include shared print CSS
   const pages = [];
   for (let i = 0; i < tags.length; i += 2) {
@@ -542,7 +547,7 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
     
     // Generate PDF from cart tags
     console.log('Generating PDF for cart tags...');
-    const pdfHTML = generateCartTagsDocument(pdfTags);
+    const pdfHTML = generateCartTagsDocument(leagueName, pdfTags);
     
     let attachments = [];
     try {
@@ -578,6 +583,11 @@ router.post('/tournament/:tournamentId/send', async (req, res) => {
       console.error('Error generating PDF:', pdfError);
       console.log('Continuing without PDF attachment...');
       // Continue without attachment - email will just have the tee sheet
+    }
+
+    const emailDelayMs = getOutgoingEmailDelayMs();
+    if (emailDelayMs > 0) {
+      await sleep(emailDelayMs);
     }
     
     await sendEmail(golfCourseEmails, subject, emailHTML, null, attachments);
