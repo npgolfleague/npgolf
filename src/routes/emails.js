@@ -5,6 +5,9 @@ const multer = require('multer');
 const upload = multer();
 const { sendEmail } = require('../email');
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
+
 // GET /api/emails - Get all received emails (admin only)
 router.get('/', async (req, res) => {
   try {
@@ -105,6 +108,7 @@ router.post('/send', upload.single('attachment'), async (req, res) => {
 
     const htmlBody = body.replace(/\n/g, '<br>');
     let sent = 0, failed = 0;
+    const emailDelayMs = getOutgoingEmailDelayMs();
     for (let i = 0; i < recipients.length; i++) {
       const email = recipients[i];
       try {
@@ -112,6 +116,9 @@ router.post('/send', upload.single('attachment'), async (req, res) => {
         const includeBcc = (i === 0 && recipients.length > 1);
         await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null, includeBcc);
         sent++;
+        if (emailDelayMs > 0 && i < recipients.length - 1) {
+          await sleep(emailDelayMs);
+        }
       } catch (e) {
         console.error(`Failed to send to ${email}:`, e.message);
         failed++;

@@ -8,6 +8,8 @@ const { sendEmail } = require('../email');
 
 const router = express.Router();
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
 function isStrongPassword(password) {
   const minLen = 8;
@@ -273,6 +275,10 @@ router.post('/forgot-password', async (req, res) => {
       const text = `Hello ${user.name || ''},\n\nWe received a request to reset your NPGOLF password.\n\nReset your password: ${resetLink}\n\nThis link expires in 1 hour. If you did not request this, you can safely ignore this email.`;
 
       try {
+        const emailDelayMs = getOutgoingEmailDelayMs();
+        if (emailDelayMs > 0) {
+          await sleep(emailDelayMs);
+        }
         await sendEmail(user.email, subject, html, text);
       } catch (emailErr) {
         console.error('Failed to send password reset email:', emailErr.message);
