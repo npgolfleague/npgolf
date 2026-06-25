@@ -6,6 +6,8 @@ const { requireAdmin } = require('../middleware/admin');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 
+const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
+
 const formatDateOnly = (value, locale = 'en-US', options = {}) => {
   if (!value) {
     return '';
@@ -25,6 +27,95 @@ const formatDateOnly = (value, locale = 'en-US', options = {}) => {
   }
 
   return parsed.toLocaleDateString(locale, options);
+};
+
+const calculateRecentAverageQuota = (playerRow, holeCount) => {
+  const points = [];
+
+  for (let i = 1; i <= 7; i++) {
+    const pointsRaw = playerRow[`points_${i}`];
+    const holesRaw = playerRow[`holes_${i}`];
+
+    if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
+      continue;
+    }
+
+    const pointsValue = Number(pointsRaw);
+    const holesValue = Number(holesRaw);
+
+    if (Number.isNaN(pointsValue) || holesValue !== holeCount) {
+      continue;
+    }
+
+    points.push(pointsValue);
+  }
+
+  if (points.length === 0) {
+    return null;
+  }
+
+  return Math.floor(points.reduce((sum, value) => sum + value, 0) / points.length);
+};
+
+const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleCount) => {
+  const quotaColumn = Number(tournamentHoleCount) === 9 ? 'quota_9' : 'quota_18';
+
+  const [rows] = await db.query(
+    `SELECT
+       p.id AS player_id,
+       p.name,
+       tp.tournament_quota,
+       p.${quotaColumn} AS default_player_quota,
+       q.points_1,
+       q.points_2,
+       q.points_3,
+       q.points_4,
+       q.points_5,
+       q.points_6,
+       q.points_7,
+       q.holes_1,
+       q.holes_2,
+       q.holes_3,
+       q.holes_4,
+       q.holes_5,
+       q.holes_6,
+       q.holes_7,
+       COALESCE(SUM(s.quota), 0) AS total_quota_points,
+       COUNT(DISTINCT s.hole_id) AS holes_played
+     FROM players p
+     JOIN tournament_players tp ON p.id = tp.player_id
+     LEFT JOIN quota q ON q.player_id = p.id
+     LEFT JOIN scores s ON s.player_id = p.id AND s.tournament_id = ?
+     WHERE tp.tournament_id = ? AND p.active = 1
+     GROUP BY p.id, p.name, tp.tournament_quota, p.${quotaColumn},
+              q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
+              q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7`,
+    [tournamentId, tournamentId]
+  );
+
+  const rankedPlayers = rows
+    .map((row) => {
+      const recentAverageQuota = calculateRecentAverageQuota(row, Number(tournamentHoleCount));
+      const fallbackQuota = Number(row.tournament_quota ?? row.default_player_quota) || 0;
+      const playerQuota = recentAverageQuota ?? fallbackQuota;
+      const totalPoints = Number(row.total_quota_points) || 0;
+
+      return {
+        player_id: row.player_id,
+        name: row.name,
+        total_points: totalPoints,
+        player_quota: playerQuota,
+        over_under: totalPoints - playerQuota,
+        holes_played: Number(row.holes_played) || 0
+      };
+    })
+    .filter((player) => player.holes_played > 0)
+    .sort((a, b) => {
+      if (b.over_under !== a.over_under) return b.over_under - a.over_under;
+      return String(a.name).localeCompare(String(b.name));
+    });
+
+  return rankedPlayers;
 };
 
 const getTournamentQuotaColumn = (numberOfHoles) => (
@@ -241,7 +332,7 @@ const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
   return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
 };
 
-const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], customMessage = null }) => {
+const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], customMessage = null }) => {
   const prizePercentages = [0.5, 0.3, 0.2];
   const prizePlayers = [];
   let i = 0;
@@ -317,11 +408,11 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, numberOfHoles, rank
 
   const dashboardSection = dashboardTotals.length > 0 ? `
     <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
-      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 ${req.league?.cup_name || 'Paradise Cup'} & YTD Totals</h2>
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 ${cupName} & YTD Totals</h2>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead><tr style="background:#f0f4f8;">
           <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
-          <th style="padding:8px 12px;text-align:center;color:#555;">${req.league?.cup_name || 'Paradise Cup'} Pts</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">${cupName} Pts</th>
           <th style="padding:8px 12px;text-align:right;color:#555;">Total Prize Money YTD</th>
         </tr></thead>
         <tbody>${dashboardTotals.map((p, idx) =>
@@ -1122,8 +1213,9 @@ router.post('/:id/complete', async (req, res) => {
       await ensureTournamentResultsEmailTable(pool);
       const tournamentDate = formatDateOnly(tournamentRows[0].date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const courseName = tournamentRows[0].course_name || 'Unknown Course';
+      const emailRankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
       await recalculateAllPlayersPrizeMoney(pool);
-      const rankedPlayerIds = [...new Set(rankedPlayers.map((p) => p.player_id).filter(Boolean))];
+      const rankedPlayerIds = [...new Set(emailRankedPlayers.map((p) => p.player_id).filter(Boolean))];
       let dashboardTotals = [];
       if (rankedPlayerIds.length > 0) {
         const placeholders = rankedPlayerIds.map(() => '?').join(', ');
@@ -1139,8 +1231,9 @@ router.post('/:id/complete', async (req, res) => {
       const emailHTML = buildResultsEmailHTML({
         tournamentDate,
         courseName,
+        cupName: req.league?.cup_name || 'Paradise Cup',
         numberOfHoles: tournamentHoleCount,
-        rankedPlayers,
+        rankedPlayers: emailRankedPlayers,
         skinWinners,
         ctpWinners,
         skinPrizePerSkin,
@@ -1188,33 +1281,17 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   try {
     await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
-      `SELECT t.date, t.number_of_holes, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.quota_collected, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
       [tournamentId]
     );
     if (tournamentRows.length === 0) return res.status(404).json({ error: 'Tournament not found' });
-    const { date, number_of_holes, course_name } = tournamentRows[0];
+    const { date, number_of_holes, quota_collected, course_name } = tournamentRows[0];
     const tournamentHoleCount = Number(number_of_holes) === 9 ? 9 : 18;
-
-    const [paradiseRows] = await pool.query(
-      `SELECT pp.player_id, pp.place, pp.over_under, pp.total_quota_points, pp.player_quota, p.name
-       FROM tournament_paradise_points pp
-       JOIN players p ON p.id = pp.player_id
-       WHERE pp.tournament_id = ?
-       ORDER BY pp.place ASC`,
-      [tournamentId]
-    );
-    if (paradiseRows.length === 0) return res.status(400).json({ error: 'No completion data found — complete the tournament first' });
-
-    const rankedPlayers = paradiseRows.map(r => ({
-      player_id: r.player_id,
-      name: r.name,
-      total_points: Number(r.total_quota_points),
-      player_quota: Number(r.player_quota),
-      over_under: Number(r.over_under)
-    }));
+    const rankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
+    if (rankedPlayers.length === 0) return res.status(400).json({ error: 'No score data found for this tournament' });
 
     // Prize money is already calculated during tournament completion — no need to recalculate here.
     const rankedPlayerIds = [...new Set(rankedPlayers.map((p) => p.player_id).filter(Boolean))];
@@ -1261,12 +1338,15 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
     );
     const settings = settingsRows[0] || {};
     const tournamentFee = Number(tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes) || 0;
-    const quotaPrizePot = (Number(paidCountsRows[0]?.paid_players) || 0) * tournamentFee;
+    const quotaPrizePot = quota_collected != null
+      ? Number(quota_collected)
+      : (Number(paidCountsRows[0]?.paid_players) || 0) * tournamentFee;
 
     const tournamentDate = formatDateOnly(date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const emailHTML = buildResultsEmailHTML({
       tournamentDate,
       courseName: course_name,
+      cupName: req.league?.cup_name || 'Paradise Cup',
       numberOfHoles: tournamentHoleCount,
       rankedPlayers,
       skinWinners: skinRows,
@@ -1363,15 +1443,21 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
     for (let i = 0; i < recipients.length; i++) {
       const player = recipients[i];
       try {
-        // Only BCC on the first email when sending to multiple recipients
-        const includeBcc = (i === 0 && recipients.length > 1);
-        await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
+        await sendEmail(player.email, subject, html, null, null, false, outgoingEmailFrom);
         sent++;
         if (emailDelayMs > 0 && i < recipients.length - 1) {
           await sleep(emailDelayMs);
         }
       } catch (err) {
         failed.push({ email: player.email, error: err.message });
+      }
+    }
+
+    if (!singleEmail && recipients.length > 1 && sent > 0) {
+      try {
+        await sendEmail(GROUP_EMAIL_COPY_TO, subject, html, null, null, false, outgoingEmailFrom);
+      } catch (copyErr) {
+        console.error('Failed to send single results email copy:', copyErr.message);
       }
     }
 
@@ -1677,6 +1763,8 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     
     let smsSent = 0, emailSent = 0, smsFailed = [], emailFailed = [];
     let emailProviderBlocked = false;
+    let firstEmailSubject = null;
+    let firstEmailHtml = null;
     const emailDelayMs = getOutgoingEmailDelayMs();
     
     // Count email recipients for BCC logic
@@ -1756,11 +1844,14 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
               </body>
             </html>
           `;
+
+          if (!firstEmailSubject) {
+            firstEmailSubject = subject;
+            firstEmailHtml = html;
+          }
           
           console.log(`Sending Email to ${player.name} (${player.email})`);
-          // Only BCC on the first email when sending to multiple recipients
-          const includeBcc = (emailSent === 0 && emailPlayers.length > 1);
-          await sendEmail(player.email, subject, html, null, null, includeBcc, outgoingEmailFrom);
+          await sendEmail(player.email, subject, html, null, null, false, outgoingEmailFrom);
           console.log(`✓ Email sent successfully to ${player.name}`);
           emailSent++;
           if (emailDelayMs > 0 && emailSent < emailPlayers.length) {
@@ -1775,6 +1866,14 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
             break;
           }
         }
+      }
+    }
+
+    if ((method === 'email' || method === 'both') && emailPlayers.length > 1 && emailSent > 0 && firstEmailSubject && firstEmailHtml) {
+      try {
+        await sendEmail(GROUP_EMAIL_COPY_TO, firstEmailSubject, firstEmailHtml, null, null, false, outgoingEmailFrom);
+      } catch (copyErr) {
+        console.error('Failed to send single invitation email copy:', copyErr.message);
       }
     }
 

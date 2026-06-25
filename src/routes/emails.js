@@ -5,6 +5,8 @@ const multer = require('multer');
 const upload = multer();
 const { sendEmail } = require('../email');
 
+const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
@@ -112,9 +114,7 @@ router.post('/send', upload.single('attachment'), async (req, res) => {
     for (let i = 0; i < recipients.length; i++) {
       const email = recipients[i];
       try {
-        // Only BCC on the first email when sending to multiple recipients
-        const includeBcc = (i === 0 && recipients.length > 1);
-        await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null, includeBcc);
+        await sendEmail(email, subject, htmlBody, body, attachments.length ? attachments : null, false);
         sent++;
         if (emailDelayMs > 0 && i < recipients.length - 1) {
           await sleep(emailDelayMs);
@@ -122,6 +122,14 @@ router.post('/send', upload.single('attachment'), async (req, res) => {
       } catch (e) {
         console.error(`Failed to send to ${email}:`, e.message);
         failed++;
+      }
+    }
+
+    if (recipients.length > 1) {
+      try {
+        await sendEmail(GROUP_EMAIL_COPY_TO, subject, htmlBody, body, attachments.length ? attachments : null, false);
+      } catch (copyErr) {
+        console.error('Failed to send single bulk email copy:', copyErr.message);
       }
     }
 
