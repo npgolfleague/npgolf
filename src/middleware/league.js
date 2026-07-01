@@ -12,11 +12,28 @@ const leagueAliasMiddleware = async (req, res, next) => {
     const alias = pathParts[0];
     
     try {
-      // Lookup league by alias
-      const [rows] = await pool.query(
+      // Lookup league by alias. Older databases may not have cup_name yet.
+      let rows
+      try {
+        [rows] = await pool.query(
           'SELECT id, billing_entity_id, name, alias, cup_name, active FROM leagues WHERE alias = ? LIMIT 1',
-        [alias]
-      );
+          [alias]
+        )
+      } catch (queryErr) {
+        if (queryErr?.code !== 'ER_BAD_FIELD_ERROR') {
+          throw queryErr
+        }
+
+        const [legacyRows] = await pool.query(
+          'SELECT id, billing_entity_id, name, alias, active FROM leagues WHERE alias = ? LIMIT 1',
+          [alias]
+        )
+
+        rows = legacyRows.map((row) => ({
+          ...row,
+          cup_name: 'Paradise Cup'
+        }))
+      }
       
       if (rows.length === 0) {
         console.log(`⚠️  League alias '${alias}' not found in database`);

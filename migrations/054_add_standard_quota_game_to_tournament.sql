@@ -1,0 +1,16 @@
+SET @column_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tournament'
+    AND COLUMN_NAME = 'standard_quota_game'
+);
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE tournament ADD COLUMN standard_quota_game TINYINT(1) NOT NULL DEFAULT 1 AFTER shotgun_start',
+  'SELECT ''Column standard_quota_game already exists in tournament'''
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

@@ -7,6 +7,7 @@ export const AddTournament = () => {
   const [date, setDate] = useState('')
   const [firstTeeTime, setFirstTeeTime] = useState('')
   const [shotgunStart, setShotgunStart] = useState(false)
+  const [standardQuotaGame, setStandardQuotaGame] = useState(true)
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
   const [nineHoleSide, setNineHoleSide] = useState('front')
@@ -39,7 +40,7 @@ export const AddTournament = () => {
 
     setLoading(true)
     try {
-      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart)
+      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error creating tournament:', err)
@@ -103,6 +104,21 @@ export const AddTournament = () => {
                   />
                   Shotgun Start (all groups start at the same time)
                 </label>
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={standardQuotaGame}
+                    onChange={(e) => setStandardQuotaGame(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Standard quota game is being played
+                </label>
+                <p className="text-sm text-gray-500 mt-1 ml-6">
+                  Leave checked for normal quota leaderboard scoring. Uncheck for side-game-only events.
+                </p>
               </div>
 
               <div>
