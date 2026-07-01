@@ -8,6 +8,7 @@ export const EditTournament = () => {
   const [date, setDate] = useState('')
   const [firstTeeTime, setFirstTeeTime] = useState('')
   const [shotgunStart, setShotgunStart] = useState(false)
+  const [standardQuotaGame, setStandardQuotaGame] = useState(true)
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
   const [nineHoleSide, setNineHoleSide] = useState('front')
@@ -32,6 +33,7 @@ export const EditTournament = () => {
       setDate(tournament.date.split('T')[0]) // Convert to YYYY-MM-DD format
       setFirstTeeTime(tournament.first_tee_time ? String(tournament.first_tee_time).slice(0, 5) : '')
       setShotgunStart(Boolean(tournament.shotgun_start))
+      setStandardQuotaGame(tournament.standard_quota_game !== 0 && tournament.standard_quota_game !== false)
       setCourseId(tournament.course_id)
       setNumberOfHoles(tournament.number_of_holes)
       setNineHoleSide(tournament.nine_hole_side || 'front')
@@ -55,7 +57,7 @@ export const EditTournament = () => {
 
     setLoading(true)
     try {
-      await tournamentsAPI.update(id, date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart)
+      await tournamentsAPI.update(id, date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error updating tournament:', err)
@@ -127,6 +129,21 @@ export const EditTournament = () => {
                   />
                   Shotgun Start (all groups start at the same time)
                 </label>
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={standardQuotaGame}
+                    onChange={(e) => setStandardQuotaGame(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Standard quota game is being played
+                </label>
+                <p className="text-sm text-gray-500 mt-1 ml-6">
+                  Leave checked for normal quota leaderboard scoring. Uncheck for side-game-only events.
+                </p>
               </div>
 
               <div>

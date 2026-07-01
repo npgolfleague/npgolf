@@ -28,6 +28,11 @@ export const ScoreEntry = () => {
   const [postedInfo, setPostedInfo] = useState(null)
   const [posting, setPosting] = useState(false)
   const [isFivesome, setIsFivesome] = useState(false)
+  const [ctpMode, setCtpMode] = useState('regular')
+  const [foursomeGameEnabled, setFoursomeGameEnabled] = useState(false)
+  const [foursomeGameMatchAmount, setFoursomeGameMatchAmount] = useState('5')
+  const [foursomeGameCtpAmount, setFoursomeGameCtpAmount] = useState('1')
+  const [foursomeGameCtpData, setFoursomeGameCtpData] = useState({})
   const scoreInputRefs = useRef({})
 
   // Helper to focus the next player's input for the same field
@@ -477,24 +482,32 @@ export const ScoreEntry = () => {
     })
   }
 
-  const handleOpenCtpModal = (playerId) => {
+  const handleOpenCtpModal = (playerId, mode = 'regular') => {
     setCtpPlayerId(playerId)
+    setCtpMode(mode)
     setShowCtpModal(true)
   }
 
   const handleCloseCtpModal = () => {
     setShowCtpModal(false)
     setCtpPlayerId(null)
+    setCtpMode('regular')
   }
 
   const handleCtpChange = (field, value) => {
-    setCtpData(prev => ({
-      ...prev,
-      [ctpPlayerId]: {
-        ...prev[ctpPlayerId],
-        [field]: value
-      }
-    }))
+    if (ctpMode === 'foursome') {
+      setFoursomeGameCtpData(prev => ({
+        ...prev,
+        [currentHole]: {
+          ...prev[currentHole],
+          playerId: ctpPlayerId,
+          [field]: value
+        }
+      }))
+      return
+    }
+
+    setCtpData(prev => ({ ...prev, [ctpPlayerId]: { ...prev[ctpPlayerId], [field]: value } }))
   }
 
   const handleCtpImageChange = (e) => {
@@ -502,14 +515,20 @@ export const ScoreEntry = () => {
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setCtpData(prev => ({
-          ...prev,
-          [ctpPlayerId]: {
-            ...prev[ctpPlayerId],
-            imageFile: file,
-            imagePreview: reader.result
-          }
-        }))
+        if (ctpMode === 'foursome') {
+          setFoursomeGameCtpData(prev => ({
+            ...prev,
+            [currentHole]: {
+              ...prev[currentHole],
+              playerId: ctpPlayerId,
+              imageFile: file,
+              imagePreview: reader.result
+            }
+          }))
+          return
+        }
+
+        setCtpData(prev => ({ ...prev, [ctpPlayerId]: { ...prev[ctpPlayerId], imageFile: file, imagePreview: reader.result } }))
       }
       reader.readAsDataURL(file)
     }
@@ -535,6 +554,7 @@ export const ScoreEntry = () => {
       const scoreValue = scores[`${currentHole}-${playerId}-score`]
       const quotaValue = scores[`${currentHole}-${playerId}-quota`]
       const playerCtp = ctpData[playerId]
+      const foursomeCtp = foursomeGameCtpData[currentHole]
       if (!scoreValue) return null
 
       return {
@@ -544,9 +564,12 @@ export const ScoreEntry = () => {
         score: parseInt(scoreValue),
         quota: quotaValue !== '' && quotaValue !== null && quotaValue !== undefined ? parseInt(quotaValue) : null,
         foursome_group: foursomeGroup,
-        ctp_feet: playerCtp?.feet ? parseInt(playerCtp.feet) : null,
-        ctp_inches: playerCtp?.inches ? parseFloat(playerCtp.inches) : null,
-        ctp_image_url: playerCtp?.imagePreview || null
+        ctp_feet: playerCtp?.feet !== '' && playerCtp?.feet !== null && playerCtp?.feet !== undefined ? parseInt(playerCtp.feet) : null,
+        ctp_inches: playerCtp?.inches !== '' && playerCtp?.inches !== null && playerCtp?.inches !== undefined ? parseFloat(playerCtp.inches) : null,
+        ctp_image_url: playerCtp?.imagePreview || null,
+        foursome_ctp_feet: foursomeCtp?.playerId === playerId && foursomeCtp?.feet !== '' && foursomeCtp?.feet !== null && foursomeCtp?.feet !== undefined ? parseInt(foursomeCtp.feet) : null,
+        foursome_ctp_inches: foursomeCtp?.playerId === playerId && foursomeCtp?.inches !== '' && foursomeCtp?.inches !== null && foursomeCtp?.inches !== undefined ? parseFloat(foursomeCtp.inches) : null,
+        foursome_ctp_image_url: foursomeCtp?.playerId === playerId ? foursomeCtp?.imagePreview || null : null
       }
     }).filter(Boolean)
 
@@ -684,6 +707,76 @@ export const ScoreEntry = () => {
     return total
   }
 
+  const getFoursomeGameSummary = () => {
+    if (!selectedTournament || !foursomeGameEnabled || selectedPlayers.length !== 4 || playableHoles.length === 0) return null
+    const matchAmt = Number(foursomeGameMatchAmount) || 0
+    const ctpAmt = Number(foursomeGameCtpAmount) || 0
+    const segSize = selectedTournament.number_of_holes === 9 ? 3 : 6
+    const numSegs = 3
+    const [A, B, C, D] = selectedPlayers.map(id => players.find(p => p.id === id))
+    const segPairs = [[[A, B], [C, D]], [[A, C], [B, D]], [[A, D], [B, C]]]
+    const getScore = (pid, hnum) => parseInt(scores[`${hnum}-${pid}-score`]) || 0
+    const getPar = (hnum) => { const h = holes.find(x => x.hole_number === hnum); return h?.mens_par || 4 }
+    const getPairSegScore = (pair, start, end) =>
+      playableHoles.slice(start, end).reduce((sum, h) =>
+        sum + pair.reduce((ps, p) => ps + getScore(p?.id, h.hole_number) - getPar(h.hole_number), 0), 0)
+    const segments = []
+    for (let s = 0; s < numSegs; s++) {
+      const start = s * segSize
+      const end = start + segSize
+      const [p0, p1] = segPairs[s]
+      const seg0 = getPairSegScore(p0, start, end)
+      const seg1 = getPairSegScore(p1, start, end)
+      const pot = matchAmt
+      let result
+      if (seg0 < seg1) { result = { winner: 0, amount: matchAmt } }
+      else if (seg1 < seg0) { result = { winner: 1, amount: matchAmt } }
+      else { result = { winner: -1, amount: 0 } }
+      segments.push({ seg: s + 1, holes: `${playableHoles[start]?.hole_number}–${playableHoles[end - 1]?.hole_number}`, pair0: p0, pair1: p1, pair0score: seg0, pair1score: seg1, result, pot })
+    }
+    const playerTotals = {}
+    selectedPlayers.forEach(id => { playerTotals[id] = 0 })
+    segments.forEach(seg => {
+      const winners = seg.result.winner === 0 ? seg.pair0 : seg.result.winner === 1 ? seg.pair1 : []
+      const losers = seg.result.winner === 0 ? seg.pair1 : seg.result.winner === 1 ? seg.pair0 : []
+      winners.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) + seg.result.amount })
+      losers.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) - seg.result.amount })
+    })
+    const ctpPar3Holes = playableHoles.filter(h => h.mens_par === 3)
+    let ctpCarryoverPerPlayer = ctpAmt
+    const ctpRows = ctpPar3Holes.map((h, idx) => {
+      const record = foursomeGameCtpData[h.hole_number]
+      const winner = record?.playerId ? players.find(p => p.id === record.playerId) : null
+      // CTP setup amount is per player; winner receives from the other players.
+      const amount = winner ? ctpCarryoverPerPlayer * (selectedPlayers.length - 1) : 0
+      const isLast = idx === ctpPar3Holes.length - 1
+
+      if (winner) {
+        ctpCarryoverPerPlayer = ctpAmt
+      } else if (!isLast) {
+        ctpCarryoverPerPlayer += ctpAmt
+      }
+
+      return { hole: h.hole_number, winner: winner?.name || '—', winnerId: winner?.id || null, amount }
+    })
+    // Apply CTP payouts to playerTotals
+    ctpRows.forEach(row => {
+      if (row.winnerId && row.amount > 0) {
+        selectedPlayers.forEach(id => {
+          if (id === row.winnerId) {
+            playerTotals[id] = (playerTotals[id] || 0) + row.amount
+          } else {
+            playerTotals[id] = (playerTotals[id] || 0) - (row.amount / (selectedPlayers.length - 1))
+          }
+        })
+      }
+    })
+    return { modeLabel: selectedTournament.number_of_holes === 9 ? '333' : '666', players: [A, B, C, D], segments, playerTotals, ctpRows, matchAmt, ctpAmt }
+  }
+
+  const foursomeGameSummary = getFoursomeGameSummary()
+  const activeCtpRecord = ctpMode === 'foursome' ? foursomeGameCtpData[currentHole] : ctpData[ctpPlayerId]
+
   const holeData = getCurrentHoleData()
 
   return (
@@ -733,6 +826,31 @@ export const ScoreEntry = () => {
           </select>
         </div>
 
+        {/* Side Game Setup */}
+        <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-200">
+          <div className="text-sm font-semibold text-emerald-900 mb-2">
+            {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '333' : '666') : '333/666'} Side Game Setup
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-900">
+            <input type="checkbox" checked={foursomeGameEnabled} onChange={(e) => setFoursomeGameEnabled(e.target.checked)} className="h-4 w-4" />
+            Play {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '333' : '666') : '333/666'} side game
+          </label>
+          {foursomeGameEnabled && (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                  Per {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '3-hole' : '6-hole') : 'segment'} match ($)
+                </label>
+                <input type="number" min="0" step="0.01" value={foursomeGameMatchAmount} onChange={(e) => setFoursomeGameMatchAmount(e.target.value)} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm" placeholder="5.00" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-emerald-800 mb-1">CTP amount per player per par 3 ($)</label>
+                <input type="number" min="0" step="0.01" value={foursomeGameCtpAmount} onChange={(e) => setFoursomeGameCtpAmount(e.target.value)} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm" placeholder="1.00" />
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Foursome Group */}
         {selectedTournament && (
           <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -768,6 +886,66 @@ export const ScoreEntry = () => {
             />
             {foursomeGroup && (
               <p className="text-xs text-green-600 mt-1">✓ Group name set</p>
+            )}
+          </div>
+        )}
+
+        {/* Side Game Results */}
+        {foursomeGameEnabled && foursomeGameSummary && (
+          <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-300">
+            <div className="text-sm font-semibold text-emerald-900 mb-3">{foursomeGameSummary.modeLabel} Side Game – Live Results</div>
+            <div className="space-y-2 mb-3">
+              {foursomeGameSummary.segments.map(seg => (
+                <div key={seg.seg} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1">
+                    <span>Segment {seg.seg} (holes {seg.holes})</span>
+                    <span className="text-emerald-700">Pot: ${seg.pot.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{seg.pair0.map(p => p?.name).join(' & ')}: <b>{seg.pair0score > 0 ? '+' : ''}{seg.pair0score}</b></span>
+                    <span className={seg.result.winner === 0 ? 'text-emerald-700 font-bold' : seg.result.winner === 1 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
+                      {seg.result.winner === 0 ? '✓ WIN' : seg.result.winner === 1 ? 'loss' : 'PUSH'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{seg.pair1.map(p => p?.name).join(' & ')}: <b>{seg.pair1score > 0 ? '+' : ''}{seg.pair1score}</b></span>
+                    <span className={seg.result.winner === 1 ? 'text-emerald-700 font-bold' : seg.result.winner === 0 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
+                      {seg.result.winner === 1 ? '✓ WIN' : seg.result.winner === 0 ? 'loss' : 'PUSH'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <div className="text-xs font-semibold text-gray-600 mb-1">Running totals</div>
+              <div className="grid grid-cols-2 gap-1">
+                {foursomeGameSummary.players.map(p => p && (
+                  <div key={p.id} className="flex justify-between text-sm font-semibold">
+                    <span>{p.name}</span>
+                    <span className={`text-sm font-semibold ${
+                      (foursomeGameSummary.playerTotals[p.id] || 0) > 0 ? 'text-emerald-700' :
+                      (foursomeGameSummary.playerTotals[p.id] || 0) < 0 ? 'text-red-600' : 'text-gray-400'
+                    }`}>
+                      {(foursomeGameSummary.playerTotals[p.id] || 0) > 0
+                        ? `wins $${(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
+                        : (foursomeGameSummary.playerTotals[p.id] || 0) < 0
+                          ? `owes $${Math.abs(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
+                          : 'even'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {foursomeGameSummary.ctpRows.length > 0 && foursomeGameSummary.ctpAmt > 0 && (
+              <div className="mt-3 border-t pt-2">
+                <div className="text-xs font-semibold text-gray-600 mb-1">Side CTP (par 3s)</div>
+                {foursomeGameSummary.ctpRows.map(r => (
+                  <div key={r.hole} className="flex justify-between text-xs text-gray-700">
+                    <span>Hole {r.hole}: {r.winner}</span>
+                    <span>${r.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -908,6 +1086,28 @@ export const ScoreEntry = () => {
                             {ctpData[playerId].feet}' {ctpData[playerId].inches}"
                           </div>
                         )}
+                    {holeData.mens_par === 3 && foursomeGameEnabled && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCtpModal(playerId, 'foursome')}
+                          className={`w-full min-h-[44px] py-2 px-3 rounded-lg font-semibold text-sm transition ${
+                            foursomeGameCtpData[currentHole]?.playerId === playerId
+                              ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-500'
+                              : 'bg-gray-50 text-gray-600 border-2 border-dashed border-emerald-300 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {foursomeGameCtpData[currentHole]?.playerId === playerId ? '✓ Side CTP' : '🎯 Set Side CTP'}
+                        </button>
+                        {foursomeGameCtpData[currentHole]?.playerId === playerId && (
+                          <div className="text-xs text-emerald-700 mt-1 text-center">
+                            {foursomeGameCtpData[currentHole].feet}' {foursomeGameCtpData[currentHole].inches}"
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+
                       </div>
                     )}
                   </div>
@@ -1101,7 +1301,9 @@ export const ScoreEntry = () => {
         {showCtpModal && ctpPlayerId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">Closest to Pin - {players.find(p => p.id === ctpPlayerId)?.name}</h3>
+              <h3 className="text-xl font-bold mb-4">
+                {ctpMode === 'foursome' ? 'Side Game CTP' : 'Closest to Pin'} – {players.find(p => p.id === ctpPlayerId)?.name}
+              </h3>
               
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Distance</label>
@@ -1115,7 +1317,7 @@ export const ScoreEntry = () => {
                       min="0"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                       placeholder="0"
-                      value={ctpData[ctpPlayerId]?.feet || ''}
+                      value={activeCtpRecord?.feet || ''}
                       onChange={(e) => handleCtpChange('feet', e.target.value)}
                     />
                   </div>
@@ -1129,7 +1331,7 @@ export const ScoreEntry = () => {
                       step="0.1"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                       placeholder="0.0"
-                      value={ctpData[ctpPlayerId]?.inches || ''}
+                      value={activeCtpRecord?.inches || ''}
                       onChange={(e) => handleCtpChange('inches', e.target.value)}
                     />
                   </div>
@@ -1144,10 +1346,10 @@ export const ScoreEntry = () => {
                   onChange={handleCtpImageChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />
-                {ctpData[ctpPlayerId]?.imagePreview && (
+                {activeCtpRecord?.imagePreview && (
                   <div className="mt-2">
                     <img 
-                      src={ctpData[ctpPlayerId].imagePreview} 
+                      src={activeCtpRecord.imagePreview} 
                       alt="CTP measurement" 
                       className="w-full h-48 object-cover rounded-lg"
                     />

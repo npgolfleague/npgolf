@@ -576,7 +576,7 @@ router.get('/', async (req, res) => {
   try {
       const leagueId = getLeagueId(req);
       const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at, t.completed,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.created_at, t.completed,
               c.id as course_id, c.name as course_name, c.address as course_address,
               CASE
                 WHEN EXISTS (
@@ -604,7 +604,7 @@ router.get('/upcoming', async (req, res) => {
   try {
       const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.created_at,
               c.id as course_id, c.name as course_name, c.address as course_address
        FROM tournament t
        JOIN course c ON t.course_id = c.id
@@ -647,7 +647,7 @@ router.get('/:id', async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.first_tee_time, t.shotgun_start, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.first_tee_time, t.shotgun_start, t.created_at,
               t.quota_collected, t.skins_collected,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
               CASE
@@ -695,15 +695,16 @@ router.put('/:id/collected', async (req, res) => {
 // POST /api/tournaments - Create tournament
 router.post('/', async (req, res) => {
   try {
-    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game } = req.body;
     const leagueId = getLeagueId(req);
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     const teeTime = first_tee_time && String(first_tee_time).trim() !== '' ? String(first_tee_time).trim() : null;
     const shotgunStart = Boolean(shotgun_start);
+    const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     const [result] = await pool.query(
-      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, league_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, leagueId]
+      'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, league_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, standardQuotaGame, leagueId]
     );
     res.status(201).json({
       id: result.insertId,
@@ -713,6 +714,7 @@ router.post('/', async (req, res) => {
       nine_hole_side: side,
       first_tee_time: teeTime,
       shotgun_start: shotgunStart,
+      standard_quota_game: Boolean(standardQuotaGame),
       league_id: leagueId
     });
   } catch (err) {
@@ -725,14 +727,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
-    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start } = req.body;
+    const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game } = req.body;
     const holeCount = Number(number_of_holes || 18);
     const side = holeCount === 9 && nine_hole_side === 'back' ? 'back' : 'front';
     const teeTime = first_tee_time && String(first_tee_time).trim() !== '' ? String(first_tee_time).trim() : null;
     const shotgunStart = Boolean(shotgun_start);
+    const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     await pool.query(
-      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ?, first_tee_time = ?, shotgun_start = ? WHERE id = ? AND league_id = ?',
-      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, req.params.id, leagueId]
+      'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ?, first_tee_time = ?, shotgun_start = ?, standard_quota_game = ? WHERE id = ? AND league_id = ?',
+      [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, standardQuotaGame, req.params.id, leagueId]
     );
     res.json({
       id: req.params.id,
@@ -741,7 +744,8 @@ router.put('/:id', async (req, res) => {
       number_of_holes: holeCount,
       nine_hole_side: side,
       first_tee_time: teeTime,
-      shotgun_start: shotgunStart
+      shotgun_start: shotgunStart,
+      standard_quota_game: Boolean(standardQuotaGame)
     });
   } catch (err) {
     console.error('Error updating tournament:', err);

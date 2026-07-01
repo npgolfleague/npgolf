@@ -182,20 +182,51 @@ router.post('/', async (req, res) => {
       
       const results = [];
       for (const score of scores) {
-        const { tournament_id, player_id, hole_id, score: scoreValue, quota, ctp_feet, ctp_inches, ctp_image_url } = score;
+        const {
+          tournament_id,
+          player_id,
+          hole_id,
+          score: scoreValue,
+          quota,
+          ctp_feet,
+          ctp_inches,
+          ctp_image_url,
+          foursome_ctp_feet,
+          foursome_ctp_inches,
+          foursome_ctp_image_url
+        } = score;
         // Accept either `foursome` (new name) or `foursome_group` (legacy) in incoming payloads
         const foursomeVal = score.foursome || score.foursome_group || null;
         
         // First, always save the score and quota (without CTP data initially)
         const [result] = await connection.query(
-           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
-           VALUES (?, ?, ?, ?, ?, ?)
+           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group, ctp_feet, ctp_inches, ctp_image_url, foursome_ctp_feet, foursome_ctp_inches, foursome_ctp_image_url) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE 
              score = VALUES(score), 
              quota = VALUES(quota), 
              foursome_group = VALUES(foursome_group),
+             ctp_feet = VALUES(ctp_feet),
+             ctp_inches = VALUES(ctp_inches),
+             ctp_image_url = VALUES(ctp_image_url),
+             foursome_ctp_feet = VALUES(foursome_ctp_feet),
+             foursome_ctp_inches = VALUES(foursome_ctp_inches),
+             foursome_ctp_image_url = VALUES(foursome_ctp_image_url),
              entered_at = CURRENT_TIMESTAMP`,
-          [tournament_id, player_id, hole_id, scoreValue, quota, foursomeVal]
+          [
+            tournament_id,
+            player_id,
+            hole_id,
+            scoreValue,
+            quota,
+            foursomeVal,
+            ctp_feet,
+            ctp_inches,
+            ctp_image_url,
+            foursome_ctp_feet,
+            foursome_ctp_inches,
+            foursome_ctp_image_url
+          ]
         );
         
         // Now handle CTP data separately if provided
@@ -246,6 +277,51 @@ router.post('/', async (req, res) => {
             );
           } else {
             console.log(`Not saving CTP as it's not the closest.`);
+          }
+        }
+
+        if (foursome_ctp_feet !== null && foursome_ctp_feet !== undefined) {
+          const newDistance = (parseInt(foursome_ctp_feet) * 12) + parseFloat(foursome_ctp_inches || 0);
+          console.log(`New side-game CTP submission: Player ${player_id}, Hole ${hole_id}, Distance: ${foursome_ctp_feet}' ${foursome_ctp_inches}" (${newDistance} inches)`);
+
+          const [existingFoursomeCtps] = await connection.query(
+            `SELECT s.player_id, s.foursome_ctp_feet, s.foursome_ctp_inches, p.name
+             FROM scores s 
+             JOIN players p ON s.player_id = p.id
+             WHERE s.tournament_id = ? AND s.hole_id = ? AND s.player_id != ? AND s.foursome_ctp_feet IS NOT NULL`,
+            [tournament_id, hole_id, player_id]
+          );
+
+          console.log(`Found ${existingFoursomeCtps.length} existing side-game CTP(s) for this hole`);
+
+          let hasCloser = false;
+          for (const existingCtp of existingFoursomeCtps) {
+            const existingDistance = (parseInt(existingCtp.foursome_ctp_feet) * 12) + parseFloat(existingCtp.foursome_ctp_inches || 0);
+            console.log(`Comparing side-game CTP with ${existingCtp.name}: ${existingCtp.foursome_ctp_feet}' ${existingCtp.foursome_ctp_inches}" (${existingDistance} inches)`);
+            if (existingDistance <= newDistance) {
+              console.log(`Existing side-game CTP is closer or equal. Rejecting new CTP.`);
+              hasCloser = true;
+              break;
+            }
+          }
+
+          if (!hasCloser) {
+            console.log(`New side-game CTP is closest! Saving and clearing other side-game CTPs.`);
+            await connection.query(
+              `UPDATE scores 
+               SET foursome_ctp_feet = ?, foursome_ctp_inches = ?, foursome_ctp_image_url = ?
+               WHERE tournament_id = ? AND hole_id = ? AND player_id = ?`,
+              [foursome_ctp_feet, foursome_ctp_inches, foursome_ctp_image_url, tournament_id, hole_id, player_id]
+            );
+
+            await connection.query(
+              `UPDATE scores 
+               SET foursome_ctp_feet = NULL, foursome_ctp_inches = NULL, foursome_ctp_image_url = NULL 
+               WHERE tournament_id = ? AND hole_id = ? AND player_id != ?`,
+              [tournament_id, hole_id, player_id]
+            );
+          } else {
+            console.log(`Not saving side-game CTP as it's not the closest.`);
           }
         }
         
