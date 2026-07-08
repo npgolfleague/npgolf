@@ -715,24 +715,48 @@ export const ScoreEntry = () => {
     const numSegs = 3
     const [A, B, C, D] = selectedPlayers.map(id => players.find(p => p.id === id))
     const segPairs = [[[A, B], [C, D]], [[A, C], [B, D]], [[A, D], [B, C]]]
-    const getScore = (pid, hnum) => parseInt(scores[`${hnum}-${pid}-score`]) || 0
-    const getPar = (hnum) => { const h = holes.find(x => x.hole_number === hnum); return h?.mens_par || 4 }
-    const getPairSegScore = (pair, start, end) =>
+    const getPairSegQuotaPoints = (pair, start, end) =>
       playableHoles.slice(start, end).reduce((sum, h) =>
-        sum + pair.reduce((ps, p) => ps + getScore(p?.id, h.hole_number) - getPar(h.hole_number), 0), 0)
+        sum + pair.reduce((ps, p) => {
+          const raw = scores[`${h.hole_number}-${p?.id}-quota`]
+          if (raw === '' || raw === null || raw === undefined) return ps
+          const parsed = Number(raw)
+          return ps + (Number.isNaN(parsed) ? 0 : parsed)
+        }, 0), 0)
+    const getPairSegGoal = (pair) => {
+      const pairQuotaTotal = pair.reduce((sum, p) => sum + (getPlayerCurrentQuota(p) || 0), 0)
+      return Math.round(pairQuotaTotal / 3)
+    }
     const segments = []
     for (let s = 0; s < numSegs; s++) {
       const start = s * segSize
       const end = start + segSize
       const [p0, p1] = segPairs[s]
-      const seg0 = getPairSegScore(p0, start, end)
-      const seg1 = getPairSegScore(p1, start, end)
+      const goal0 = getPairSegGoal(p0)
+      const goal1 = getPairSegGoal(p1)
+      const actual0 = getPairSegQuotaPoints(p0, start, end)
+      const actual1 = getPairSegQuotaPoints(p1, start, end)
+      const seg0 = actual0 - goal0
+      const seg1 = actual1 - goal1
       const pot = matchAmt
       let result
-      if (seg0 < seg1) { result = { winner: 0, amount: matchAmt } }
-      else if (seg1 < seg0) { result = { winner: 1, amount: matchAmt } }
+      if (seg0 > seg1) { result = { winner: 0, amount: matchAmt } }
+      else if (seg1 > seg0) { result = { winner: 1, amount: matchAmt } }
       else { result = { winner: -1, amount: 0 } }
-      segments.push({ seg: s + 1, holes: `${playableHoles[start]?.hole_number}–${playableHoles[end - 1]?.hole_number}`, pair0: p0, pair1: p1, pair0score: seg0, pair1score: seg1, result, pot })
+      segments.push({
+        seg: s + 1,
+        holes: `${playableHoles[start]?.hole_number}–${playableHoles[end - 1]?.hole_number}`,
+        pair0: p0,
+        pair1: p1,
+        pair0score: seg0,
+        pair1score: seg1,
+        pair0goal: goal0,
+        pair1goal: goal1,
+        pair0actual: actual0,
+        pair1actual: actual1,
+        result,
+        pot
+      })
     }
     const playerTotals = {}
     selectedPlayers.forEach(id => { playerTotals[id] = 0 })
@@ -902,13 +926,19 @@ export const ScoreEntry = () => {
                     <span className="text-emerald-700">Pot: ${seg.pot.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span>{seg.pair0.map(p => p?.name).join(' & ')}: <b>{seg.pair0score > 0 ? '+' : ''}{seg.pair0score}</b></span>
+                    <span>
+                      {seg.pair0.map(p => p?.name).join(' & ')}: <b>{seg.pair0score > 0 ? '+' : ''}{seg.pair0score}</b>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair0actual}, goal {seg.pair0goal})</span>
+                    </span>
                     <span className={seg.result.winner === 0 ? 'text-emerald-700 font-bold' : seg.result.winner === 1 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
                       {seg.result.winner === 0 ? '✓ WIN' : seg.result.winner === 1 ? 'loss' : 'PUSH'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span>{seg.pair1.map(p => p?.name).join(' & ')}: <b>{seg.pair1score > 0 ? '+' : ''}{seg.pair1score}</b></span>
+                    <span>
+                      {seg.pair1.map(p => p?.name).join(' & ')}: <b>{seg.pair1score > 0 ? '+' : ''}{seg.pair1score}</b>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair1actual}, goal {seg.pair1goal})</span>
+                    </span>
                     <span className={seg.result.winner === 1 ? 'text-emerald-700 font-bold' : seg.result.winner === 0 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
                       {seg.result.winner === 1 ? '✓ WIN' : seg.result.winner === 0 ? 'loss' : 'PUSH'}
                     </span>
