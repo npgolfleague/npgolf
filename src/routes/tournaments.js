@@ -792,6 +792,44 @@ router.post('/:id/complete', async (req, res) => {
     const isNineHoleTournament = tournamentHoleCount === 9;
     const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
 
+    // Require complete score coverage for all active players not marked as no-shows.
+    const [incompleteScoreRows] = await connection.query(
+      `SELECT tp.player_id,
+              p.name,
+              COUNT(DISTINCT s.hole_id) AS holes_played
+       FROM tournament_players tp
+       JOIN players p ON p.id = tp.player_id
+       LEFT JOIN scores s
+         ON s.tournament_id = tp.tournament_id
+        AND s.player_id = tp.player_id
+       WHERE tp.tournament_id = ?
+         AND p.active = 1
+         AND COALESCE(tp.attending_status, 'yes') <> 'no'
+       GROUP BY tp.player_id, p.name
+       HAVING COUNT(DISTINCT s.hole_id) < ?
+       ORDER BY p.name ASC`,
+      [tournamentId, tournamentHoleCount]
+    );
+
+    if (incompleteScoreRows.length > 0) {
+      const sampleNames = incompleteScoreRows
+        .slice(0, 6)
+        .map((row) => String(row.name || '').trim())
+        .filter(Boolean)
+        .join(', ');
+      const overflowCount = Math.max(0, incompleteScoreRows.length - 6);
+      const suffix = overflowCount > 0 ? ` and ${overflowCount} more` : '';
+      return res.status(400).json({
+        error: `Cannot complete tournament: ${incompleteScoreRows.length} player(s) have incomplete scores (${sampleNames}${suffix}).`,
+        incompletePlayers: incompleteScoreRows.map((row) => ({
+          player_id: row.player_id,
+          name: row.name,
+          holes_played: Number(row.holes_played) || 0,
+          required_holes: tournamentHoleCount
+        }))
+      });
+    }
+
     // Load quota point values from league settings (fall back to system defaults)
     const [settingsRows] = await connection.query(
       `SELECT quota_points_albatross, quota_points_eagle, quota_points_birdie,
