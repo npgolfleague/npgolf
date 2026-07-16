@@ -110,7 +110,7 @@ router.post('/:tournamentId/players', async (req, res) => {
         `UPDATE tournament_players
          SET attending_status = 'yes',
              response_date = NOW(),
-             tournament_quota = ?,
+             tournament_quota = COALESCE(tournament_quota, ?),
              tee_id = COALESCE(?, tee_id)
          WHERE tournament_id = ? AND player_id = ?`,
         [tournamentQuota, resolvedTeeId, tournamentId, playerId]

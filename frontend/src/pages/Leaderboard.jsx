@@ -220,12 +220,20 @@ export function Leaderboard() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6">
-        <button
-          onClick={() => navigate('/app/dashboard')}
-          className="text-blue-600 hover:text-blue-800 mb-2"
-        >
-          ← Back to Dashboard
-        </button>
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => navigate('/app/dashboard')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            ← Back to Dashboard
+          </button>
+          <button
+            onClick={() => navigate(`/tournaments/${tournamentId}/hole-scores`)}
+            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            View Hole Scores
+          </button>
+        </div>
         <h1 className="text-3xl font-bold">🏆 Tournament Leaderboard</h1>
         {tournament && (
           <p className="text-gray-600 mt-2">

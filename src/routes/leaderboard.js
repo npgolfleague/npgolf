@@ -42,6 +42,10 @@ router.get('/:tournamentId', async (req, res) => {
       SELECT t.number_of_holes,
              t.quota_collected,
              t.skins_collected,
+             CASE
+               WHEN EXISTS (SELECT 1 FROM tournament_paradise_points tpp WHERE tpp.tournament_id = t.id)
+               THEN 1 ELSE 0
+             END AS is_completed,
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND paid = 1) as paid_players,
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND skins_ctp_paid = 1) as skins_ctp_players
       FROM tournament t
@@ -51,7 +55,12 @@ router.get('/:tournamentId', async (req, res) => {
     const [settingsInfo] = await pool.query('SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes, live_scoring FROM league_settings WHERE league_id = ? LIMIT 1', [getLeagueId(req)]);
     
     const tournament = tournamentInfo[0];
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
     const holeCount = Number(tournament?.number_of_holes);
+    const isCompleted = Number(tournament?.is_completed || 0) === 1;
     const settings = settingsInfo[0];
     const liveScoring = !settings || settings.live_scoring == null ? true : Boolean(settings.live_scoring);
 
@@ -111,17 +120,24 @@ router.get('/:tournamentId', async (req, res) => {
         q.holes_5,
         q.holes_6,
         q.holes_7,
+        tpp.place AS finalized_place,
+        tpp.player_quota AS finalized_player_quota,
+        tpp.over_under AS finalized_over_under,
         COALESCE(SUM(s.quota), 0) as total_quota_points,
         COUNT(DISTINCT s.hole_id) as holes_played,
         COALESCE(SUM(s.score), 0) as total_strokes
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
       LEFT JOIN quota q ON q.player_id = p.id
+      LEFT JOIN tournament_paradise_points tpp
+        ON tpp.tournament_id = tp.tournament_id
+       AND tpp.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
       GROUP BY p.id, p.name, p.email, tp.tournament_quota, p.${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
-               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7
+               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
+               tpp.place, tpp.player_quota, tpp.over_under
     `, [tournamentId, tournamentId]);
     
     const skins = {};
@@ -338,10 +354,19 @@ router.get('/:tournamentId', async (req, res) => {
     // Calculate over/under for each player first
     const playersWithOverUnder = rows.map((player) => {
       const playerSkins = skins[player.id]?.count || 0;
-      const recentAverageQuota = calculateRecentAverageQuota(player, holeCount);
       const fallbackQuota = parseFloat(player.tournament_quota ?? player.default_player_quota) || 0;
-      const playerQuota = recentAverageQuota ?? fallbackQuota;
-      const overUnder = (parseFloat(player.total_quota_points) || 0) - playerQuota;
+      const hasFinalizedValues = player.finalized_player_quota !== null && player.finalized_over_under !== null;
+
+      // For completed tournaments, freeze to finalized values so standings never drift.
+      const playerQuota = isCompleted
+        ? (hasFinalizedValues ? (parseFloat(player.finalized_player_quota) || 0) : fallbackQuota)
+        : (calculateRecentAverageQuota(player, holeCount) ?? fallbackQuota);
+
+      const overUnder = isCompleted
+        ? (hasFinalizedValues
+          ? (parseFloat(player.finalized_over_under) || 0)
+          : ((parseFloat(player.total_quota_points) || 0) - playerQuota))
+        : ((parseFloat(player.total_quota_points) || 0) - playerQuota);
       
       return {
         id: player.id,
@@ -350,6 +375,7 @@ router.get('/:tournamentId', async (req, res) => {
         player_quota: playerQuota,
         total_quota_points: parseFloat(player.total_quota_points) || 0,
         over_under: overUnder,
+        finalized_place: player.finalized_place != null ? Number(player.finalized_place) : null,
         holes_played: player.holes_played,
         total_strokes: player.total_strokes,
         skins: playerSkins,
@@ -358,6 +384,16 @@ router.get('/:tournamentId', async (req, res) => {
     });
 
     playersWithOverUnder.sort((a, b) => {
+      if (isCompleted) {
+        const aHasPlace = a.finalized_place != null;
+        const bHasPlace = b.finalized_place != null;
+        if (aHasPlace && bHasPlace && a.finalized_place !== b.finalized_place) {
+          return a.finalized_place - b.finalized_place;
+        }
+        if (aHasPlace !== bHasPlace) {
+          return aHasPlace ? -1 : 1;
+        }
+      }
       if (b.holes_played !== a.holes_played) return b.holes_played - a.holes_played;
       if (b.over_under !== a.over_under) return b.over_under - a.over_under;
       return String(a.name).localeCompare(String(b.name));
