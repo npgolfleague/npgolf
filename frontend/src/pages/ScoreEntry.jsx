@@ -22,17 +22,16 @@ export const ScoreEntry = () => {
   const [ctpData, setCtpData] = useState({})
   const [showCtpModal, setShowCtpModal] = useState(false)
   const [ctpPlayerId, setCtpPlayerId] = useState(null)
-  const [ctpLeader, setCtpLeader] = useState(null)
-  const [showCompletionModal, setShowCompletionModal] = useState(false)
-  const [isPosted, setIsPosted] = useState(false)
-  const [postedInfo, setPostedInfo] = useState(null)
-  const [posting, setPosting] = useState(false)
-  const [isFivesome, setIsFivesome] = useState(false)
   const [ctpMode, setCtpMode] = useState('regular')
   const [foursomeGameEnabled, setFoursomeGameEnabled] = useState(false)
   const [foursomeGameMatchAmount, setFoursomeGameMatchAmount] = useState('5')
   const [foursomeGameCtpAmount, setFoursomeGameCtpAmount] = useState('1')
   const [foursomeGameCtpData, setFoursomeGameCtpData] = useState({})
+  const [ctpLeader, setCtpLeader] = useState(null)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [isPosted, setIsPosted] = useState(false)
+  const [postedInfo, setPostedInfo] = useState(null)
+  const [posting, setPosting] = useState(false)
   const scoreInputRefs = useRef({})
 
   // Helper to focus the next player's input for the same field
@@ -44,42 +43,6 @@ export const ScoreEntry = () => {
       scoreInputRefs.current[key]?.focus()
       scoreInputRefs.current[key]?.select()
     }
-  }
-
-  const getDefaultStartHole = (tournament) => {
-    if (!tournament) return 1
-    return tournament.number_of_holes === 9 && tournament.nine_hole_side === 'back' ? 10 : 1
-  }
-
-  const getStartingHoleFromGroupName = (groupName) => {
-    if (!groupName) return null
-    const match = String(groupName).trim().match(/^(\d{1,2})/)
-    if (!match) return null
-
-    const hole = Number(match[1])
-    return hole >= 1 && hole <= 18 ? hole : null
-  }
-
-  const isHolePlayableForTournament = (tournament, holeNumber) => {
-    if (!tournament || !holeNumber) return false
-
-    if (tournament.number_of_holes === 9) {
-      const side = tournament.nine_hole_side || 'front'
-      if (side === 'back') {
-        return holeNumber >= 10 && holeNumber <= 18
-      }
-      return holeNumber >= 1 && holeNumber <= 9
-    }
-
-    return holeNumber >= 1 && holeNumber <= 18
-  }
-
-  const resolveStartHoleForGroup = (tournament, groupName) => {
-    const parsedStartHole = getStartingHoleFromGroupName(groupName)
-    if (parsedStartHole && isHolePlayableForTournament(tournament, parsedStartHole)) {
-      return parsedStartHole
-    }
-    return getDefaultStartHole(tournament)
   }
 
   const getPlayableHoles = () => {
@@ -116,7 +79,6 @@ export const ScoreEntry = () => {
       try {
         const tResp = await tournamentsAPI.get(tid)
         setSelectedTournament(tResp.data)
-        setCurrentHole(resolveStartHoleForGroup(tResp.data, fq))
         await fetchTournamentPlayers(tid)
         if (fq) {
           setFoursomeGroup(fq)
@@ -128,6 +90,8 @@ export const ScoreEntry = () => {
           })
           setSelectedPlayers(ids)
           setFoursomePairs(fps)
+          setCtpData({})
+          setFoursomeGameCtpData({})
         }
       } catch (err) {
         console.error('Error loading foursome from URL:', err)
@@ -264,7 +228,8 @@ export const ScoreEntry = () => {
 
   const handleGroupSelect = async (groupName) => {
     setFoursomeGroup(groupName)
-    setCurrentHole(resolveStartHoleForGroup(selectedTournament, groupName))
+    setCtpData({})
+    setFoursomeGameCtpData({})
     if (groupName && selectedTournament) {
       try {
         // Get the scores for this group to find the players
@@ -327,15 +292,25 @@ export const ScoreEntry = () => {
       
       // Convert existing scores to the format expected by the component
       const loadedScores = {}
+      const loadedFoursomeCtp = {}
       existingScores.forEach(scoreRecord => {
         const hole = holes.find(h => h.id === scoreRecord.hole_id)
         if (hole) {
           loadedScores[`${hole.hole_number}-${scoreRecord.player_id}-score`] = scoreRecord.score
           loadedScores[`${hole.hole_number}-${scoreRecord.player_id}-quota`] = scoreRecord.quota
+          if (scoreRecord.foursome_ctp_feet !== null && scoreRecord.foursome_ctp_feet !== undefined) {
+            loadedFoursomeCtp[hole.hole_number] = {
+              playerId: scoreRecord.player_id,
+              feet: scoreRecord.foursome_ctp_feet,
+              inches: scoreRecord.foursome_ctp_inches,
+              imagePreview: scoreRecord.foursome_ctp_image_url || null
+            }
+          }
         }
       })
       
       setScores(loadedScores)
+      setFoursomeGameCtpData(loadedFoursomeCtp)
     } catch (err) {
       console.error('Error loading existing scores:', err)
       // Don't alert on 404 - just means no scores exist yet
@@ -507,7 +482,13 @@ export const ScoreEntry = () => {
       return
     }
 
-    setCtpData(prev => ({ ...prev, [ctpPlayerId]: { ...prev[ctpPlayerId], [field]: value } }))
+    setCtpData(prev => ({
+      ...prev,
+      [ctpPlayerId]: {
+        ...prev[ctpPlayerId],
+        [field]: value
+      }
+    }))
   }
 
   const handleCtpImageChange = (e) => {
@@ -528,7 +509,14 @@ export const ScoreEntry = () => {
           return
         }
 
-        setCtpData(prev => ({ ...prev, [ctpPlayerId]: { ...prev[ctpPlayerId], imageFile: file, imagePreview: reader.result } }))
+        setCtpData(prev => ({
+          ...prev,
+          [ctpPlayerId]: {
+            ...prev[ctpPlayerId],
+            imageFile: file,
+            imagePreview: reader.result
+          }
+        }))
       }
       reader.readAsDataURL(file)
     }
@@ -594,14 +582,8 @@ export const ScoreEntry = () => {
       if (currentIndex >= 0 && currentIndex < playableHoles.length - 1) {
         setCurrentHole(playableHoles[currentIndex + 1].hole_number)
       } else {
-        // Last playable hole was saved. If anything is missing, jump to the earliest missing hole.
-        const earliestIncompleteHole = findEarliestIncompleteHole(playableHoles, selectedPlayers, scores)
-        if (earliestIncompleteHole != null) {
-          setCurrentHole(earliestIncompleteHole)
-        } else {
-          // All holes done — show completion modal
-          setShowCompletionModal(true)
-        }
+        // All holes done — show completion modal
+        setShowCompletionModal(true)
       }
     } catch (err) {
       console.error('Error saving scores:', err)
@@ -616,21 +598,6 @@ export const ScoreEntry = () => {
     return playableHoles.find(h => h.hole_number === currentHole)
   }
 
-  const findEarliestIncompleteHole = (holeList, playerIds, scoreMap) => {
-    for (const hole of holeList) {
-      const hasMissingEntry = playerIds.some(playerId => {
-        const scoreValue = scoreMap[`${hole.hole_number}-${playerId}-score`]
-        return scoreValue === undefined || scoreValue === null || scoreValue === ''
-      })
-
-      if (hasMissingEntry) {
-        return hole.hole_number
-      }
-    }
-
-    return null
-  }
-
   const handlePostScores = async () => {
     if (!selectedTournament || !foursomeGroup) return
     try {
@@ -640,26 +607,8 @@ export const ScoreEntry = () => {
       setPostedInfo(res.data)
       setShowCompletionModal(false)
     } catch (err) {
-      const status = err?.response?.status
-      const serverError = err?.response?.data?.error
-      const requestUrl = err?.config?.url
-      const code = err?.code
-      const message = serverError || err?.message || 'Unknown error'
-
-      console.error('Error posting scores:', {
-        status,
-        code,
-        message,
-        serverError,
-        requestUrl,
-        foursomeGroup,
-        tournamentId: selectedTournament?.id
-      })
-
-      const detail = status
-        ? `(${status}) ${message}`
-        : `${message}${code ? ` [${code}]` : ''}`
-      alert(`Failed to post scores: ${detail}`)
+      console.error('Error posting scores:', err)
+      alert('Failed to post scores. Please try again.')
     } finally {
       setPosting(false)
     }
@@ -708,98 +657,98 @@ export const ScoreEntry = () => {
   }
 
   const getFoursomeGameSummary = () => {
-    if (!selectedTournament || !foursomeGameEnabled || selectedPlayers.length !== 4 || playableHoles.length === 0) return null
-    const matchAmt = Number(foursomeGameMatchAmount) || 0
-    const ctpAmt = Number(foursomeGameCtpAmount) || 0
-    const segSize = selectedTournament.number_of_holes === 9 ? 3 : 6
-    const numSegs = 3
-    const [A, B, C, D] = selectedPlayers.map(id => players.find(p => p.id === id))
-    const segPairs = [[[A, B], [C, D]], [[A, C], [B, D]], [[A, D], [B, C]]]
-    const getPairSegQuotaPoints = (pair, start, end) =>
-      playableHoles.slice(start, end).reduce((sum, h) =>
-        sum + pair.reduce((ps, p) => {
-          const raw = scores[`${h.hole_number}-${p?.id}-quota`]
-          if (raw === '' || raw === null || raw === undefined) return ps
-          const parsed = Number(raw)
-          return ps + (Number.isNaN(parsed) ? 0 : parsed)
-        }, 0), 0)
-    const getPairSegGoal = (pair) => {
-      const pairQuotaTotal = pair.reduce((sum, p) => sum + (getPlayerCurrentQuota(p) || 0), 0)
-      return Math.round(pairQuotaTotal / 3)
+    if (!selectedTournament || !foursomeGameEnabled || selectedPlayers.length !== 4 || playableHoles.length === 0) {
+      return null
     }
-    const segments = []
-    for (let s = 0; s < numSegs; s++) {
-      const start = s * segSize
-      const end = start + segSize
-      const [p0, p1] = segPairs[s]
-      const goal0 = getPairSegGoal(p0)
-      const goal1 = getPairSegGoal(p1)
-      const actual0 = getPairSegQuotaPoints(p0, start, end)
-      const actual1 = getPairSegQuotaPoints(p1, start, end)
-      const seg0 = actual0 - goal0
-      const seg1 = actual1 - goal1
-      const pot = matchAmt
-      let result
-      if (seg0 > seg1) { result = { winner: 0, amount: matchAmt } }
-      else if (seg1 > seg0) { result = { winner: 1, amount: matchAmt } }
-      else { result = { winner: -1, amount: 0 } }
-      segments.push({
-        seg: s + 1,
-        holes: `${playableHoles[start]?.hole_number}–${playableHoles[end - 1]?.hole_number}`,
-        pair0: p0,
-        pair1: p1,
-        pair0score: seg0,
-        pair1score: seg1,
-        pair0goal: goal0,
-        pair1goal: goal1,
-        pair0actual: actual0,
-        pair1actual: actual1,
-        result,
-        pot
-      })
+
+    const segmentLength = playableHoles.length / 3
+    if (!Number.isInteger(segmentLength) || segmentLength <= 0) {
+      return null
     }
-    const playerTotals = {}
-    selectedPlayers.forEach(id => { playerTotals[id] = 0 })
-    segments.forEach(seg => {
-      const winners = seg.result.winner === 0 ? seg.pair0 : seg.result.winner === 1 ? seg.pair1 : []
-      const losers = seg.result.winner === 0 ? seg.pair1 : seg.result.winner === 1 ? seg.pair0 : []
-      winners.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) + seg.result.amount })
-      losers.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) - seg.result.amount })
-    })
-    const ctpPar3Holes = playableHoles.filter(h => h.mens_par === 3)
-    let ctpCarryoverPerPlayer = ctpAmt
-    const ctpRows = ctpPar3Holes.map((h, idx) => {
-      const record = foursomeGameCtpData[h.hole_number]
-      const winner = record?.playerId ? players.find(p => p.id === record.playerId) : null
-      // CTP setup amount is per player; winner receives from the other players.
-      const amount = winner ? ctpCarryoverPerPlayer * (selectedPlayers.length - 1) : 0
-      const isLast = idx === ctpPar3Holes.length - 1
 
-      if (winner) {
-        ctpCarryoverPerPlayer = ctpAmt
-      } else if (!isLast) {
-        ctpCarryoverPerPlayer += ctpAmt
-      }
-
-      return { hole: h.hole_number, winner: winner?.name || '—', winnerId: winner?.id || null, amount }
-    })
-    // Apply CTP payouts to playerTotals
-    ctpRows.forEach(row => {
-      if (row.winnerId && row.amount > 0) {
-        selectedPlayers.forEach(id => {
-          if (id === row.winnerId) {
-            playerTotals[id] = (playerTotals[id] || 0) + row.amount
-          } else {
-            playerTotals[id] = (playerTotals[id] || 0) - (row.amount / (selectedPlayers.length - 1))
-          }
-        })
+    const matchAmount = Number(foursomeGameMatchAmount) || 0
+    const ctpBaseAmount = Number(foursomeGameCtpAmount) || 0
+    const slots = ['A', 'B', 'C', 'D']
+    const lineup = selectedPlayers.map((playerId, index) => {
+      const player = players.find(entry => entry.id === playerId) || null
+      return {
+        slot: slots[index],
+        playerId,
+        player,
+        quotaTarget: Math.floor((getPlayerCurrentQuota(player) || 0) / 3)
       }
     })
-    return { modeLabel: selectedTournament.number_of_holes === 9 ? '333' : '666', players: [A, B, C, D], segments, playerTotals, ctpRows, matchAmt, ctpAmt }
+
+    const pairings = [
+      [[0, 1], [2, 3]],
+      [[0, 2], [1, 3]],
+      [[0, 3], [1, 2]]
+    ]
+
+    const segments = pairings.map((pairing, index) => {
+      const holes = playableHoles.slice(index * segmentLength, (index + 1) * segmentLength)
+      const [teamAIndexes, teamBIndexes] = pairing
+      const teamAPlayers = teamAIndexes.map(playerIndex => lineup[playerIndex])
+      const teamBPlayers = teamBIndexes.map(playerIndex => lineup[playerIndex])
+
+      const getPlayerSegmentPoints = (playerId) => holes.reduce((sum, hole) => {
+        const quotaValue = scores[`${hole.hole_number}-${playerId}-quota`]
+        return sum + (parseInt(quotaValue) || 0)
+      }, 0)
+
+      const teamAActual = teamAPlayers.reduce((sum, entry) => sum + getPlayerSegmentPoints(entry.playerId), 0)
+      const teamBActual = teamBPlayers.reduce((sum, entry) => sum + getPlayerSegmentPoints(entry.playerId), 0)
+      const teamATarget = teamAPlayers.reduce((sum, entry) => sum + entry.quotaTarget, 0)
+      const teamBTarget = teamBPlayers.reduce((sum, entry) => sum + entry.quotaTarget, 0)
+      const winner = teamAActual > teamBActual ? 'A' : teamBActual > teamAActual ? 'B' : 'Tie'
+
+      return {
+        label: `${teamAPlayers.map(entry => entry.slot).join('+')} vs ${teamBPlayers.map(entry => entry.slot).join('+')}`,
+        holes,
+        teamAPlayers,
+        teamBPlayers,
+        teamAActual,
+        teamBActual,
+        teamATarget,
+        teamBTarget,
+        winner,
+        payoutPerPlayer: winner === 'Tie' ? matchAmount / 2 : matchAmount
+      }
+    })
+
+    const ctpHoles = playableHoles.filter(hole => hole.mens_par === 3)
+    let carryover = ctpBaseAmount
+    const ctpRows = ctpHoles.map((hole, index) => {
+      const record = foursomeGameCtpData[hole.hole_number]
+      const payout = record ? carryover : 0
+      const isLastHole = index === ctpHoles.length - 1
+
+      if (record) {
+        carryover = ctpBaseAmount
+      } else if (!isLastHole) {
+        carryover += ctpBaseAmount
+      }
+
+      return {
+        hole,
+        record,
+        payout,
+        carryover
+      }
+    })
+
+    return {
+      modeLabel: selectedTournament.number_of_holes === 9 ? '333' : '666',
+      lineup,
+      segments,
+      ctpRows,
+      ctpBaseAmount
+    }
   }
 
   const foursomeGameSummary = getFoursomeGameSummary()
   const activeCtpRecord = ctpMode === 'foursome' ? foursomeGameCtpData[currentHole] : ctpData[ctpPlayerId]
+  const activeCtpPlayerName = players.find(player => player.id === ctpPlayerId)?.name || ''
 
   const holeData = getCurrentHoleData()
 
@@ -838,7 +787,12 @@ export const ScoreEntry = () => {
             onChange={(e) => {
               const tournament = tournaments.find(t => t.id === parseInt(e.target.value))
               setSelectedTournament(tournament)
-              setCurrentHole(getDefaultStartHole(tournament))
+              setFoursomeGameEnabled(false)
+              setFoursomeGameMatchAmount('5')
+              setFoursomeGameCtpAmount('1')
+              setFoursomeGameCtpData({})
+              const startHole = tournament?.number_of_holes === 9 && tournament?.nine_hole_side === 'back' ? 10 : 1
+              setCurrentHole(startHole)
             }}
           >
             <option value="">Choose a tournament...</option>
@@ -848,29 +802,9 @@ export const ScoreEntry = () => {
               </option>
             ))}
           </select>
-        </div>
-
-        {/* Side Game Setup */}
-        <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-200">
-          <div className="text-sm font-semibold text-emerald-900 mb-2">
-            {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '333' : '666') : '333/666'} Side Game Setup
-          </div>
-          <label className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-900">
-            <input type="checkbox" checked={foursomeGameEnabled} onChange={(e) => setFoursomeGameEnabled(e.target.checked)} className="h-4 w-4" />
-            Play {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '333' : '666') : '333/666'} side game
-          </label>
-          {foursomeGameEnabled && (
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-semibold text-emerald-800 mb-1">
-                  Per {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '3-hole' : '6-hole') : 'segment'} match ($)
-                </label>
-                <input type="number" min="0" step="0.01" value={foursomeGameMatchAmount} onChange={(e) => setFoursomeGameMatchAmount(e.target.value)} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm" placeholder="5.00" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-emerald-800 mb-1">CTP amount per player per par 3 ($)</label>
-                <input type="number" min="0" step="0.01" value={foursomeGameCtpAmount} onChange={(e) => setFoursomeGameCtpAmount(e.target.value)} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm" placeholder="1.00" />
-              </div>
+          {selectedTournament?.standard_quota_game === 0 && (
+            <div className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              Standard quota game is disabled for this tournament
             </div>
           )}
         </div>
@@ -914,71 +848,56 @@ export const ScoreEntry = () => {
           </div>
         )}
 
-        {/* Side Game Results */}
-        {foursomeGameEnabled && foursomeGameSummary && (
-          <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-300">
-            <div className="text-sm font-semibold text-emerald-900 mb-3">{foursomeGameSummary.modeLabel} Side Game – Live Results</div>
-            <div className="space-y-2 mb-3">
-              {foursomeGameSummary.segments.map(seg => (
-                <div key={seg.seg} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                  <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1">
-                    <span>Segment {seg.seg} (holes {seg.holes})</span>
-                    <span className="text-emerald-700">Pot: ${seg.pot.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>
-                      {seg.pair0.map(p => p?.name).join(' & ')}: <b>{seg.pair0score > 0 ? '+' : ''}{seg.pair0score}</b>
-                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair0actual}, goal {seg.pair0goal})</span>
-                    </span>
-                    <span className={seg.result.winner === 0 ? 'text-emerald-700 font-bold' : seg.result.winner === 1 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
-                      {seg.result.winner === 0 ? '✓ WIN' : seg.result.winner === 1 ? 'loss' : 'PUSH'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>
-                      {seg.pair1.map(p => p?.name).join(' & ')}: <b>{seg.pair1score > 0 ? '+' : ''}{seg.pair1score}</b>
-                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair1actual}, goal {seg.pair1goal})</span>
-                    </span>
-                    <span className={seg.result.winner === 1 ? 'text-emerald-700 font-bold' : seg.result.winner === 0 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
-                      {seg.result.winner === 1 ? '✓ WIN' : seg.result.winner === 0 ? 'loss' : 'PUSH'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="border-t pt-2 mt-2">
-              <div className="text-xs font-semibold text-gray-600 mb-1">Running totals</div>
-              <div className="grid grid-cols-2 gap-1">
-                {foursomeGameSummary.players.map(p => p && (
-                  <div key={p.id} className="flex justify-between text-sm font-semibold">
-                    <span>{p.name}</span>
-                    <span className={`text-sm font-semibold ${
-                      (foursomeGameSummary.playerTotals[p.id] || 0) > 0 ? 'text-emerald-700' :
-                      (foursomeGameSummary.playerTotals[p.id] || 0) < 0 ? 'text-red-600' : 'text-gray-400'
-                    }`}>
-                      {(foursomeGameSummary.playerTotals[p.id] || 0) > 0
-                        ? `wins $${(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
-                        : (foursomeGameSummary.playerTotals[p.id] || 0) < 0
-                          ? `owes $${Math.abs(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
-                          : 'even'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {foursomeGameSummary.ctpRows.length > 0 && foursomeGameSummary.ctpAmt > 0 && (
-              <div className="mt-3 border-t pt-2">
-                <div className="text-xs font-semibold text-gray-600 mb-1">Side CTP (par 3s)</div>
-                {foursomeGameSummary.ctpRows.map(r => (
-                  <div key={r.hole} className="flex justify-between text-xs text-gray-700">
-                    <span>Hole {r.hole}: {r.winner}</span>
-                    <span>${r.amount.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Side Game Setup */}
+        <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-200">
+          <div className="text-sm font-semibold text-emerald-900 mb-2">
+            {selectedTournament
+              ? (selectedTournament.number_of_holes === 9 ? '333' : '666')
+              : '333/666'} Side Game Setup
           </div>
-        )}
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-900">
+            <input
+              type="checkbox"
+              checked={foursomeGameEnabled}
+              onChange={(e) => setFoursomeGameEnabled(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Play {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '333' : '666') : '333/666'} side game
+          </label>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                Per {selectedTournament ? (selectedTournament.number_of_holes === 9 ? '3-hole' : '6-hole') : 'segment'} match ($)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={foursomeGameMatchAmount}
+                onChange={(e) => setFoursomeGameMatchAmount(e.target.value)}
+                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+                placeholder="5.00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-emerald-800 mb-1">CTP amount per par 3 ($)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={foursomeGameCtpAmount}
+                onChange={(e) => setFoursomeGameCtpAmount(e.target.value)}
+                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+                placeholder="1.00"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 mt-2">
+            {selectedTournament
+              ? 'Side-game calculations and side CTP details appear once you select players.'
+              : 'Select a tournament to determine whether this side game runs as 333 (9 holes) or 666 (18 holes).'}
+          </p>
+        </div>
 
         {/* Score Entry for Current Hole */}
         {selectedPlayers.length > 0 && holeData && (
@@ -1099,7 +1018,7 @@ export const ScoreEntry = () => {
                       </div>
                     </div>
                     {holeData.mens_par === 3 && (
-                      <div className="mt-2">
+                      <div className="mt-2 space-y-2">
                         <button
                           type="button"
                           onClick={() => handleOpenCtpModal(playerId)}
@@ -1116,28 +1035,26 @@ export const ScoreEntry = () => {
                             {ctpData[playerId].feet}' {ctpData[playerId].inches}"
                           </div>
                         )}
-                    {holeData.mens_par === 3 && foursomeGameEnabled && (
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCtpModal(playerId, 'foursome')}
-                          className={`w-full min-h-[44px] py-2 px-3 rounded-lg font-semibold text-sm transition ${
-                            foursomeGameCtpData[currentHole]?.playerId === playerId
-                              ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-500'
-                              : 'bg-gray-50 text-gray-600 border-2 border-dashed border-emerald-300 hover:bg-emerald-50'
-                          }`}
-                        >
-                          {foursomeGameCtpData[currentHole]?.playerId === playerId ? '✓ Side CTP' : '🎯 Set Side CTP'}
-                        </button>
-                        {foursomeGameCtpData[currentHole]?.playerId === playerId && (
-                          <div className="text-xs text-emerald-700 mt-1 text-center">
-                            {foursomeGameCtpData[currentHole].feet}' {foursomeGameCtpData[currentHole].inches}"
-                          </div>
+                        {foursomeGameEnabled && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCtpModal(playerId, 'foursome')}
+                              className={`w-full min-h-[44px] py-2 px-3 rounded-lg font-semibold text-sm transition ${
+                                foursomeGameCtpData[currentHole]?.playerId === playerId
+                                  ? 'bg-amber-100 text-amber-900 border-2 border-amber-500'
+                                  : 'bg-amber-50 text-amber-800 border-2 border-amber-200 hover:bg-amber-100'
+                              }`}
+                            >
+                              {foursomeGameCtpData[currentHole]?.playerId === playerId ? '✓ Side CTP Recorded' : `📍 Set ${selectedTournament?.number_of_holes === 9 ? '333' : '666'} CTP`}
+                            </button>
+                            {foursomeGameCtpData[currentHole]?.playerId === playerId && (
+                              <div className="text-xs text-gray-600 mt-1 text-center">
+                                {foursomeGameCtpData[currentHole].feet}' {foursomeGameCtpData[currentHole].inches}"
+                              </div>
+                            )}
+                          </>
                         )}
-                      </div>
-                    )}
-
-
                       </div>
                     )}
                   </div>
@@ -1196,7 +1113,7 @@ export const ScoreEntry = () => {
           <div className="bg-white rounded-lg shadow p-4 mt-4">
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-semibold text-gray-700">
-                Select Players (up to {isFivesome ? 5 : 4})
+                Select Players (up to 4)
               </label>
               {selectedPlayers.length > 0 && (
                 <button
@@ -1213,22 +1130,8 @@ export const ScoreEntry = () => {
               </div>
             ) : (
               <>
-                <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 accent-blue-600"
-                    checked={isFivesome}
-                    onChange={(e) => {
-                      setIsFivesome(e.target.checked)
-                      if (!e.target.checked) {
-                        setSelectedPlayers(prev => prev.slice(0, 4))
-                      }
-                    }}
-                  />
-                  <span className="text-sm text-gray-700">This is a fivesome</span>
-                </label>
                 <div className="flex flex-col gap-2">
-                  {(isFivesome ? [0, 1, 2, 3, 4] : [0, 1, 2, 3]).map(slot => (
+                  {[0, 1, 2, 3].map(slot => (
                     <div key={slot} className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 w-16">Player {slot + 1}</span>
                       <select
@@ -1261,7 +1164,7 @@ export const ScoreEntry = () => {
                 </div>
                 <div className="mt-2">
                   <div className="text-sm text-gray-600">
-                    Selected: {selectedPlayers.length}/{isFivesome ? 5 : 4}
+                    Selected: {selectedPlayers.length}/4
                   </div>
                 </div>
               </>
@@ -1331,9 +1234,7 @@ export const ScoreEntry = () => {
         {showCtpModal && ctpPlayerId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">
-                {ctpMode === 'foursome' ? 'Side Game CTP' : 'Closest to Pin'} – {players.find(p => p.id === ctpPlayerId)?.name}
-              </h3>
+              <h3 className="text-xl font-bold mb-4">{ctpMode === 'foursome' ? `${selectedTournament?.number_of_holes === 9 ? '333' : '666'} Side CTP` : 'Closest to Pin'} - {activeCtpPlayerName}</h3>
               
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Distance</label>
