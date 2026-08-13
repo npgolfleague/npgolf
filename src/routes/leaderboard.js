@@ -123,6 +123,7 @@ router.get('/:tournamentId', async (req, res) => {
         tpp.place AS finalized_place,
         tpp.player_quota AS finalized_player_quota,
         tpp.over_under AS finalized_over_under,
+        tpp.total_quota_points AS finalized_total_quota_points,
         COALESCE(SUM(s.quota), 0) as total_quota_points,
         COUNT(DISTINCT s.hole_id) as holes_played,
         COALESCE(SUM(s.score), 0) as total_strokes
@@ -137,7 +138,7 @@ router.get('/:tournamentId', async (req, res) => {
       GROUP BY p.id, p.name, p.email, tp.tournament_quota, p.${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
                q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
-               tpp.place, tpp.player_quota, tpp.over_under
+               tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points
     `, [tournamentId, tournamentId]);
     
     const skins = {};
@@ -362,18 +363,22 @@ router.get('/:tournamentId', async (req, res) => {
         ? (hasFinalizedValues ? (parseFloat(player.finalized_player_quota) || 0) : fallbackQuota)
         : (calculateRecentAverageQuota(player, holeCount) ?? fallbackQuota);
 
+      const totalQuotaPoints = isCompleted && player.finalized_total_quota_points !== null
+        ? (parseFloat(player.finalized_total_quota_points) || 0)
+        : (parseFloat(player.total_quota_points) || 0);
+
       const overUnder = isCompleted
         ? (hasFinalizedValues
           ? (parseFloat(player.finalized_over_under) || 0)
-          : ((parseFloat(player.total_quota_points) || 0) - playerQuota))
-        : ((parseFloat(player.total_quota_points) || 0) - playerQuota);
+          : (totalQuotaPoints - playerQuota))
+        : (totalQuotaPoints - playerQuota);
       
       return {
         id: player.id,
         name: player.name,
         email: player.email,
         player_quota: playerQuota,
-        total_quota_points: parseFloat(player.total_quota_points) || 0,
+        total_quota_points: totalQuotaPoints,
         over_under: overUnder,
         finalized_place: player.finalized_place != null ? Number(player.finalized_place) : null,
         holes_played: player.holes_played,
