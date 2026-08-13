@@ -58,6 +58,35 @@ const calculateRecentAverageQuota = (playerRow, holeCount) => {
 };
 
 const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleCount) => {
+  // Prefer frozen completion values so regenerated emails match completed leaderboard payouts.
+  const [finalizedRows] = await db.query(
+    `SELECT
+       tpp.player_id,
+       p.name,
+       tpp.total_quota_points AS total_points,
+       tpp.player_quota,
+       tpp.over_under,
+       tpp.place
+     FROM tournament_paradise_points tpp
+     JOIN players p ON p.id = tpp.player_id
+     WHERE tpp.tournament_id = ?
+       AND p.active = 1
+     ORDER BY tpp.place ASC, p.name ASC`,
+    [tournamentId]
+  );
+
+  if (finalizedRows.length > 0) {
+    return finalizedRows.map((row) => ({
+      player_id: row.player_id,
+      name: row.name,
+      total_points: Number(row.total_points) || 0,
+      player_quota: Number(row.player_quota) || 0,
+      over_under: Number(row.over_under) || 0,
+      holes_played: Number(tournamentHoleCount) === 9 ? 9 : 18,
+      place: Number(row.place) || null
+    }));
+  }
+
   const quotaColumn = Number(tournamentHoleCount) === 9 ? 'quota_9' : 'quota_18';
 
   const [rows] = await db.query(
