@@ -80,37 +80,65 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
        q.holes_5,
        q.holes_6,
        q.holes_7,
+       tpp.place AS finalized_place,
+       tpp.player_quota AS finalized_player_quota,
+       tpp.over_under AS finalized_over_under,
+       tpp.total_quota_points AS finalized_total_quota_points,
        COALESCE(SUM(s.quota), 0) AS total_quota_points,
        COUNT(DISTINCT s.hole_id) AS holes_played
      FROM players p
      JOIN tournament_players tp ON p.id = tp.player_id
      LEFT JOIN quota q ON q.player_id = p.id
+     LEFT JOIN tournament_paradise_points tpp
+       ON tpp.tournament_id = tp.tournament_id
+      AND tpp.player_id = p.id
      LEFT JOIN scores s ON s.player_id = p.id AND s.tournament_id = ?
      WHERE tp.tournament_id = ? AND p.active = 1
      GROUP BY p.id, p.name, tp.tournament_quota, p.${quotaColumn},
               q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
-              q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7`,
+              q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
+              tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points`,
     [tournamentId, tournamentId]
   );
 
   const rankedPlayers = rows
     .map((row) => {
+      const hasFinalizedValues = row.finalized_place !== null
+        && row.finalized_player_quota !== null
+        && row.finalized_over_under !== null
+        && row.finalized_total_quota_points !== null;
       const recentAverageQuota = calculateRecentAverageQuota(row, Number(tournamentHoleCount));
       const fallbackQuota = Number(row.tournament_quota ?? row.default_player_quota) || 0;
-      const playerQuota = recentAverageQuota ?? fallbackQuota;
-      const totalPoints = Number(row.total_quota_points) || 0;
+      const playerQuota = hasFinalizedValues
+        ? (Number(row.finalized_player_quota) || 0)
+        : (recentAverageQuota ?? fallbackQuota);
+      const totalPoints = hasFinalizedValues
+        ? (Number(row.finalized_total_quota_points) || 0)
+        : (Number(row.total_quota_points) || 0);
+      const overUnder = hasFinalizedValues
+        ? (Number(row.finalized_over_under) || 0)
+        : (totalPoints - playerQuota);
 
       return {
         player_id: row.player_id,
         name: row.name,
         total_points: totalPoints,
         player_quota: playerQuota,
-        over_under: totalPoints - playerQuota,
-        holes_played: Number(row.holes_played) || 0
+        over_under: overUnder,
+        holes_played: Number(row.holes_played) || 0,
+        finalized_place: row.finalized_place != null ? Number(row.finalized_place) : null
       };
     })
     .filter((player) => player.holes_played > 0)
     .sort((a, b) => {
+      const aHasPlace = a.finalized_place != null;
+      const bHasPlace = b.finalized_place != null;
+      if (aHasPlace && bHasPlace && a.finalized_place !== b.finalized_place) {
+        return a.finalized_place - b.finalized_place;
+      }
+      if (aHasPlace !== bHasPlace) {
+        return aHasPlace ? -1 : 1;
+      }
       if (b.over_under !== a.over_under) return b.over_under - a.over_under;
       return String(a.name).localeCompare(String(b.name));
     });
@@ -381,7 +409,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
             <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
             <td style="padding:8px 12px;">${w.player_name}</td>
             <td style="padding:8px 12px;text-align:center;">${w.score}</td>
-            <td style="padding:8px 12px;text-align:right;">$${skinPrizePerSkin}</td>
+            <td style="padding:8px 12px;text-align:right;">$${Number(w.prize_money ?? skinPrizePerSkin ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
           </tr>`).join('')}</tbody>
       </table>
     </div>` : '';
@@ -774,7 +802,7 @@ router.post('/:id/complete', async (req, res) => {
     
     // Get tournament date and course
     const [tournamentRows] = await connection.query(
-      `SELECT t.date, t.number_of_holes, t.league_id, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.league_id, t.quota_collected, t.skins_collected, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
@@ -1068,7 +1096,9 @@ router.post('/:id/complete', async (req, res) => {
     const skinsCTPFee = Number(
       tournamentHoleCount === 18 ? settings.skins_ctp_fee_18_holes : settings.skins_ctp_fee_9_holes
     ) || 0;
-    const skinsCTPTotalPot = (Number(paidCounts.skins_ctp_paid_players) || 0) * skinsCTPFee;
+    const skinsCTPTotalPot = tournamentRows[0].skins_collected != null
+      ? Number(tournamentRows[0].skins_collected)
+      : (Number(paidCounts.skins_ctp_paid_players) || 0) * skinsCTPFee;
     const skinPrizePot = skinsCTPTotalPot * 0.6;
     const ctpPrizePot = skinsCTPTotalPot * 0.4;
     const skinPrizePerSkin = skinWinners.length > 0 ? Math.floor(skinPrizePot / skinWinners.length) : 0;
@@ -1077,7 +1107,9 @@ router.post('/:id/complete', async (req, res) => {
     const tournamentFee = Number(
       tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes
     ) || 0;
-    const quotaPrizePot = (Number(paidCounts.paid_players) || 0) * tournamentFee;
+    const quotaPrizePot = tournamentRows[0].quota_collected != null
+      ? Number(tournamentRows[0].quota_collected)
+      : (Number(paidCounts.paid_players) || 0) * tournamentFee;
 
     await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
@@ -1323,14 +1355,14 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   try {
     await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
-      `SELECT t.date, t.number_of_holes, t.quota_collected, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
       [tournamentId]
     );
     if (tournamentRows.length === 0) return res.status(404).json({ error: 'Tournament not found' });
-    const { date, number_of_holes, quota_collected, course_name } = tournamentRows[0];
+    const { date, number_of_holes, quota_collected, skins_collected, course_name } = tournamentRows[0];
     const tournamentHoleCount = Number(number_of_holes) === 9 ? 9 : 18;
     const rankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
     if (rankedPlayers.length === 0) return res.status(400).json({ error: 'No score data found for this tournament' });
@@ -1358,9 +1390,8 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
        ORDER BY sw.hole_number ASC`,
       [tournamentId]
     );
-    const skinPrizePerSkin = skinRows.length > 0 ? Number(skinRows[0].prize_money) : 0;
 
-    const [ctpRows] = await pool.query(
+    const [rawCtpRows] = await pool.query(
       `SELECT cw.hole_number, cw.ctp_feet, cw.ctp_inches, cw.prize_money, p.name AS player_name
        FROM tournament_ctp_winners cw
        JOIN players p ON p.id = cw.player_id
@@ -1368,21 +1399,63 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
        ORDER BY cw.hole_number ASC`,
       [tournamentId]
     );
-    const ctpPrizePerWinner = ctpRows.length > 0 ? Number(ctpRows[0].prize_money) : 0;
 
     const [paidCountsRows] = await pool.query(
-      `SELECT SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players FROM tournament_players WHERE tournament_id = ?`,
+      `SELECT
+         SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players,
+         SUM(CASE WHEN skins_ctp_paid = 1 THEN 1 ELSE 0 END) AS skins_ctp_paid_players
+       FROM tournament_players
+       WHERE tournament_id = ?`,
       [tournamentId]
     );
     const [settingsRows] = await pool.query(
-      'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
+      'SELECT tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
       [getLeagueId(req)]
     );
     const settings = settingsRows[0] || {};
     const tournamentFee = Number(tournamentHoleCount === 18 ? settings.tournament_fee_18_holes : settings.tournament_fee_9_holes) || 0;
+    const skinsCTPFee = Number(tournamentHoleCount === 18 ? settings.skins_ctp_fee_18_holes : settings.skins_ctp_fee_9_holes) || 0;
     const quotaPrizePot = quota_collected != null
       ? Number(quota_collected)
       : (Number(paidCountsRows[0]?.paid_players) || 0) * tournamentFee;
+    const skinsCTPTotalPot = skins_collected != null
+      ? Number(skins_collected)
+      : (Number(paidCountsRows[0]?.skins_ctp_paid_players) || 0) * skinsCTPFee;
+    const skinPrizePot = skinsCTPTotalPot * 0.6;
+    const ctpPrizePot = skinsCTPTotalPot * 0.4;
+
+    const hasExplicitSkinPrizes = skinRows.some((row) => Number(row.prize_money || 0) > 0);
+    const skinPrizePerSkin = skinRows.length > 0 ? Math.floor(skinPrizePot / skinRows.length) : 0;
+    const emailSkinRows = skinRows.map((row) => ({
+      ...row,
+      prize_money: hasExplicitSkinPrizes ? Number(row.prize_money || 0) : skinPrizePerSkin
+    }));
+
+    const normalizedCtpRows = [];
+    const seenCtpHoles = new Set();
+    for (const row of rawCtpRows) {
+      const holeNumber = Number(row.hole_number);
+      if (!Number.isFinite(holeNumber) || seenCtpHoles.has(holeNumber)) {
+        continue;
+      }
+      seenCtpHoles.add(holeNumber);
+      normalizedCtpRows.push(row);
+      if (tournamentHoleCount === 9 && normalizedCtpRows.length >= 2) {
+        break;
+      }
+    }
+
+    const explicitCtpPrizeTotal = normalizedCtpRows.reduce(
+      (sum, row) => sum + Number(row.prize_money || 0),
+      0
+    );
+    const hasExplicitCtpPrizes = explicitCtpPrizeTotal > 0;
+    const canUseExplicitCtpPrizes = hasExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
+    const ctpPrizePerWinner = normalizedCtpRows.length > 0 ? Math.floor(ctpPrizePot / normalizedCtpRows.length) : 0;
+    const emailCtpRows = normalizedCtpRows.map((row) => ({
+      ...row,
+      prize_money: canUseExplicitCtpPrizes ? Number(row.prize_money || 0) : ctpPrizePerWinner
+    }));
 
     const tournamentDate = formatDateOnly(date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const emailHTML = buildResultsEmailHTML({
@@ -1391,8 +1464,8 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       cupName: req.league?.cup_name || 'Paradise Cup',
       numberOfHoles: tournamentHoleCount,
       rankedPlayers,
-      skinWinners: skinRows,
-      ctpWinners: ctpRows,
+      skinWinners: emailSkinRows,
+      ctpWinners: emailCtpRows,
       skinPrizePerSkin,
       ctpPrizePerWinner,
       quotaPrizePot,
