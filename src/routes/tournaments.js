@@ -389,6 +389,36 @@ const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
   return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
 };
 
+const mergeManagedAndScoreDerivedCtpWinners = (managedRows, scoreDerivedRows, numberOfHoles) => {
+  const normalizedManaged = calculateCtpWinnersByHole(managedRows || [], numberOfHoles);
+  const normalizedScoreDerived = calculateCtpWinnersByHole(scoreDerivedRows || [], numberOfHoles);
+
+  const winnersByHole = new Map();
+
+  normalizedScoreDerived.forEach((row) => {
+    winnersByHole.set(Number(row.hole_number), {
+      prize_money: Number(row.prize_money || 0),
+      ...row
+    });
+  });
+
+  normalizedManaged.forEach((row) => {
+    winnersByHole.set(Number(row.hole_number), {
+      prize_money: Number(row.prize_money || 0),
+      ...row
+    });
+  });
+
+  let resolved = Array.from(winnersByHole.values())
+    .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+
+  if (Number(numberOfHoles) === 9) {
+    resolved = resolved.slice(0, 2);
+  }
+
+  return resolved;
+};
+
 const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], customMessage = null }) => {
   const prizePercentages = [0.5, 0.3, 0.2];
   const prizePlayers = [];
@@ -1079,7 +1109,7 @@ router.post('/:id/complete', async (req, res) => {
 
     const skinWinners = calculateSkinsByHole(skinScoreRows);
 
-    const [ctpRows] = await connection.query(
+    const [scoreDerivedCtpRows] = await connection.query(
       `SELECT h.id AS hole_id,
               h.hole_number,
               s.player_id,
@@ -1104,7 +1134,24 @@ router.post('/:id/complete', async (req, res) => {
       [tournamentId]
     );
 
-    const ctpWinners = calculateCtpWinnersByHole(ctpRows, tournamentHoleCount);
+    const [managedCtpRows] = await connection.query(
+      `SELECT cw.hole_id,
+              cw.hole_number,
+              cw.player_id,
+              p.name AS player_name,
+              cw.ctp_feet,
+              cw.ctp_inches,
+              cw.ctp_image_url,
+              cw.prize_money
+       FROM tournament_ctp_winners cw
+       JOIN players p ON p.id = cw.player_id
+       WHERE cw.tournament_id = ?
+       ORDER BY cw.hole_number ASC`,
+      [tournamentId]
+    );
+
+    // Managed winners take precedence by hole; any unmanaged hole falls back to score-derived CTP leaders.
+    const ctpWinners = mergeManagedAndScoreDerivedCtpWinners(managedCtpRows, scoreDerivedCtpRows, tournamentHoleCount);
 
     const [paidCountsRows] = await connection.query(
       `SELECT
@@ -1420,12 +1467,37 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       [tournamentId]
     );
 
-    const [rawCtpRows] = await pool.query(
-      `SELECT cw.hole_number, cw.ctp_feet, cw.ctp_inches, cw.prize_money, p.name AS player_name
+    const [managedCtpRows] = await pool.query(
+      `SELECT cw.hole_id, cw.hole_number, cw.player_id, cw.ctp_feet, cw.ctp_inches, cw.prize_money, p.name AS player_name
        FROM tournament_ctp_winners cw
        JOIN players p ON p.id = cw.player_id
        WHERE cw.tournament_id = ?
        ORDER BY cw.hole_number ASC`,
+      [tournamentId]
+    );
+
+    const [scoreDerivedCtpRows] = await pool.query(
+      `SELECT h.id AS hole_id,
+              h.hole_number,
+              s.player_id,
+              p.name AS player_name,
+              s.ctp_feet,
+              s.ctp_inches,
+              s.ctp_image_url,
+              (s.ctp_feet * 12 + s.ctp_inches) AS total_inches
+       FROM scores s
+       JOIN hole h ON s.hole_id = h.id
+       JOIN players p ON s.player_id = p.id
+       JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
+       WHERE s.tournament_id = ?
+         AND EXISTS (
+           SELECT 1 FROM hole_tee ht_p3
+           WHERE ht_p3.hole_id = h.id AND ht_p3.par = 3
+         )
+         AND s.ctp_feet IS NOT NULL
+         AND p.active = 1
+         AND tp.skins_ctp_paid = 1
+       ORDER BY h.hole_number ASC, total_inches ASC`,
       [tournamentId]
     );
 
@@ -1460,26 +1532,19 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       prize_money: hasExplicitSkinPrizes ? Number(row.prize_money || 0) : skinPrizePerSkin
     }));
 
-    const normalizedCtpRows = [];
-    const seenCtpHoles = new Set();
-    for (const row of rawCtpRows) {
-      const holeNumber = Number(row.hole_number);
-      if (!Number.isFinite(holeNumber) || seenCtpHoles.has(holeNumber)) {
-        continue;
-      }
-      seenCtpHoles.add(holeNumber);
-      normalizedCtpRows.push(row);
-      if (tournamentHoleCount === 9 && normalizedCtpRows.length >= 2) {
-        break;
-      }
-    }
+    const normalizedCtpRows = mergeManagedAndScoreDerivedCtpWinners(
+      managedCtpRows,
+      scoreDerivedCtpRows,
+      tournamentHoleCount
+    );
 
     const explicitCtpPrizeTotal = normalizedCtpRows.reduce(
       (sum, row) => sum + Number(row.prize_money || 0),
       0
     );
-    const hasExplicitCtpPrizes = explicitCtpPrizeTotal > 0;
-    const canUseExplicitCtpPrizes = hasExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
+    const hasCompleteExplicitCtpPrizes = normalizedCtpRows.length > 0
+      && normalizedCtpRows.every((row) => Number(row.prize_money || 0) > 0);
+    const canUseExplicitCtpPrizes = hasCompleteExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
     const ctpPrizePerWinner = normalizedCtpRows.length > 0 ? Math.floor(ctpPrizePot / normalizedCtpRows.length) : 0;
     const emailCtpRows = normalizedCtpRows.map((row) => ({
       ...row,

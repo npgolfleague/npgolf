@@ -40,6 +40,27 @@ async function getPar3HolesForCourse(courseId) {
   }
 }
 
+function normalizeCtpRowsByHole(rows, maxRows = null) {
+  const seenHoles = new Set();
+  const normalized = [];
+
+  for (const row of rows || []) {
+    const holeNumber = Number(row?.hole_number);
+    if (!Number.isFinite(holeNumber) || seenHoles.has(holeNumber)) {
+      continue;
+    }
+
+    seenHoles.add(holeNumber);
+    normalized.push(row);
+
+    if (maxRows != null && normalized.length >= maxRows) {
+      break;
+    }
+  }
+
+  return normalized;
+}
+
 // GET /api/scores - List all scores
 router.get('/', async (req, res) => {
   try {
@@ -439,10 +460,52 @@ router.get('/tournament/:tournamentId/ctp-admin-options', requireAdmin, async (r
       [tournamentId]
     );
 
+    const allowedHoleIdSet = new Set((ctpHoles || []).map((row) => Number(row.hole_id)));
+    const filteredSavedRows = (winnerRows || []).filter((row) => allowedHoleIdSet.has(Number(row.hole_id)));
+
+    let scoreDerivedRows = [];
+    const ctpHoleIds = (ctpHoles || [])
+      .map((row) => Number(row.hole_id))
+      .filter((id) => Number.isInteger(id));
+
+    if (ctpHoleIds.length > 0) {
+      const holePlaceholders = ctpHoleIds.map(() => '?').join(', ');
+      const [rawScoreRows] = await pool.query(
+        `SELECT s.hole_id,
+                h.hole_number,
+                s.player_id,
+                p.name AS player_name,
+                s.ctp_feet,
+                s.ctp_inches
+         FROM scores s
+         JOIN players p ON p.id = s.player_id
+         JOIN hole h ON h.id = s.hole_id
+         WHERE s.tournament_id = ?
+           AND s.ctp_feet IS NOT NULL
+           AND s.hole_id IN (${holePlaceholders})
+         ORDER BY h.hole_number ASC, (s.ctp_feet * 12 + s.ctp_inches) ASC`,
+        [tournamentId, ...ctpHoleIds]
+      );
+
+      scoreDerivedRows = normalizeCtpRowsByHole(rawScoreRows);
+    }
+
+    // Saved admin winners take precedence by hole; holes without admin rows fall back to score-derived leaders.
+    const winnerByHole = new Map();
+    scoreDerivedRows.forEach((row) => {
+      winnerByHole.set(Number(row.hole_number), row);
+    });
+    filteredSavedRows.forEach((row) => {
+      winnerByHole.set(Number(row.hole_number), row);
+    });
+
+    const mergedWinnerRows = Array.from(winnerByHole.values())
+      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+
     return res.json({
       holes: ctpHoles,
       players: playerRows,
-      winners: winnerRows
+      winners: mergedWinnerRows
     });
   } catch (err) {
     console.error('Error fetching CTP admin options:', err);
@@ -539,7 +602,8 @@ router.put('/tournament/:tournamentId/ctp-winners', requireAdmin, async (req, re
              player_id = VALUES(player_id),
              ctp_feet = VALUES(ctp_feet),
              ctp_inches = VALUES(ctp_inches),
-             ctp_image_url = VALUES(ctp_image_url)`,
+             ctp_image_url = VALUES(ctp_image_url),
+             prize_money = 0.00`,
           [tournamentId, hole.hole_id, holeNumber, playerId, ctpFeet, ctpInches]
         );
       }
@@ -578,26 +642,8 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
   try {
     const { tournamentId } = req.params;
 
-    const [savedRows] = await pool.query(
-      `SELECT w.ctp_feet, w.ctp_inches, w.ctp_image_url,
-              p.id as player_id, p.name as player_name,
-              w.hole_number,
-              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par,
-              w.prize_money
-       FROM tournament_ctp_winners w
-       JOIN players p ON w.player_id = p.id
-       LEFT JOIN hole h ON w.hole_id = h.id
-       WHERE w.tournament_id = ?
-       ORDER BY w.hole_number ASC`,
-      [tournamentId]
-    );
-
-    if (savedRows.length > 0) {
-      return res.json(savedRows);
-    }
-
     const [tournamentRows] = await pool.query(
-      'SELECT number_of_holes FROM tournament WHERE id = ? LIMIT 1',
+      'SELECT course_id, number_of_holes, nine_hole_side FROM tournament WHERE id = ? LIMIT 1',
       [tournamentId]
     );
 
@@ -606,35 +652,77 @@ router.get('/tournament/:tournamentId/ctp-winners', async (req, res) => {
     }
 
     const tournament = tournamentRows[0];
+    const holeCount = Number(tournament.number_of_holes) === 9 ? 9 : 18;
 
-    const [rows] = await pool.query(
-      `SELECT s.ctp_feet, s.ctp_inches, s.ctp_image_url,
-              p.id as player_id, p.name as player_name,
-              h.hole_number,
-              (SELECT par FROM hole_tee WHERE hole_id = h.id ORDER BY id LIMIT 1) AS mens_par
-       FROM scores s
-       JOIN players p ON s.player_id = p.id
-       JOIN hole h ON s.hole_id = h.id
-       JOIN hole_tee ht_par ON ht_par.hole_id = h.id AND ht_par.par = 3
-       WHERE s.tournament_id = ? 
-         AND s.ctp_feet IS NOT NULL
-       ORDER BY (s.ctp_feet * 12 + s.ctp_inches) ASC, h.hole_number ASC`,
+    const coursePar3Holes = await getPar3HolesForCourse(tournament.course_id);
+    const useBackNine = holeCount === 9 && tournament.nine_hole_side === 'back';
+    const allowedHoles = holeCount === 9
+      ? coursePar3Holes.filter((hole) => useBackNine ? Number(hole.hole_number) > 9 : Number(hole.hole_number) <= 9)
+      : coursePar3Holes;
+
+    const allowedHoleIdSet = new Set(allowedHoles.map((hole) => Number(hole.hole_id)));
+    const allowedParByHole = new Map(allowedHoles.map((hole) => [Number(hole.hole_number), Number(hole.mens_par) || 3]));
+
+    const [savedRowsRaw] = await pool.query(
+      `SELECT w.hole_id, w.hole_number, w.ctp_feet, w.ctp_inches, w.ctp_image_url,
+              p.id AS player_id, p.name AS player_name,
+              w.prize_money
+       FROM tournament_ctp_winners w
+       JOIN players p ON w.player_id = p.id
+       WHERE w.tournament_id = ?
+       ORDER BY w.hole_number ASC`,
       [tournamentId]
     );
-    
-    // Group by hole and get the closest for each
-    const winners = {};
-    rows.forEach(row => {
-      if (!winners[row.hole_number] || 
-          (row.ctp_feet * 12 + row.ctp_inches) < (winners[row.hole_number].ctp_feet * 12 + winners[row.hole_number].ctp_inches)) {
-        winners[row.hole_number] = row;
-      }
+
+    const savedRows = (savedRowsRaw || [])
+      .filter((row) => allowedHoleIdSet.has(Number(row.hole_id)))
+      .map((row) => ({
+        ...row,
+        mens_par: allowedParByHole.get(Number(row.hole_number)) ?? 3
+      }));
+
+    let scoreDerivedRows = [];
+    const allowedHoleIds = allowedHoles
+      .map((hole) => Number(hole.hole_id))
+      .filter((id) => Number.isInteger(id));
+
+    if (allowedHoleIds.length > 0) {
+      const holePlaceholders = allowedHoleIds.map(() => '?').join(', ');
+      const [rawScoreRows] = await pool.query(
+        `SELECT s.hole_id, h.hole_number,
+                s.ctp_feet, s.ctp_inches, s.ctp_image_url,
+                p.id AS player_id, p.name AS player_name
+         FROM scores s
+         JOIN players p ON s.player_id = p.id
+         JOIN hole h ON s.hole_id = h.id
+         WHERE s.tournament_id = ?
+           AND s.ctp_feet IS NOT NULL
+           AND s.hole_id IN (${holePlaceholders})
+         ORDER BY h.hole_number ASC, (s.ctp_feet * 12 + s.ctp_inches) ASC`,
+        [tournamentId, ...allowedHoleIds]
+      );
+
+      scoreDerivedRows = normalizeCtpRowsByHole(rawScoreRows).map((row) => ({
+        ...row,
+        mens_par: allowedParByHole.get(Number(row.hole_number)) ?? 3,
+        prize_money: 0
+      }));
+    }
+
+    // Saved admin winners take precedence by hole; holes without admin rows fall back to score-derived leaders.
+    const winnerByHole = new Map();
+    scoreDerivedRows.forEach((row) => {
+      winnerByHole.set(Number(row.hole_number), row);
+    });
+    savedRows.forEach((row) => {
+      winnerByHole.set(Number(row.hole_number), row);
     });
 
-    let result = Object.values(winners).sort((a, b) => a.hole_number - b.hole_number);
+    let result = Array.from(winnerByHole.values())
+      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
 
-    // For 9-hole tournaments, only return 2 CTP winners
-    if (tournament.number_of_holes === 9) {
+    // For 9-hole tournaments, only return 2 CTP winners.
+    if (holeCount === 9) {
       result = result.slice(0, 2);
     }
 
