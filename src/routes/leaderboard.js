@@ -247,59 +247,7 @@ router.get('/:tournamentId', async (req, res) => {
       });
     }
 
-    if (savedCtpWinners.length > 0) {
-      const normalizedSavedCtpWinners = [];
-      const seenCtpHoles = new Set();
-      const sortedSavedCtpWinners = [...savedCtpWinners].sort(
-        (a, b) => Number(a.hole_number) - Number(b.hole_number)
-      );
-
-      for (const winner of sortedSavedCtpWinners) {
-        const holeNumber = Number(winner.hole_number);
-        if (!Number.isFinite(holeNumber) || seenCtpHoles.has(holeNumber)) {
-          continue;
-        }
-
-        seenCtpHoles.add(holeNumber);
-        normalizedSavedCtpWinners.push(winner);
-
-        if (holeCount === 9 && normalizedSavedCtpWinners.length >= 2) {
-          break;
-        }
-      }
-
-      normalizedSavedCtpWinners.forEach((winner) => {
-        if (!ctpPrizes[winner.player_id]) {
-          ctpPrizes[winner.player_id] = {
-            count: 0,
-            prize: 0,
-            holes: []
-          };
-        }
-
-        ctpPrizes[winner.player_id].count++;
-        ctpPrizes[winner.player_id].holes.push(winner.hole_number);
-      });
-
-      const explicitCtpPrizeTotal = normalizedSavedCtpWinners.reduce(
-        (sum, winner) => sum + Number(winner.prize_money || 0),
-        0
-      );
-      const hasExplicitCtpPrizes = explicitCtpPrizeTotal > 0;
-      const canUseExplicitCtpPrizes = hasExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
-      if (canUseExplicitCtpPrizes) {
-        normalizedSavedCtpWinners.forEach((winner) => {
-          ctpPrizes[winner.player_id].prize += Number(winner.prize_money || 0);
-        });
-      } else {
-        const ctpWinnerCount = normalizedSavedCtpWinners.length;
-        const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
-        Object.keys(ctpPrizes).forEach((playerId) => {
-          ctpPrizes[playerId].prize = ctpPrizes[playerId].count * ctpPrizePerWinner;
-        });
-      }
-    } else {
-      const [ctpWinners] = await pool.query(`
+    const [scoreDerivedCtpRows] = await pool.query(`
         SELECT 
           h.id as hole_id,
           h.hole_number,
@@ -320,36 +268,69 @@ router.get('/:tournamentId', async (req, res) => {
         ORDER BY h.hole_number, total_inches ASC
       `, [tournamentId]);
 
-      const ctpByHole = {};
-      ctpWinners.forEach(ctp => {
-        if (!ctpByHole[ctp.hole_number]) {
-          ctpByHole[ctp.hole_number] = ctp;
+    const scoreDerivedCtpByHole = {};
+    scoreDerivedCtpRows.forEach((ctp) => {
+      if (!scoreDerivedCtpByHole[ctp.hole_number]) {
+        scoreDerivedCtpByHole[ctp.hole_number] = {
+          ...ctp,
+          prize_money: 0
+        };
+      }
+    });
+
+    const savedCtpByHole = {};
+    [...savedCtpWinners]
+      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number))
+      .forEach((winner) => {
+        const holeNumber = Number(winner.hole_number);
+        if (!Number.isFinite(holeNumber) || savedCtpByHole[holeNumber]) {
+          return;
         }
+        savedCtpByHole[holeNumber] = winner;
       });
 
-      let ctpWinningHoles = Object.keys(ctpByHole)
-        .map(Number)
-        .sort((a, b) => a - b);
+    let ctpWinningHoles = Array.from(new Set([
+      ...Object.keys(scoreDerivedCtpByHole).map(Number),
+      ...Object.keys(savedCtpByHole).map(Number)
+    ])).sort((a, b) => a - b);
 
-      if (holeCount === 9) {
-        ctpWinningHoles = ctpWinningHoles.slice(0, 2);
+    if (holeCount === 9) {
+      ctpWinningHoles = ctpWinningHoles.slice(0, 2);
+    }
+
+    const resolvedCtpWinners = ctpWinningHoles
+      .map((holeNumber) => savedCtpByHole[holeNumber] || scoreDerivedCtpByHole[holeNumber])
+      .filter(Boolean);
+
+    resolvedCtpWinners.forEach((winner) => {
+      if (!ctpPrizes[winner.player_id]) {
+        ctpPrizes[winner.player_id] = {
+          count: 0,
+          prize: 0,
+          holes: []
+        };
       }
 
-      const ctpWinnerCount = ctpWinningHoles.length;
-      const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
+      ctpPrizes[winner.player_id].count++;
+      ctpPrizes[winner.player_id].holes.push(winner.hole_number);
+    });
 
-      ctpWinningHoles.forEach((holeNumber) => {
-        const winner = ctpByHole[holeNumber];
-        if (!ctpPrizes[winner.player_id]) {
-          ctpPrizes[winner.player_id] = {
-            count: 0,
-            prize: 0,
-            holes: []
-          };
-        }
-        ctpPrizes[winner.player_id].count++;
-        ctpPrizes[winner.player_id].prize += ctpPrizePerWinner;
-        ctpPrizes[winner.player_id].holes.push(winner.hole_number);
+    const explicitCtpPrizeTotal = resolvedCtpWinners.reduce(
+      (sum, winner) => sum + Number(winner.prize_money || 0),
+      0
+    );
+    const hasCompleteExplicitCtpPrizes = resolvedCtpWinners.length > 0
+      && resolvedCtpWinners.every((winner) => Number(winner.prize_money || 0) > 0);
+    const canUseExplicitCtpPrizes = hasCompleteExplicitCtpPrizes && explicitCtpPrizeTotal <= ctpPrizePot + 0.01;
+    if (canUseExplicitCtpPrizes) {
+      resolvedCtpWinners.forEach((winner) => {
+        ctpPrizes[winner.player_id].prize += Number(winner.prize_money || 0);
+      });
+    } else {
+      const ctpWinnerCount = resolvedCtpWinners.length;
+      const ctpPrizePerWinner = ctpWinnerCount > 0 ? Math.floor(ctpPrizePot / ctpWinnerCount) : 0;
+      Object.keys(ctpPrizes).forEach((playerId) => {
+        ctpPrizes[playerId].prize = ctpPrizes[playerId].count * ctpPrizePerWinner;
       });
     }
     // Calculate over/under for each player first
