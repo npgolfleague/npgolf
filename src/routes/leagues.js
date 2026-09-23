@@ -55,6 +55,37 @@ function ensureLeagueScope(req, res, id) {
   return true;
 }
 
+async function getCurrentLeagueSeasonRow(leagueId) {
+  const [rows] = await pool.query(
+    `SELECT ls.*
+     FROM league_seasons ls
+     JOIN leagues l ON l.id = ls.league_id
+     WHERE ls.league_id = ?
+       AND ls.season_year = COALESCE(l.season_year, YEAR(CURDATE()))
+     LIMIT 1`,
+    [leagueId]
+  );
+
+  return rows[0] || null;
+}
+
+async function getLeagueSeasonYear(leagueId) {
+  const [rows] = await pool.query('SELECT season_year FROM leagues WHERE id = ? LIMIT 1', [leagueId]);
+  return Number(rows[0]?.season_year) || new Date().getFullYear();
+}
+
+async function upsertLeagueSeasonPots(leagueId, championshipPot, losersBracketPot) {
+  const seasonYear = await getLeagueSeasonYear(leagueId);
+  await pool.query(
+    `INSERT INTO league_seasons (league_id, season_year, championship_pot, losers_bracket_pot)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       championship_pot = VALUES(championship_pot),
+       losers_bracket_pot = VALUES(losers_bracket_pot)`,
+    [leagueId, seasonYear, championshipPot ?? 0, losersBracketPot ?? 0]
+  );
+}
+
 // Get current league from alias context (or sensible default when no alias is present)
 router.get('/current', async (req, res) => {
   try {
@@ -158,6 +189,7 @@ router.get('/:id/settings', async (req, res) => {
       'SELECT * FROM league_settings WHERE league_id = ? LIMIT 1',
       [id]
     );
+    const seasonRow = await getCurrentLeagueSeasonRow(id);
     
     if (rows.length === 0) {
       // Return defaults — settings row will be created on first save
@@ -177,11 +209,22 @@ router.get('/:id/settings', async (req, res) => {
         quota_points_bogey: 2,
         quota_points_double_bogey: 1,
         quota_points_worse: 0,
-        live_scoring: 1
+        live_scoring: 1,
+        playoff_format: 'none',
+        championship_pot: Number(seasonRow?.championship_pot) || 0,
+        losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
+        season_id: seasonRow?.id || null,
+        season_year: Number(seasonRow?.season_year) || await getLeagueSeasonYear(id)
       });
     }
     
-    res.json(rows[0]);
+    res.json({
+      ...rows[0],
+      championship_pot: Number(seasonRow?.championship_pot) || 0,
+      losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
+      season_id: seasonRow?.id || null,
+      season_year: Number(seasonRow?.season_year) || null
+    });
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch league settings' });
@@ -197,6 +240,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
     golf_course_email,
     outgoing_email_from,
+    playoff_format,
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
     live_scoring
@@ -214,6 +258,13 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
   }
   const normalizedOutgoingEmailFrom = normalizedOutgoingFromResult?.normalized ?? null;
 
+  const normalizedPlayoffFormat = playoff_format === undefined
+    ? undefined
+    : String(playoff_format).toLowerCase();
+  if (normalizedPlayoffFormat !== undefined && !['none', 'fedex_cup'].includes(normalizedPlayoffFormat)) {
+    return res.status(400).json({ error: 'Invalid playoff format' });
+  }
+
   try {
     // Verify league exists
     const [leagueRows] = await pool.query('SELECT id FROM leagues WHERE id = ? LIMIT 1', [id]);
@@ -228,10 +279,11 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
         golf_course_email,
         outgoing_email_from,
+        playoff_format,
         quota_points_albatross, quota_points_eagle, quota_points_birdie,
         quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
         live_scoring
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         tournament_fee_18_holes = VALUES(tournament_fee_18_holes),
         tournament_fee_9_holes = VALUES(tournament_fee_9_holes),
@@ -239,6 +291,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         skins_ctp_fee_9_holes = VALUES(skins_ctp_fee_9_holes),
         golf_course_email = VALUES(golf_course_email),
         outgoing_email_from = VALUES(outgoing_email_from),
+        playoff_format = VALUES(playoff_format),
         quota_points_albatross = VALUES(quota_points_albatross),
         quota_points_eagle = VALUES(quota_points_eagle),
         quota_points_birdie = VALUES(quota_points_birdie),
@@ -253,6 +306,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         skins_ctp_fee_18_holes ?? 10.00, skins_ctp_fee_9_holes ?? 5.00,
         normalizedGolfCourseEmail,
         normalizedOutgoingEmailFrom,
+        normalizedPlayoffFormat ?? 'none',
         quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
         quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
         quota_points_worse ?? 0,
@@ -265,6 +319,105 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error updating league settings:', err);
     res.status(500).json({ error: 'Failed to update league settings' });
+  }
+});
+
+router.get('/:id/playoff-overview', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!ensureLeagueScope(req, res, id)) return;
+
+    const [settingsRows] = await pool.query(
+      'SELECT playoff_format FROM league_settings WHERE league_id = ? LIMIT 1',
+      [id]
+    );
+    const seasonRow = await getCurrentLeagueSeasonRow(id);
+
+    if (!seasonRow) {
+      return res.json({
+        league_id: Number(id),
+        playoff_format: settingsRows[0]?.playoff_format || 'none',
+        season_id: null,
+        season_year: await getLeagueSeasonYear(id),
+        championship_pot: 0,
+        losers_bracket_pot: 0,
+        champion_player_id: null,
+        champion_tiebreak_player_id: null,
+        losers_winner_player_id: null,
+        standings: [],
+        playoff_tournaments: []
+      });
+    }
+
+    const [standingsRows] = await pool.query(
+      `SELECT
+         sps.player_id,
+         p.name,
+         sps.regular_points,
+         sps.playoff_points,
+         sps.losers_bracket_points,
+         (COALESCE(sps.regular_points, 0) + COALESCE(sps.playoff_points, 0) + COALESCE(sps.losers_bracket_points, 0)) AS total_points
+       FROM season_player_stats sps
+       JOIN players p ON p.id = sps.player_id
+       WHERE sps.season_id = ?
+       ORDER BY total_points DESC, sps.regular_points DESC, p.name ASC`,
+      [seasonRow.id]
+    );
+
+    const [playoffTournamentRows] = await pool.query(
+      `SELECT
+         t.id,
+         t.date,
+         t.playoff_stage,
+         t.completed,
+         c.name AS course_name,
+         CASE
+           WHEN EXISTS (
+             SELECT 1
+             FROM tournament_playoff_points tpp
+             WHERE tpp.tournament_id = t.id
+           ) THEN 1 ELSE 0
+         END AS has_playoff_points
+       FROM tournament t
+       LEFT JOIN course c ON c.id = t.course_id
+       WHERE t.league_id = ?
+         AND t.season_id = ?
+         AND t.playoff_stage <> 'regular'
+       ORDER BY t.date ASC, t.id ASC`,
+      [id, seasonRow.id]
+    );
+
+    res.json({
+      league_id: Number(id),
+      playoff_format: settingsRows[0]?.playoff_format || 'none',
+      season_id: Number(seasonRow.id),
+      season_year: Number(seasonRow.season_year) || await getLeagueSeasonYear(id),
+      championship_pot: Number(seasonRow.championship_pot) || 0,
+      losers_bracket_pot: Number(seasonRow.losers_bracket_pot) || 0,
+      champion_player_id: seasonRow.champion_player_id,
+      champion_tiebreak_player_id: seasonRow.champion_tiebreak_player_id,
+      losers_winner_player_id: seasonRow.losers_winner_player_id,
+      standings: standingsRows.map((row, index) => ({
+        rank: index + 1,
+        player_id: row.player_id,
+        name: row.name,
+        regular_points: Number(row.regular_points) || 0,
+        playoff_points: Number(row.playoff_points) || 0,
+        losers_bracket_points: Number(row.losers_bracket_points) || 0,
+        total_points: Number(row.total_points) || 0
+      })),
+      playoff_tournaments: playoffTournamentRows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        playoff_stage: row.playoff_stage,
+        completed: Number(row.completed) === 1,
+        course_name: row.course_name,
+        has_playoff_points: Number(row.has_playoff_points) === 1
+      }))
+    });
+  } catch (err) {
+    console.error('DB error', err);
+    res.status(500).json({ error: 'Failed to fetch playoff overview' });
   }
 });
 

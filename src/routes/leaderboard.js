@@ -40,6 +40,12 @@ router.get('/:tournamentId', async (req, res) => {
     // Get tournament details and settings
     const [tournamentInfo] = await pool.query(`
       SELECT t.number_of_holes,
+             t.season_id,
+             ls.season_year,
+             ls.champion_tiebreak_player_id,
+             t.playoff_stage,
+             t.playoff_override_semifinal_player_ids,
+             t.playoff_override_final_player_ids,
              t.quota_collected,
              t.skins_collected,
              CASE
@@ -49,6 +55,7 @@ router.get('/:tournamentId', async (req, res) => {
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND paid = 1) as paid_players,
              (SELECT COUNT(*) FROM tournament_players WHERE tournament_id = ? AND skins_ctp_paid = 1) as skins_ctp_players
       FROM tournament t
+                LEFT JOIN league_seasons ls ON ls.id = t.season_id
       WHERE t.id = ?
     `, [tournamentId, tournamentId, tournamentId]);
     
@@ -508,13 +515,81 @@ router.get('/:tournamentId', async (req, res) => {
         skins_collected: tournament.skins_collected != null ? Number(tournament.skins_collected) : null
       });
     });
+
+    let playoff = null;
+
+    if (tournament.playoff_stage && tournament.playoff_stage !== 'regular' && tournament.season_id) {
+      const [seasonRows] = await pool.query(
+        `SELECT
+           sps.player_id,
+           p.name,
+           sps.regular_points,
+           sps.playoff_points,
+           sps.losers_bracket_points,
+           (COALESCE(sps.regular_points, 0) + COALESCE(sps.playoff_points, 0) + COALESCE(sps.losers_bracket_points, 0)) AS total_points
+         FROM season_player_stats sps
+         JOIN players p ON p.id = sps.player_id
+         WHERE sps.season_id = ?
+         ORDER BY total_points DESC, sps.regular_points DESC, p.name ASC`,
+        [tournament.season_id]
+      );
+
+      const [playoffRows] = await pool.query(
+        `SELECT
+           tpp.player_id,
+           p.name,
+           tpp.bracket_type,
+           tpp.result_type,
+           tpp.playoff_week,
+           tpp.rank_position,
+           tpp.tie_group_size,
+           tpp.over_under,
+           tpp.points_awarded,
+           tpp.cumulative_points_after
+         FROM tournament_playoff_points tpp
+         JOIN players p ON p.id = tpp.player_id
+         WHERE tpp.tournament_id = ?
+         ORDER BY tpp.bracket_type ASC, tpp.playoff_week ASC, tpp.rank_position ASC, p.name ASC`,
+        [tournamentId]
+      );
+
+      const playoffResults = playoffRows.filter((row) => row.bracket_type === 'playoff');
+      const losersResults = playoffRows.filter((row) => row.bracket_type === 'losers');
+      const playoffWeek = playoffRows.length > 0 ? Number(playoffRows[0].playoff_week) || null : null;
+
+      playoff = {
+        seasonId: Number(tournament.season_id),
+        seasonYear: tournament.season_year != null ? Number(tournament.season_year) : null,
+        stage: tournament.playoff_stage,
+        semifinalOverridePlayerIds: Array.isArray(tournament.playoff_override_semifinal_player_ids)
+          ? tournament.playoff_override_semifinal_player_ids.map((value) => Number(value)).filter((value) => Number.isInteger(value))
+          : [],
+        finalOverridePlayerIds: Array.isArray(tournament.playoff_override_final_player_ids)
+          ? tournament.playoff_override_final_player_ids.map((value) => Number(value)).filter((value) => Number.isInteger(value))
+          : [],
+        championTiebreakPlayerId: Number(tournament.champion_tiebreak_player_id) || null,
+        standings: seasonRows.map((row, index) => ({
+          rank: index + 1,
+          playerId: row.player_id,
+          name: row.name,
+          regularPoints: Number(row.regular_points) || 0,
+          playoffPoints: Number(row.playoff_points) || 0,
+          losersBracketPoints: Number(row.losers_bracket_points) || 0,
+          totalPoints: Number(row.total_points) || 0
+        })),
+        playoffResults,
+        losersResults,
+        playoffWeek
+      };
+    }
     
     res.json({
       leaderboard,
       totalPlayers: totalPlayersCount,
       playersWithCompleteScores: completeScoresCount,
       expectedHoles: holeCount,
-      liveScoring
+      liveScoring,
+      playoff
     });
   } catch (err) {
     console.error('DB error', err);
