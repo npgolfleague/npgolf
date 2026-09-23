@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS = {
   quota_points_bogey: 2,
   quota_points_double_bogey: 1,
   quota_points_worse: 0,
+  playoff_format: 'none',
+  championship_pot: 0,
+  losers_bracket_pot: 0,
   live_scoring: 1
 }
 
@@ -38,6 +41,9 @@ function settingsFromResponse(data) {
     quota_points_bogey: data.quota_points_bogey ?? DEFAULT_SETTINGS.quota_points_bogey,
     quota_points_double_bogey: data.quota_points_double_bogey ?? DEFAULT_SETTINGS.quota_points_double_bogey,
     quota_points_worse: data.quota_points_worse ?? DEFAULT_SETTINGS.quota_points_worse,
+    playoff_format: data.playoff_format || DEFAULT_SETTINGS.playoff_format,
+    championship_pot: data.championship_pot ?? DEFAULT_SETTINGS.championship_pot,
+    losers_bracket_pot: data.losers_bracket_pot ?? DEFAULT_SETTINGS.losers_bracket_pot,
     live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1
   }
 }
@@ -109,7 +115,7 @@ export const Settings = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    const newValue = name.includes('fee') ? (parseFloat(value) || 0)
+    const newValue = name.includes('fee') || name.includes('pot') ? (parseFloat(value) || 0)
       : name.startsWith('quota_points') ? (parseInt(value, 10) || 0)
       : value
     setSettings(prev => ({ ...prev, [name]: newValue }))
@@ -301,6 +307,52 @@ export const Settings = () => {
               <p className="text-sm text-gray-500 mt-1">
                 Optional. When set, invitation and results emails are sent from this address.
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Playoff Format
+              </label>
+              <select
+                name="playoff_format"
+                value={settings.playoff_format}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="none">Disabled</option>
+                <option value="fedex_cup">FedEx Cup</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Championship Pot ($)
+                </label>
+                <input
+                  type="number"
+                  name="championship_pot"
+                  value={settings.championship_pot}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Losers Bracket Pot ($)
+                </label>
+                <input
+                  type="number"
+                  name="losers_bracket_pot"
+                  value={settings.losers_bracket_pot}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <hr className="border-gray-200" />

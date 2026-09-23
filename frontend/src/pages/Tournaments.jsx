@@ -320,7 +320,14 @@ export const Tournaments = () => {
                     tournaments.map((tournament) => (
                       <tr key={tournament.id} className="border-t hover:bg-gray-50">
                         <td className="px-4 md:px-6 py-4 text-gray-900 whitespace-nowrap">
-                          {formatDateOnly(tournament.date)}
+                          <div className="flex flex-col gap-1">
+                            <span>{formatDateOnly(tournament.date)}</span>
+                            {tournament.playoff_stage && tournament.playoff_stage !== 'regular' && (
+                              <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tournament.playoff_stage === 'final' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {tournament.playoff_stage === 'final' ? 'Playoff Final' : 'Playoff Semifinal'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 md:px-6 py-4 text-gray-900 whitespace-nowrap">{tournament.course_name}</td>
                         <td className="px-4 md:px-6 py-4 text-gray-900 whitespace-nowrap">{formatHolesLabel(tournament)}</td>

@@ -60,6 +60,7 @@ router.put('/', requireAdmin, async (req, res) => {
     skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
     golf_course_email,
     outgoing_email_from,
+    playoff_format,
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse
   } = req.body;
@@ -68,6 +69,7 @@ router.put('/', requireAdmin, async (req, res) => {
       skins_ctp_fee_18_holes === undefined && skins_ctp_fee_9_holes === undefined && 
       golf_course_email === undefined &&
       outgoing_email_from === undefined &&
+      playoff_format === undefined &&
       quota_points_albatross === undefined && quota_points_eagle === undefined &&
       quota_points_birdie === undefined && quota_points_par === undefined &&
       quota_points_bogey === undefined && quota_points_double_bogey === undefined &&
@@ -86,6 +88,13 @@ router.put('/', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: normalizedOutgoingFromResult.error });
   }
   const normalizedOutgoingEmailFrom = normalizedOutgoingFromResult?.normalized ?? null;
+
+  const normalizedPlayoffFormat = playoff_format === undefined
+    ? undefined
+    : String(playoff_format).toLowerCase();
+  if (normalizedPlayoffFormat !== undefined && !['none', 'fedex_cup'].includes(normalizedPlayoffFormat)) {
+    return res.status(400).json({ error: 'Invalid playoff format' });
+  }
 
   try {
     const updates = [];
@@ -119,6 +128,11 @@ router.put('/', requireAdmin, async (req, res) => {
     if (outgoing_email_from !== undefined) {
       updates.push('outgoing_email_from = ?');
       values.push(normalizedOutgoingEmailFrom);
+    }
+
+    if (normalizedPlayoffFormat !== undefined) {
+      updates.push('playoff_format = ?');
+      values.push(normalizedPlayoffFormat);
     }
 
     if (quota_points_albatross !== undefined) { updates.push('quota_points_albatross = ?'); values.push(quota_points_albatross); }
