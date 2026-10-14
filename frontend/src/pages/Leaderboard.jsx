@@ -378,6 +378,43 @@ export function Leaderboard() {
   const prizeAmountsReady = leaderboard.length > 0 &&
     (leaderboard[0].quota_collected != null || leaderboard[0].skins_collected != null);
 
+  const getSortedPlayoffRows = (rows) => {
+    const sortedRows = [...(rows || [])].sort((left, right) => {
+      const rightCumulative = Number(right.cumulative_points_after ?? right.points_awarded ?? 0);
+      const leftCumulative = Number(left.cumulative_points_after ?? left.points_awarded ?? 0);
+
+      if (rightCumulative !== leftCumulative) {
+        return rightCumulative - leftCumulative;
+      }
+
+      const rightPoints = Number(right.points_awarded ?? 0);
+      const leftPoints = Number(left.points_awarded ?? 0);
+      if (rightPoints !== leftPoints) {
+        return rightPoints - leftPoints;
+      }
+
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+
+    let previousCumulative = null;
+    let previousRank = 0;
+
+    return sortedRows.map((row, index) => {
+      const cumulative = Number(row.cumulative_points_after ?? row.points_awarded ?? 0);
+      const rank = previousCumulative !== null && cumulative === previousCumulative
+        ? previousRank
+        : index + 1;
+
+      previousCumulative = cumulative;
+      previousRank = rank;
+
+      return {
+        ...row,
+        display_rank_position: rank
+      };
+    });
+  };
+
   const renderPlayoffTable = (rows, emptyMessage) => {
     if (!rows || rows.length === 0) {
       return (
@@ -386,6 +423,8 @@ export function Leaderboard() {
         </div>
       );
     }
+
+    const sortedRows = getSortedPlayoffRows(rows);
 
     return (
       <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
@@ -402,13 +441,13 @@ export function Leaderboard() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {rows.map((row, index) => (
+            {sortedRows.map((row, index) => (
               <tr key={`${row.player_id || row.id}-${index}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">{row.name}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">
-                  {row.rank_position != null ? `#${row.rank_position}` : '-'}
+                  {row.display_rank_position != null ? `#${row.display_rank_position}` : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 capitalize">
                   {row.bracket_type || '-'}
@@ -974,7 +1013,12 @@ export function Leaderboard() {
                 Season {playoffData.seasonYear || 'current'} | Prize pool tracked separately from the championship bracket.
               </p>
             </div>
-            {renderPlayoffTable(playoffData.losersResults, 'No losers bracket results recorded yet.')}
+            {renderPlayoffTable(
+              playoffData.stage === 'final' && Array.isArray(playoffData.losersStandings) && playoffData.losersStandings.length > 0
+                ? playoffData.losersStandings
+                : playoffData.losersResults,
+              'No losers bracket results recorded yet.'
+            )}
           </div>
         )}
         </>

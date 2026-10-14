@@ -8,6 +8,7 @@ const { sendEmail } = require('../email');
 const {
   PLAYOFF_STAGE,
   PLAYOFF_SEED_POINTS,
+  PLAYOFF_FINAL_POINTS,
   LOSERS_BRACKET_POINTS,
   selectTopWithTies,
   awardRankedPoints
@@ -382,6 +383,14 @@ const parseIdList = (value) => {
 };
 
 const recalculateSeasonStatsFromLedger = async (db, seasonId) => {
+  await db.query(
+    `UPDATE season_player_stats
+     SET playoff_points = 0,
+         losers_bracket_points = 0
+     WHERE season_id = ?`,
+    [seasonId]
+  );
+
   const [playoffRows] = await db.query(
     `SELECT player_id,
             SUM(CASE WHEN bracket_type = 'playoff' THEN points_awarded ELSE 0 END) AS playoff_points,
@@ -664,7 +673,126 @@ const calculateCtpWinnersByHole = (rows, numberOfHoles) => {
   return winningHoles.map((holeNumber) => ctpByHole[holeNumber]);
 };
 
-const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], customMessage = null }) => {
+const getPlayoffResultsEmailData = async (db, tournamentId, seasonId, playoffStage) => {
+  if (!Number.isInteger(Number(seasonId)) || !playoffStage || playoffStage === 'regular') {
+    return null;
+  }
+
+  const [playoffRows] = await db.query(
+    `SELECT
+       tpp.player_id,
+       p.name,
+       tpp.bracket_type,
+       tpp.rank_position,
+       tpp.tie_group_size,
+       tpp.over_under,
+       tpp.points_awarded,
+       tpp.cumulative_points_after
+     FROM tournament_playoff_points tpp
+     JOIN players p ON p.id = tpp.player_id
+     WHERE tpp.tournament_id = ?
+     ORDER BY tpp.bracket_type ASC, tpp.rank_position ASC, p.name ASC`,
+    [tournamentId]
+  );
+
+  const [seasonRows] = await db.query(
+    `SELECT
+       sps.player_id,
+       p.name,
+       COALESCE(sps.regular_points, 0) AS regular_points,
+       COALESCE(sps.playoff_points, 0) AS playoff_points,
+       COALESCE(sps.losers_bracket_points, 0) AS losers_bracket_points,
+       (COALESCE(sps.regular_points, 0) + COALESCE(sps.playoff_points, 0) + COALESCE(sps.losers_bracket_points, 0)) AS total_points
+     FROM season_player_stats sps
+     JOIN players p ON p.id = sps.player_id
+     WHERE sps.season_id = ?
+     ORDER BY total_points DESC, regular_points DESC, p.name ASC`,
+    [seasonId]
+  );
+
+  let allowedLosersPlayerIds = null;
+  const normalizedStage = String(playoffStage || '').toLowerCase();
+
+  if (normalizedStage === 'final') {
+    const [previousPlayoffRows] = await db.query(
+      `SELECT id
+       FROM tournament
+       WHERE season_id = ?
+         AND id <> ?
+         AND playoff_stage IN ('semifinal', 'final')
+       ORDER BY date DESC, id DESC
+       LIMIT 1`,
+      [seasonId, tournamentId]
+    );
+
+    const sourceTournamentIds = [Number(tournamentId)];
+    if (previousPlayoffRows.length > 0) {
+      sourceTournamentIds.push(Number(previousPlayoffRows[0].id));
+    }
+
+    const placeholders = sourceTournamentIds.map(() => '?').join(', ');
+    const [loserParticipantRows] = await db.query(
+      `SELECT DISTINCT player_id
+       FROM tournament_playoff_points
+       WHERE bracket_type = 'losers'
+         AND tournament_id IN (${placeholders})`,
+      sourceTournamentIds
+    );
+
+    allowedLosersPlayerIds = new Set(
+      loserParticipantRows
+        .map((row) => Number(row.player_id))
+        .filter((playerId) => Number.isInteger(playerId))
+    );
+  }
+
+  const losersStandings = seasonRows
+    .map((row) => ({
+      player_id: Number(row.player_id),
+      name: row.name,
+      losers_bracket_points: Number(row.losers_bracket_points) || 0
+    }))
+    .filter((row) => {
+      if (row.losers_bracket_points <= 0) {
+        return false;
+      }
+
+      if (!allowedLosersPlayerIds) {
+        return true;
+      }
+
+      return allowedLosersPlayerIds.has(Number(row.player_id));
+    })
+    .sort((a, b) => {
+      if (b.losers_bracket_points !== a.losers_bracket_points) {
+        return b.losers_bracket_points - a.losers_bracket_points;
+      }
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    })
+    .map((row, index) => ({
+      player_id: row.player_id,
+      name: row.name,
+      bracket_type: 'losers',
+      rank_position: index + 1,
+      tie_group_size: 1,
+      over_under: null,
+      points_awarded: row.losers_bracket_points,
+      cumulative_points_after: row.losers_bracket_points
+    }));
+
+  const weeklyLosersResults = playoffRows.filter((row) => row.bracket_type === 'losers');
+  const losersResults = normalizedStage === 'final' ? losersStandings : weeklyLosersResults;
+
+  return {
+    stage: playoffStage,
+    playoffResults: playoffRows.filter((row) => row.bracket_type === 'playoff'),
+    losersResults,
+    losersStandings,
+    standings: seasonRows
+  };
+};
+
+const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], playoffData = null, customMessage = null }) => {
   const prizePercentages = [0.5, 0.3, 0.2];
   const prizePlayers = [];
   let i = 0;
@@ -756,6 +884,114 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
       </table>
     </div>` : '';
 
+  const getSortedPlayoffRows = (rows) => {
+    const sortedRows = [...(rows || [])].sort((left, right) => {
+      const rightCumulative = Number(right.cumulative_points_after ?? right.points_awarded ?? 0);
+      const leftCumulative = Number(left.cumulative_points_after ?? left.points_awarded ?? 0);
+
+      if (rightCumulative !== leftCumulative) {
+        return rightCumulative - leftCumulative;
+      }
+
+      const rightPoints = Number(right.points_awarded ?? 0);
+      const leftPoints = Number(left.points_awarded ?? 0);
+      if (rightPoints !== leftPoints) {
+        return rightPoints - leftPoints;
+      }
+
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+
+    let previousCumulative = null;
+    let previousRank = 0;
+
+    return sortedRows.map((row, index) => {
+      const cumulative = Number(row.cumulative_points_after ?? row.points_awarded ?? 0);
+      const rank = previousCumulative !== null && cumulative === previousCumulative
+        ? previousRank
+        : index + 1;
+
+      previousCumulative = cumulative;
+      previousRank = rank;
+
+      return {
+        ...row,
+        display_rank_position: rank
+      };
+    });
+  };
+
+  const renderPlayoffRows = (rows) => getSortedPlayoffRows(rows).map((row, idx) => {
+    const overUnder = row.over_under == null
+      ? '-'
+      : Number(row.over_under) > 0
+        ? `+${Number(row.over_under)}`
+        : `${Number(row.over_under) || 0}`;
+    return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
+      <td style="padding:8px 12px;">${row.display_rank_position ?? '-'}</td>
+      <td style="padding:8px 12px;">${row.name}</td>
+      <td style="padding:8px 12px;text-align:center;">${overUnder}</td>
+      <td style="padding:8px 12px;text-align:center;">${row.tie_group_size ?? 1}</td>
+      <td style="padding:8px 12px;text-align:right;">${Number(row.points_awarded || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+      <td style="padding:8px 12px;text-align:right;">${Number(row.cumulative_points_after ?? row.points_awarded ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
+    </tr>`;
+  }).join('');
+
+  const playoffResultsSection = playoffData && playoffData.playoffResults?.length > 0 ? `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">🏁 Playoff ${playoffData.stage === 'final' ? 'Final' : 'Semifinal'} Results</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:8px 12px;text-align:left;color:#555;">Rank</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">+/-</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">Tie</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Points</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Cumulative</th>
+        </tr></thead>
+        <tbody>${renderPlayoffRows(playoffData.playoffResults)}</tbody>
+      </table>
+    </div>` : '';
+
+  const losersResultsSection = playoffData && playoffData.losersResults?.length > 0 ? `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">⚔️ Losers Bracket Results</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:8px 12px;text-align:left;color:#555;">Rank</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">+/-</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">Tie</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Points</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Cumulative</th>
+        </tr></thead>
+        <tbody>${renderPlayoffRows(playoffData.losersResults)}</tbody>
+      </table>
+    </div>` : '';
+
+  const playoffStandingsSection = playoffData && playoffData.standings?.length > 0 ? `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📊 Season Playoff Standings</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr style="background:#f0f4f8;">
+          <th style="padding:8px 12px;text-align:left;color:#555;">Rank</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Regular</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Playoff</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Losers</th>
+          <th style="padding:8px 12px;text-align:right;color:#555;">Total</th>
+        </tr></thead>
+        <tbody>${playoffData.standings.slice(0, 10).map((row, idx) => `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
+          <td style="padding:8px 12px;">${idx + 1}</td>
+          <td style="padding:8px 12px;">${row.name}</td>
+          <td style="padding:8px 12px;text-align:right;">${Number(row.regular_points || 0).toLocaleString()}</td>
+          <td style="padding:8px 12px;text-align:right;">${Number(row.playoff_points || 0).toLocaleString()}</td>
+          <td style="padding:8px 12px;text-align:right;">${Number(row.losers_bracket_points || 0).toLocaleString()}</td>
+          <td style="padding:8px 12px;text-align:right;">${Number(row.total_points || 0).toLocaleString()}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
+
   const customMessageSection = customMessage ? `
     <div style="background:#fffbeb;padding:16px 20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-top:3px solid #f59e0b;">
       <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customMessage}</p>
@@ -785,6 +1021,9 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
   </div>
   ${skinsSection}
   ${ctpSection}
+  ${playoffResultsSection}
+  ${losersResultsSection}
+  ${playoffStandingsSection}
   ${dashboardSection}
   <div style="background:#1e3a5f;color:#cdd6e4;padding:14px 20px;border-radius:0 0 8px 8px;text-align:center;font-size:12px;">
     NPGolf &bull; ${new Date().getFullYear()}
@@ -798,6 +1037,29 @@ const insertRows = async (db, tableName, rows) => {
     return;
   }
 
+  const normalizeInsertValue = (column, value) => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    // Backups store Date/DateTime values as ISO strings after JSON serialization.
+    // MySQL DATE columns reject the full ISO format, so normalize by column naming.
+    const isoDateTimeMatch = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(value);
+    if (!isoDateTimeMatch) {
+      return value;
+    }
+
+    if (column === 'date' || column.startsWith('date_')) {
+      return isoDateTimeMatch[1];
+    }
+
+    return `${isoDateTimeMatch[1]} ${isoDateTimeMatch[2]}`;
+  };
+
   const columns = Object.keys(rows[0]);
   if (columns.length === 0) {
     return;
@@ -809,7 +1071,7 @@ const insertRows = async (db, tableName, rows) => {
 
   rows.forEach((row) => {
     columns.forEach((column) => {
-      values.push(row[column] ?? null);
+      values.push(normalizeInsertValue(column, row[column]));
     });
   });
 
@@ -1120,8 +1382,19 @@ router.post('/:id/complete', async (req, res) => {
     
     // Get tournament date and course
     const [tournamentRows] = await connection.query(
-      `SELECT t.date, t.number_of_holes, t.league_id, t.season_id, t.playoff_stage, t.quota_collected, t.skins_collected, c.name AS course_name
+      `SELECT t.date,
+              t.number_of_holes,
+              t.league_id,
+              t.season_id,
+              t.playoff_stage,
+              t.playoff_override_semifinal_player_ids,
+              t.playoff_override_final_player_ids,
+              ls.champion_tiebreak_player_id,
+              t.quota_collected,
+              t.skins_collected,
+              c.name AS course_name
        FROM tournament t
+       LEFT JOIN league_seasons ls ON ls.id = t.season_id
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
       [tournamentId]
@@ -1648,15 +1921,28 @@ router.post('/:id/complete', async (req, res) => {
       );
 
       const participantIds = new Set(participantRows.map((row) => Number(row.player_id)));
-      const overrideSemifinalIds = parseIdList(tournamentRows[0].playoff_override_semifinal_player_ids);
+      const participantById = new Map(participantRows.map((row) => [Number(row.player_id), row]));
+      const regularSeasonById = new Map(regularSeasonRows.map((row) => [Number(row.player_id), row]));
+      const regularPointsById = new Map(regularSeasonRows.map((row) => [Number(row.player_id), Number(row.regular_points) || 0]));
+      const overrideSemifinalIds = [...new Set(parseIdList(tournamentRows[0].playoff_override_semifinal_player_ids))];
       const seededPlayers = overrideSemifinalIds.length > 0
-        ? regularSeasonRows.filter((row) => overrideSemifinalIds.includes(Number(row.player_id)))
+        ? overrideSemifinalIds.map((playerId) => {
+          const regularSeasonRow = regularSeasonById.get(Number(playerId));
+          const participantRow = participantById.get(Number(playerId));
+          return {
+            player_id: Number(playerId),
+            name: regularSeasonRow?.name || participantRow?.name || `Player ${playerId}`,
+            regular_points: regularPointsById.get(Number(playerId)) || 0
+          };
+        })
         : selectTopWithTies(regularSeasonRows, 8, 'regular_points');
       const missingSeededPlayers = seededPlayers.filter((row) => !participantIds.has(Number(row.player_id)));
       const extraParticipants = overrideSemifinalIds.length > 0
-        ? participantRows.filter((row) => !overrideSemifinalIds.includes(Number(row.player_id)))
+        ? []
         : participantRows.filter((row) => !seededPlayers.some((seedRow) => Number(seedRow.player_id) === Number(row.player_id)));
 
+      // With an explicit semifinal override, treat the override list as authoritative.
+      // Extra tournament participants are allowed and ignored for playoff calculations.
       if (missingSeededPlayers.length > 0 || extraParticipants.length > 0) {
         return res.status(400).json({
           error: 'Semifinal tournament roster does not match qualifying playoff field',
@@ -1730,13 +2016,22 @@ router.post('/:id/complete', async (req, res) => {
       const semifinalTotalsRows = semifinalPlayers.map((player) => ({
         player_id: player.player_id,
         name: player.name,
-        regular_points: regularSeasonRows.find((row) => Number(row.player_id) === Number(player.player_id))?.regular_points || 0,
+        regular_points: regularPointsById.get(Number(player.player_id)) || 0,
         playoff_points: semifinalTotals.get(Number(player.player_id)) || 0,
         over_under: player.over_under
       }));
       const finalsField = selectTopWithTies(semifinalTotalsRows, 4, 'playoff_points');
       const finalsParticipantIds = new Set(finalsField.map((row) => Number(row.player_id)));
-      const losersBracketPlayers = semifinalPlayers.filter((player) => !finalsParticipantIds.has(Number(player.player_id)));
+      const allScoredTournamentPlayers = scoresRowsWithSnapshot
+        .filter((row) => participantIds.has(Number(row.player_id)))
+        .map((row) => ({
+          player_id: Number(row.player_id),
+          name: row.name,
+          over_under: Number(row.over_under) || 0,
+          total_points: Number(row.total_points) || 0,
+          player_quota: Number(row.player_quota) || 0
+        }));
+      const losersBracketPlayers = allScoredTournamentPlayers.filter((player) => !finalsParticipantIds.has(Number(player.player_id)));
       const losersAwards = awardRankedPoints(losersBracketPlayers, LOSERS_BRACKET_POINTS, 'over_under');
 
       const losersLedgerRows = [];
@@ -2023,6 +2318,7 @@ router.post('/:id/complete', async (req, res) => {
         ctpPrizePerWinner,
         quotaPrizePot,
         dashboardTotals,
+        playoffData: await getPlayoffResultsEmailData(pool, tournamentId, Number(tournamentRows[0].season_id), tournamentRows[0].playoff_stage),
         customMessage: req.body?.customMessage || null
       });
       const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
@@ -2221,14 +2517,14 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   try {
     await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
-      `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, t.season_id, t.playoff_stage, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
       [tournamentId]
     );
     if (tournamentRows.length === 0) return res.status(404).json({ error: 'Tournament not found' });
-    const { date, number_of_holes, quota_collected, skins_collected, course_name } = tournamentRows[0];
+    const { date, number_of_holes, quota_collected, skins_collected, season_id, playoff_stage, course_name } = tournamentRows[0];
     const tournamentHoleCount = Number(number_of_holes) === 9 ? 9 : 18;
     const rankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
     if (rankedPlayers.length === 0) return res.status(400).json({ error: 'No score data found for this tournament' });
@@ -2336,6 +2632,7 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       ctpPrizePerWinner,
       quotaPrizePot,
       dashboardTotals,
+      playoffData: await getPlayoffResultsEmailData(pool, Number(tournamentId), Number(season_id), playoff_stage),
       customMessage: customMessage || null
     });
     const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
@@ -2494,6 +2791,10 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
     const skinWinners = Array.isArray(backupData.tournament_skin_winners) ? backupData.tournament_skin_winners : [];
     const ctpWinners = Array.isArray(backupData.tournament_ctp_winners) ? backupData.tournament_ctp_winners : [];
     const paradisePoints = Array.isArray(backupData.tournament_paradise_points) ? backupData.tournament_paradise_points : [];
+    const tournamentBackup = backupData.tournament && typeof backupData.tournament === 'object'
+      ? backupData.tournament
+      : null;
+    const seasonId = Number(tournamentBackup?.season_id);
 
     const playerIds = players.map((row) => Number(row.id)).filter((id) => Number.isInteger(id));
 
@@ -2528,11 +2829,16 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
     await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_playoff_points WHERE tournament_id = ?', [tournamentId]);
 
     await insertRows(connection, 'tournament_players', tournamentPlayers);
     await insertRows(connection, 'tournament_skin_winners', skinWinners);
     await insertRows(connection, 'tournament_ctp_winners', ctpWinners);
     await insertRows(connection, 'tournament_paradise_points', paradisePoints);
+
+    if (Number.isInteger(seasonId) && seasonId > 0) {
+      await recalculateSeasonStatsFromLedger(connection, seasonId);
+    }
 
     await connection.query(
       `UPDATE tournament_completion_backups

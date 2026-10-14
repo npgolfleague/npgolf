@@ -241,6 +241,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     golf_course_email,
     outgoing_email_from,
     playoff_format,
+    championship_pot,
+    losers_bracket_pot,
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
     live_scoring
@@ -314,8 +316,24 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
       ]
     );
 
+    if (championship_pot !== undefined || losers_bracket_pot !== undefined) {
+      const currentSeasonRow = await getCurrentLeagueSeasonRow(id);
+      await upsertLeagueSeasonPots(
+        id,
+        championship_pot !== undefined ? Number(championship_pot) || 0 : Number(currentSeasonRow?.championship_pot) || 0,
+        losers_bracket_pot !== undefined ? Number(losers_bracket_pot) || 0 : Number(currentSeasonRow?.losers_bracket_pot) || 0
+      );
+    }
+
     const [rows] = await pool.query('SELECT * FROM league_settings WHERE league_id = ? LIMIT 1', [id]);
-    res.json(rows[0]);
+    const seasonRow = await getCurrentLeagueSeasonRow(id);
+    res.json({
+      ...rows[0],
+      championship_pot: Number(seasonRow?.championship_pot) || 0,
+      losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
+      season_id: seasonRow?.id || null,
+      season_year: Number(seasonRow?.season_year) || null
+    });
   } catch (err) {
     console.error('Error updating league settings:', err);
     res.status(500).json({ error: 'Failed to update league settings' });
