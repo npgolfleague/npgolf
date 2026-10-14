@@ -556,6 +556,74 @@ router.get('/:tournamentId', async (req, res) => {
       const playoffResults = playoffRows.filter((row) => row.bracket_type === 'playoff');
       const losersResults = playoffRows.filter((row) => row.bracket_type === 'losers');
       const playoffWeek = playoffRows.length > 0 ? Number(playoffRows[0].playoff_week) || null : null;
+      let allowedLosersPlayerIds = null;
+
+      if (tournament.playoff_stage === 'final') {
+        const [previousPlayoffRows] = await pool.query(
+          `SELECT id
+           FROM tournament
+           WHERE season_id = ?
+             AND id <> ?
+             AND playoff_stage IN ('semifinal', 'final')
+           ORDER BY date DESC, id DESC
+           LIMIT 1`,
+          [tournament.season_id, tournamentId]
+        );
+
+        const sourceTournamentIds = [Number(tournamentId)];
+        if (previousPlayoffRows.length > 0) {
+          sourceTournamentIds.push(Number(previousPlayoffRows[0].id));
+        }
+
+        const placeholders = sourceTournamentIds.map(() => '?').join(', ');
+        const [loserParticipantRows] = await pool.query(
+          `SELECT DISTINCT player_id
+           FROM tournament_playoff_points
+           WHERE bracket_type = 'losers'
+             AND tournament_id IN (${placeholders})`,
+          sourceTournamentIds
+        );
+
+        allowedLosersPlayerIds = new Set(
+          loserParticipantRows
+            .map((row) => Number(row.player_id))
+            .filter((playerId) => Number.isInteger(playerId))
+        );
+      }
+
+      const losersStandings = seasonRows
+        .map((row) => ({
+          player_id: Number(row.player_id),
+          name: row.name,
+          losers_bracket_points: Number(row.losers_bracket_points) || 0
+        }))
+        .filter((row) => {
+          if (row.losers_bracket_points <= 0) {
+            return false;
+          }
+
+          if (!allowedLosersPlayerIds) {
+            return true;
+          }
+
+          return allowedLosersPlayerIds.has(Number(row.player_id));
+        })
+        .sort((a, b) => {
+          if (b.losers_bracket_points !== a.losers_bracket_points) {
+            return b.losers_bracket_points - a.losers_bracket_points;
+          }
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        })
+        .map((row, index) => ({
+          player_id: row.player_id,
+          name: row.name,
+          bracket_type: 'losers',
+          rank_position: index + 1,
+          playoff_week: playoffWeek,
+          over_under: null,
+          points_awarded: row.losers_bracket_points,
+          cumulative_points_after: row.losers_bracket_points
+        }));
 
       playoff = {
         seasonId: Number(tournament.season_id),
@@ -579,6 +647,7 @@ router.get('/:tournamentId', async (req, res) => {
         })),
         playoffResults,
         losersResults,
+        losersStandings,
         playoffWeek
       };
     }
