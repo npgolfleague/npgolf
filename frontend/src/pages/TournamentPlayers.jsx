@@ -340,7 +340,7 @@ export function TournamentPlayers() {
             </p>
           )}
           <p className="text-sm font-semibold text-blue-700 mt-1">
-            Total Players: {players.length}
+            Confirmed Players: {confirmedPlayers.length}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
