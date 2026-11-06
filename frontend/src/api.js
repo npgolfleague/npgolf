@@ -110,6 +110,10 @@ const addRefreshOn401 = (client) => client.interceptors.response.use(
 addRefreshOn401(apiClient)
 addRefreshOn401(globalApiClient)
 
+export const systemAPI = {
+  version: () => globalApiClient.get('/version')
+}
+
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
   register: (name, email, password, phone, sex, smsAllowed, leagueId) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed, league_id: leagueId }),

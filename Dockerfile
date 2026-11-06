@@ -28,6 +28,15 @@ COPY schema.sql ./schema.sql
 # Copy built frontend assets into backend
 COPY --from=frontend-builder /usr/src/app/frontend/dist ./frontend/dist
 
+# Version details stamped in at build time (shown at /api/version and in the app).
+# Declared last so changing them doesn't invalidate the cached layers above.
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_COMMIT=$GIT_COMMIT \
+    GIT_BRANCH=$GIT_BRANCH \
+    BUILD_TIME=$BUILD_TIME
+
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "src/server.js"]

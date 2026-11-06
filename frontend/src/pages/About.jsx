@@ -1,4 +1,8 @@
+import { useAppVersion, formatDateTime } from '../utils/version'
+
 export const About = () => {
+  const appVersion = useAppVersion()
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -26,6 +30,26 @@ export const About = () => {
               >
                 View SMS Compliance Page
               </a>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">Version</h2>
+              {appVersion ? (
+                <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-4 gap-y-1 text-sm">
+                  <dt className="text-gray-500">Version</dt>
+                  <dd>{appVersion.version ? `v${appVersion.version}` : 'Unknown'}</dd>
+                  <dt className="text-gray-500">Commit</dt>
+                  <dd className="font-mono">{appVersion.commit || 'Unknown'}</dd>
+                  <dt className="text-gray-500">Branch</dt>
+                  <dd className="font-mono">{appVersion.branch || 'Unknown'}</dd>
+                  <dt className="text-gray-500">Built</dt>
+                  <dd>{formatDateTime(appVersion.buildTime) || 'Unknown'}</dd>
+                  <dt className="text-gray-500">Server started</dt>
+                  <dd>{formatDateTime(appVersion.startedAt) || 'Unknown'}</dd>
+                </dl>
+              ) : (
+                <p className="mt-1 text-sm text-gray-500">Version information unavailable.</p>
+              )}
             </div>
           </div>
         </div>

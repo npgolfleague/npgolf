@@ -19,6 +19,7 @@ const rulesRouter = require('./routes/rules');
 const billingEntitiesRouter = require('./routes/billing-entities');
 const { leagueAliasMiddleware } = require('./middleware/league');
 const { startEmailPoller } = require('./email-poller');
+const { getVersionInfo } = require('./version');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,12 @@ app.use('/api/emails', emailsRouter);
 app.use('/api/cart-tags', cartTagsRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/billing-entities', billingEntitiesRouter);
+
+// GET /api/version - which build is running (public: commit, branch, build time)
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(getVersionInfo());
+});
 
 // Public pages for SMS compliance (Twilio verification)
 app.get('/', (req, res) => {

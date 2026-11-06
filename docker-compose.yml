@@ -20,6 +20,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Set by build-local.ps1; shown in the app's About page
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     image: crj001xx/npgolf:latest
     container_name: npgolf-app
     restart: always
