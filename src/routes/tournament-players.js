@@ -1,10 +1,11 @@
 const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
+const { requireAdmin, requireAuth } = require('../middleware/admin');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/players - Get all players in a tournament
-router.get('/:tournamentId/players', async (req, res) => {
+router.get('/:tournamentId/players', requireAuth, async (req, res) => {
   const { tournamentId } = req.params;
   const leagueId = getLeagueId(req);
   
@@ -35,7 +36,7 @@ router.get('/:tournamentId/players', async (req, res) => {
 
 // POST /api/tournaments/:tournamentId/players - Add a player to a tournament
 // Body: { playerId }
-router.post('/:tournamentId/players', async (req, res) => {
+router.post('/:tournamentId/players', requireAdmin, async (req, res) => {
   const { tournamentId } = req.params;
   const { playerId, teeId } = req.body;
   const leagueId = getLeagueId(req);
@@ -138,7 +139,7 @@ router.post('/:tournamentId/players', async (req, res) => {
 });
 
 // DELETE /api/tournaments/:tournamentId/players/:playerId - Remove a player from a tournament
-router.delete('/:tournamentId/players/:playerId', async (req, res) => {
+router.delete('/:tournamentId/players/:playerId', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const leagueId = getLeagueId(req);
   
@@ -166,7 +167,7 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/tee - Update the tee for a player in a tournament
 // body: { teeId: int }
-router.put('/:tournamentId/players/:playerId/tee', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/tee', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { teeId } = req.body;
   const leagueId = getLeagueId(req);
@@ -201,7 +202,7 @@ router.put('/:tournamentId/players/:playerId/tee', async (req, res) => {
 
 // POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome identifier to one or more tournament players
 // Body: { group: string, playerIds: [int], pairs?: { playerId: pairNumber } }
-router.post('/:tournamentId/foursome-group', async (req, res) => {
+router.post('/:tournamentId/foursome-group', requireAuth, async (req, res) => {
   const { tournamentId } = req.params;
   const { group, playerIds } = req.body;
 
@@ -300,7 +301,7 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
 })
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/paid - Update paid status
-router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/paid', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { paid } = req.body;
   
@@ -326,7 +327,7 @@ router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
 });
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/skins-ctp-paid - Update skins/CTP paid status
-router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/skins-ctp-paid', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { skins_ctp_paid } = req.body;
   
@@ -352,7 +353,7 @@ router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) =
 });
 
 // GET /api/tournaments/:tournamentId/available-players - Get players that can be added to the tournament
-router.get('/:tournamentId/available-players', async (req, res) => {
+router.get('/:tournamentId/available-players', requireAdmin, async (req, res) => {
   const { tournamentId } = req.params;
   const leagueId = getLeagueId(req);
   

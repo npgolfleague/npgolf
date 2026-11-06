@@ -1,8 +1,8 @@
 const express = require('express');
+const { requireAdmin, requireAuth } = require('../middleware/admin');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
-const { requireAdmin } = require('../middleware/admin');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const {
@@ -1272,7 +1272,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/tournaments/:id/collected - Save actual collected amounts for reconciliation
-router.put('/:id/collected', async (req, res) => {
+router.put('/:id/collected', requireAdmin, async (req, res) => {
   try {
     const { quota_collected, skins_collected } = req.body;
     await pool.query(
@@ -1291,7 +1291,7 @@ router.put('/:id/collected', async (req, res) => {
 });
 
 // POST /api/tournaments - Create tournament
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, season_id, season_year, playoff_stage } = req.body;
     const leagueId = getLeagueId(req);
@@ -1327,7 +1327,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/tournaments/:id - Update tournament
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, season_id, season_year, playoff_stage } = req.body;
@@ -1362,7 +1362,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/tournaments/:id - Delete tournament
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
   const leagueId = getLeagueId(req);
   await pool.query('DELETE FROM tournament WHERE id = ? AND league_id = ?', [req.params.id, leagueId]);
@@ -1374,7 +1374,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/tournaments/:id/complete - Complete tournament and update quota history
-router.post('/:id/complete', async (req, res) => {
+router.post('/:id/complete', requireAdmin, async (req, res) => {
   const connection = await pool.getConnection();
   let transactionStarted = false;
   try {
@@ -2866,7 +2866,7 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
 });
 
 // POST /api/tournaments/:id/invite-sms - Send SMS invite to all active players
-router.post('/:id/invite-sms', async (req, res) => {
+router.post('/:id/invite-sms', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   try {
     // Get tournament info
@@ -2912,7 +2912,7 @@ router.post('/:id/invite-sms', async (req, res) => {
 });
 
 // POST /api/tournaments/:id/send-sms - Send custom SMS announcement to all active players
-router.post('/:id/send-sms', async (req, res) => {
+router.post('/:id/send-sms', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   try {
     // Get tournament info with course details
@@ -3413,7 +3413,7 @@ router.get('/:id/rsvp', async (req, res) => {
 });
 
 // GET /api/tournaments/:id/attendance - Get attendance statistics for a tournament
-router.get('/:id/attendance', async (req, res) => {
+router.get('/:id/attendance', requireAuth, async (req, res) => {
   const tournamentId = req.params.id;
   
   try {

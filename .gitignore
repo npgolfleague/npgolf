@@ -50,3 +50,15 @@ npgolf-multi.tar
 npgolf-backend.tar
 npgolf-multi.tar
 npgolf-backend.tar
+
+# Database dumps and exports (contain player personal data - never commit)
+backups/
+results_exports/
+npgolf_prod
+npgolf_prod*.sql
+npgolf_backup*.sql
+local_pre_refresh_*.sql
+npgolf.sql
+*.sql.gz
+.tmp_*.json
+server.err

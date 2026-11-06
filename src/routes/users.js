@@ -3,7 +3,7 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
-const { requireAdmin, isSuperAdminRole } = require('../middleware/admin');
+const { requireAdmin, requireAuth, isSuperAdminRole } = require('../middleware/admin');
 const router = express.Router();
 
 const ALLOWED_PLAYER_ROLES = new Set(['player', 'league_admin', 'admin', 'super_admin']);
@@ -121,7 +121,7 @@ const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
 };
 
 // GET /api/users - list players
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
     const leagueId = getLeagueId(req);
@@ -617,7 +617,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 });
 
 // POST /api/users/:id/send-sms - Send SMS to a single player (admin only)
-router.post('/:id/send-sms', async (req, res) => {
+router.post('/:id/send-sms', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
   
@@ -683,7 +683,7 @@ router.post('/sms-webhook', async (req, res) => {
 
 // GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
 // GET /api/users/:id/quota - Get player's full quota row
-router.get('/:id/quota', async (req, res) => {
+router.get('/:id/quota', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(
@@ -703,7 +703,7 @@ router.get('/:id/quota', async (req, res) => {
 });
 
 // PUT /api/users/:id/quota - Update player's quota row
-router.put('/:id/quota', async (req, res) => {
+router.put('/:id/quota', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const allowedFields = [
     'date_1', 'points_1', 'quota_diff_1', 'holes_1',
@@ -755,7 +755,7 @@ router.put('/:id/quota', async (req, res) => {
 });
 
 // GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
-router.get('/:id/quota-history', async (req, res) => {
+router.get('/:id/quota-history', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(

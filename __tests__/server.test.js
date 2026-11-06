@@ -9,6 +9,16 @@ jest.mock('../src/middleware/admin', () => ({
     req.user = { id: 1, role: 'super_admin' };
     next();
   },
+  requireAnyAdmin: (req, _res, next) => {
+    req.user = { id: 1, role: 'super_admin' };
+    next();
+  },
+  requireAuth: (req, _res, next) => {
+    req.user = { id: 1, role: 'super_admin' };
+    next();
+  },
+  assertLeagueAdmin: async () => {},
+  AuthError: class AuthError extends Error {},
   isAdminCapableRole: () => true,
   isSuperAdminRole: () => true
 }));

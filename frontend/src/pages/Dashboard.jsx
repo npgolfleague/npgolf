@@ -34,7 +34,8 @@ export const Dashboard = () => {
       setLoading(true)
       const [tournamentsRes, playersRes, leagueRes] = await Promise.all([
         tournamentsAPI.upcoming(),
-        playersAPI.list(),
+        // The player list needs a login (it includes contact details)
+        user ? playersAPI.list() : Promise.resolve({ data: [] }),
         leaguesAPI.current()
       ])
       setTournaments(tournamentsRes.data)

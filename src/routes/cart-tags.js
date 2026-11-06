@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAdmin } = require('../middleware/admin');
 const router = express.Router();
 const pool = require('../db');
 const QRCode = require('qrcode');
@@ -327,7 +328,7 @@ const buildCartAssignments = (players) => {
 };
 
 // GET /api/cart-tags/tournament/:tournamentId - Generate printable cart tags HTML
-router.get('/tournament/:tournamentId', async (req, res) => {
+router.get('/tournament/:tournamentId', requireAdmin, async (req, res) => {
   try {
     const { tournamentId } = req.params;
     
@@ -394,7 +395,7 @@ router.get('/tournament/:tournamentId', async (req, res) => {
 });
 
 // POST /api/cart-tags/tournament/:tournamentId/send - Send cart tags and foursome list to golf course
-router.post('/tournament/:tournamentId/send', async (req, res) => {
+router.post('/tournament/:tournamentId/send', requireAdmin, async (req, res) => {
   try {
     const { tournamentId } = req.params;
     

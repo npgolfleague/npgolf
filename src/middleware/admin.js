@@ -9,116 +9,118 @@ function isAdminCapableRole(role) {
   return isSuperAdminRole(role) || role === 'league_admin';
 }
 
-// Middleware to verify JWT and ensure user is an admin
-async function requireAdmin(req, res, next) {
-  try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    const secret = process.env.JWT_SECRET;
-    
-    if (!secret) {
-      console.error('JWT_SECRET not set');
-      return res.status(500).json({ error: 'Server misconfigured' });
-    }
-
-    // Verify token
-    const decoded = jwt.verify(token, secret);
-    const userId = decoded.sub;
-
-    // Get user from database and check role
-    const [rows] = await pool.query(
-      'SELECT id, name, email, role FROM players WHERE id = ? LIMIT 1',
-      [userId]
-    );
-
-    const user = rows && rows[0];
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    if (!isAdminCapableRole(user.role)) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    // League admins are restricted to their current league context.
-    if (user.role === 'league_admin') {
-      if (!req.league?.id) {
-        return res.status(403).json({ error: 'League admin access requires league context' });
-      }
-
-      const [leagueMembership] = await pool.query(
-        'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
-        [req.league.id, user.id]
-      );
-
-      if (!leagueMembership.length) {
-        return res.status(403).json({ error: 'League admin is not a member of this league' });
-      }
-    }
-
-    // Attach user to request
-    req.user = user;
-    next();
-  } catch (err) {
-    if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    console.error('Admin auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed' });
+class AuthError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
   }
 }
 
-async function requireSuperAdmin(req, res, next) {
+// Verifies the Bearer token on the request and loads the user from the database.
+// Throws AuthError on any failure.
+async function authenticate(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AuthError(401, 'Please log in to continue');
+  }
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error('JWT_SECRET not set');
+    throw new AuthError(500, 'Server misconfigured');
+  }
+
+  let decoded;
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+    decoded = jwt.verify(authHeader.substring(7), secret);
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') throw new AuthError(401, 'Token expired');
+    throw new AuthError(401, 'Invalid token');
+  }
+
+  const [rows] = await pool.query(
+    'SELECT id, name, email, role FROM players WHERE id = ? LIMIT 1',
+    [decoded.sub]
+  );
+  const user = rows && rows[0];
+  if (!user) {
+    throw new AuthError(401, 'User not found');
+  }
+  return user;
+}
+
+// Throws AuthError unless the user may administer the league in req.league.
+async function assertLeagueAdmin(req, user) {
+  if (!isAdminCapableRole(user.role)) {
+    throw new AuthError(403, 'Admin access required');
+  }
+
+  // League admins are restricted to their current league context.
+  if (user.role === 'league_admin') {
+    if (!req.league?.id) {
+      throw new AuthError(403, 'League admin access requires league context');
     }
 
-    const token = authHeader.substring(7);
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      console.error('JWT_SECRET not set');
-      return res.status(500).json({ error: 'Server misconfigured' });
-    }
-
-    const decoded = jwt.verify(token, secret);
-    const userId = decoded.sub;
-
-    const [rows] = await pool.query(
-      'SELECT id, name, email, role FROM players WHERE id = ? LIMIT 1',
-      [userId]
+    const [leagueMembership] = await pool.query(
+      'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
+      [req.league.id, user.id]
     );
 
-    const user = rows && rows[0];
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+    if (!leagueMembership.length) {
+      throw new AuthError(403, 'League admin is not a member of this league');
     }
-
-    if (!isSuperAdminRole(user.role)) {
-      return res.status(403).json({ error: 'Super admin access required' });
-    }
-
-    req.user = user;
-    return next();
-  } catch (err) {
-    if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    console.error('Super admin auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed' });
   }
 }
 
-module.exports = { requireAdmin, requireSuperAdmin, isAdminCapableRole, isSuperAdminRole };
+function handleAuthError(err, res, label) {
+  if (err instanceof AuthError) {
+    return res.status(err.status).json({ error: err.message });
+  }
+  console.error(`${label} error:`, err);
+  return res.status(500).json({ error: 'Authentication failed' });
+}
+
+function makeMiddleware(label, check) {
+  return async function (req, res, next) {
+    try {
+      const user = await authenticate(req);
+      if (check) await check(req, user);
+      req.user = user;
+      return next();
+    } catch (err) {
+      return handleAuthError(err, res, label);
+    }
+  };
+}
+
+// Any logged-in user.
+const requireAuth = makeMiddleware('Auth');
+
+// Super admin, or a league admin who belongs to the league in the URL.
+const requireAdmin = makeMiddleware('Admin auth', assertLeagueAdmin);
+
+// Any admin-capable role, without a league check. For global resources
+// (such as courses) that are not tied to one league.
+const requireAnyAdmin = makeMiddleware('Admin auth', async (req, user) => {
+  if (!isAdminCapableRole(user.role)) {
+    throw new AuthError(403, 'Admin access required');
+  }
+});
+
+const requireSuperAdmin = makeMiddleware('Super admin auth', async (req, user) => {
+  if (!isSuperAdminRole(user.role)) {
+    throw new AuthError(403, 'Super admin access required');
+  }
+});
+
+module.exports = {
+  requireAuth,
+  requireAdmin,
+  requireAnyAdmin,
+  requireSuperAdmin,
+  authenticate,
+  assertLeagueAdmin,
+  AuthError,
+  isAdminCapableRole,
+  isSuperAdminRole
+};

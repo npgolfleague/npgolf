@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAdmin } = require('../middleware/admin');
 const router = express.Router();
 const pool = require('../db');
 const multer = require('multer');
@@ -11,7 +12,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
 // GET /api/emails - Get all received emails (admin only)
-router.get('/', async (req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, from_email, from_name, to_email, subject, 
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/emails/:id - Get single email
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query(
       'SELECT * FROM emails WHERE id = ?',
@@ -46,7 +47,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/emails/:id/read - Mark email as read
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', requireAdmin, async (req, res) => {
   try {
     const { is_read } = req.body;
     await pool.query(
@@ -61,7 +62,7 @@ router.put('/:id/read', async (req, res) => {
 });
 
 // DELETE /api/emails/:id - Delete email
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM emails WHERE id = ?', [req.params.id]);
     res.json({ message: 'Email deleted' });
@@ -72,7 +73,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/emails/send - Send a custom email to players or specific addresses
-router.post('/send', upload.single('attachment'), async (req, res) => {
+router.post('/send', requireAdmin, upload.single('attachment'), async (req, res) => {
   const { subject, body, recipient_type, player_ids, custom_emails } = req.body;
   if (!subject || !body) return res.status(400).json({ error: 'Subject and body are required' });
 

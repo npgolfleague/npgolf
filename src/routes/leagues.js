@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/admin');
+const { requireAdmin, requireAuth } = require('../middleware/admin');
 const router = express.Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -440,7 +440,7 @@ router.get('/:id/playoff-overview', async (req, res) => {
 });
 
 // Get league players
-router.get('/:id/players', async (req, res) => {
+router.get('/:id/players', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     if (!ensureLeagueScope(req, res, id)) return;
