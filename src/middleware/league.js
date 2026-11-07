@@ -12,11 +12,28 @@ const leagueAliasMiddleware = async (req, res, next) => {
     const alias = pathParts[0];
     
     try {
-      // Lookup league by alias
-      const [rows] = await pool.query(
-        'SELECT id, billing_entity_id, name, alias, active FROM leagues WHERE alias = ? LIMIT 1',
-        [alias]
-      );
+      // Lookup league by alias. Older databases may not have cup_name yet.
+      let rows
+      try {
+        [rows] = await pool.query(
+          'SELECT id, billing_entity_id, name, alias, cup_name, active FROM leagues WHERE alias = ? LIMIT 1',
+          [alias]
+        )
+      } catch (queryErr) {
+        if (queryErr?.code !== 'ER_BAD_FIELD_ERROR') {
+          throw queryErr
+        }
+
+        const [legacyRows] = await pool.query(
+          'SELECT id, billing_entity_id, name, alias, active FROM leagues WHERE alias = ? LIMIT 1',
+          [alias]
+        )
+
+        rows = legacyRows.map((row) => ({
+          ...row,
+          cup_name: 'Paradise Cup'
+        }))
+      }
       
       if (rows.length === 0) {
         console.log(`⚠️  League alias '${alias}' not found in database`);
@@ -58,7 +75,8 @@ const leagueAliasMiddleware = async (req, res, next) => {
 const commonRoutes = [
   'api', 'login', 'register', 'forgot-password', 'reset-password',
   'sms-consent', 'dashboard', 'about', 'robots.txt', 'favicon.svg',
-  'favicon.ico', 'assets', 'npgolf-logo.svg', 'league-select', 'billing-entities'
+  'favicon.ico', 'assets', 'npgolf-logo.svg', 'league-select', 'billing-entities',
+  'sitemap.xml', 'wp-login.php', 'wp-admin'
 ];
 
 function isCommonRoute(segment) {

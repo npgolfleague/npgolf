@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI, coursesAPI } from '../api'
+import { tournamentsAPI, coursesAPI, leaguesAPI } from '../api'
 
 export const AddTournament = () => {
   const navigate = useNavigate()
   const [date, setDate] = useState('')
+  const [firstTeeTime, setFirstTeeTime] = useState('')
+  const [shotgunStart, setShotgunStart] = useState(false)
+  const [standardQuotaGame, setStandardQuotaGame] = useState(true)
+  const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
+  const [playoffStage, setPlayoffStage] = useState('regular')
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
   const [nineHoleSide, setNineHoleSide] = useState('front')
@@ -14,7 +19,20 @@ export const AddTournament = () => {
 
   useEffect(() => {
     fetchCourses()
+    fetchLeague()
   }, [])
+
+  const fetchLeague = async () => {
+    try {
+      const response = await leaguesAPI.current()
+      const currentSeasonYear = Number(response.data?.season_year)
+      if (Number.isFinite(currentSeasonYear) && currentSeasonYear > 0) {
+        setSeasonYear(currentSeasonYear)
+      }
+    } catch (err) {
+      console.error('Error fetching current league:', err)
+    }
+  }
 
   const fetchCourses = async () => {
     try {
@@ -30,14 +48,14 @@ export const AddTournament = () => {
     e.preventDefault()
     setError('')
 
-    if (!date || !courseId) {
+    if (!date || !courseId || !firstTeeTime) {
       setError('Please fill in all required fields')
       return
     }
 
     setLoading(true)
     try {
-      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide)
+      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame, seasonYear, playoffStage)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error creating tournament:', err)
@@ -76,6 +94,82 @@ export const AddTournament = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Tournament Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={firstTeeTime}
+                  onChange={(e) => setFirstTeeTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={shotgunStart}
+                    onChange={(e) => setShotgunStart(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Shotgun Start (all groups start at the same time)
+                </label>
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={standardQuotaGame}
+                    onChange={(e) => setStandardQuotaGame(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Standard quota game is being played
+                </label>
+                <p className="text-sm text-gray-500 mt-1 ml-6">
+                  Leave checked for normal quota leaderboard scoring. Uncheck for side-game-only events.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Season Year <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={seasonYear}
+                  onChange={(e) => setSeasonYear(Number(e.target.value) || new Date().getFullYear())}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Use the league season year this tournament belongs to.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Playoff Stage
+                </label>
+                <select
+                  value={playoffStage}
+                  onChange={(e) => setPlayoffStage(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="regular">Regular Season</option>
+                  <option value="semifinal">Playoff Semifinal</option>
+                  <option value="final">Playoff Final</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  Leave as regular season unless this event is part of the playoffs.
+                </p>
               </div>
 
               <div>

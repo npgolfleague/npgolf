@@ -8,6 +8,8 @@ const { sendEmail } = require('../email');
 
 const router = express.Router();
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
 
 function isStrongPassword(password) {
   const minLen = 8;
@@ -104,10 +106,22 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Selected league is not available' });
     }
 
-    // Check if email already exists
-    const [existing] = await pool.query('SELECT id FROM players WHERE email = ? LIMIT 1', [email]);
+    if (!targetLeague.billing_entity_id) {
+      return res.status(400).json({ error: 'Selected league is not configured for registration yet' });
+    }
+
+    // Check if email is already registered in this league (case-insensitive)
+    const [existing] = await pool.query(
+      `SELECT p.id
+       FROM players p
+       JOIN league_players lp ON lp.player_id = p.id
+       WHERE lp.league_id = ?
+         AND LOWER(p.email) = LOWER(?)
+       LIMIT 1`,
+      [targetLeague.id, email]
+    );
     if (existing && existing.length > 0) {
-      return res.status(400).json({ error: 'Email already registered' });
+      return res.status(400).json({ error: 'Email already registered for this league' });
     }
 
     // Hash password
@@ -171,6 +185,15 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     console.error('Registration error', err);
+
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    if (err && (err.code === 'ER_BAD_NULL_ERROR' || err.code === 'ER_NO_REFERENCED_ROW_2')) {
+      return res.status(400).json({ error: 'Selected league is not configured for registration yet' });
+    }
+
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -252,6 +275,10 @@ router.post('/forgot-password', async (req, res) => {
       const text = `Hello ${user.name || ''},\n\nWe received a request to reset your NPGOLF password.\n\nReset your password: ${resetLink}\n\nThis link expires in 1 hour. If you did not request this, you can safely ignore this email.`;
 
       try {
+        const emailDelayMs = getOutgoingEmailDelayMs();
+        if (emailDelayMs > 0) {
+          await sleep(emailDelayMs);
+        }
         await sendEmail(user.email, subject, html, text);
       } catch (emailErr) {
         console.error('Failed to send password reset email:', emailErr.message);

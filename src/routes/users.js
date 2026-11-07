@@ -3,7 +3,7 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
-const { requireAdmin, isSuperAdminRole } = require('../middleware/admin');
+const { requireAdmin, requireAuth, isSuperAdminRole } = require('../middleware/admin');
 const router = express.Router();
 
 const ALLOWED_PLAYER_ROLES = new Set(['player', 'league_admin', 'admin', 'super_admin']);
@@ -121,7 +121,7 @@ const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
 };
 
 // GET /api/users - list players
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
     const leagueId = getLeagueId(req);
@@ -280,7 +280,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/users/refresh-quotas - Refresh players quota_18/quota_9 from latest quota history (admin only)
+// POST /api/users/refresh-quotas - Refresh players quota_18/quota_9 from average of latest 7 quota history slots (admin only)
 router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
   try {
     const [quotaRows] = await pool.query('SELECT * FROM quota');
@@ -290,8 +290,8 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
     let playersTouched = 0;
 
     for (const quotaRow of quotaRows) {
-      let latest18 = null;
-      let latest9 = null;
+      const scores18 = [];
+      const scores9 = [];
 
       for (let i = 1; i <= 7; i++) {
         const holes = Number(quotaRow[`holes_${i}`]);
@@ -305,35 +305,38 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
           continue;
         }
 
-        if (holes === 18 && latest18 === null) {
-          latest18 = Math.round(points);
+        if (holes === 18) {
+          scores18.push(points);
         }
 
-        if (holes === 9 && latest9 === null) {
-          latest9 = Math.round(points);
-        }
-
-        if (latest18 !== null && latest9 !== null) {
-          break;
+        if (holes === 9) {
+          scores9.push(points);
         }
       }
 
-      if (latest18 === null && latest9 === null) {
+      const avg18 = scores18.length > 0
+        ? Math.floor(scores18.reduce((sum, value) => sum + value, 0) / scores18.length)
+        : null;
+      const avg9 = scores9.length > 0
+        ? Math.floor(scores9.reduce((sum, value) => sum + value, 0) / scores9.length)
+        : null;
+
+      if (avg18 === null && avg9 === null) {
         continue;
       }
 
       const updates = [];
       const values = [];
 
-      if (latest18 !== null) {
+      if (avg18 !== null) {
         updates.push('quota_18 = ?');
-        values.push(latest18);
+        values.push(avg18);
         updated18++;
       }
 
-      if (latest9 !== null) {
+      if (avg9 !== null) {
         updates.push('quota_9 = ?');
-        values.push(latest9);
+        values.push(avg9);
         updated9++;
       }
 
@@ -347,7 +350,7 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
       playersTouched++;
     }
 
-    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
+    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool, getLeagueId(_req));
 
     res.json({
       message: 'Quota values refreshed successfully',
@@ -614,7 +617,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 });
 
 // POST /api/users/:id/send-sms - Send SMS to a single player (admin only)
-router.post('/:id/send-sms', async (req, res) => {
+router.post('/:id/send-sms', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
   
@@ -680,7 +683,7 @@ router.post('/sms-webhook', async (req, res) => {
 
 // GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
 // GET /api/users/:id/quota - Get player's full quota row
-router.get('/:id/quota', async (req, res) => {
+router.get('/:id/quota', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(
@@ -700,7 +703,7 @@ router.get('/:id/quota', async (req, res) => {
 });
 
 // PUT /api/users/:id/quota - Update player's quota row
-router.put('/:id/quota', async (req, res) => {
+router.put('/:id/quota', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const allowedFields = [
     'date_1', 'points_1', 'quota_diff_1', 'holes_1',
@@ -752,7 +755,7 @@ router.put('/:id/quota', async (req, res) => {
 });
 
 // GET /api/users/:id/quota-history - Get player's quota history (last 7 rounds)
-router.get('/:id/quota-history', async (req, res) => {
+router.get('/:id/quota-history', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(

@@ -37,6 +37,7 @@ export const BillingEntities = () => {
   const [leagueFormData, setLeagueFormData] = useState({
     name: '',
     slug: '',
+    cup_name: 'Paradise Cup',
     description: '',
     season_year: new Date().getFullYear(),
     start_date: '',
@@ -169,6 +170,7 @@ export const BillingEntities = () => {
     setLeagueFormData({
       name: '',
       slug: '',
+      cup_name: 'Paradise Cup',
       description: '',
       season_year: new Date().getFullYear(),
       start_date: '',
@@ -188,6 +190,7 @@ export const BillingEntities = () => {
     setLeagueFormData({
       name: league.name || '',
       slug: league.slug || '',
+      cup_name: league.cup_name || 'Paradise Cup',
       description: league.description || '',
       season_year: league.season_year || new Date().getFullYear(),
       start_date: toDateInput(league.start_date),
@@ -224,6 +227,7 @@ export const BillingEntities = () => {
       setLeagueFormData({
         name: '',
         slug: '',
+        cup_name: 'Paradise Cup',
         description: '',
         season_year: new Date().getFullYear(),
         start_date: '',
@@ -665,6 +669,19 @@ export const BillingEntities = () => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">Lowercase, numbers, hyphens only</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Cup Name
+                    </label>
+                    <input
+                      type="text"
+                      name="cup_name"
+                      value={leagueFormData.cup_name}
+                      onChange={handleLeagueChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
 
                   <div>

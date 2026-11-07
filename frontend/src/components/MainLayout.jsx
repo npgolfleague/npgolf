@@ -2,6 +2,7 @@ import { useState, useContext, useEffect } from 'react'
 import { useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
+import { useAppVersion, formatVersionShort, formatDateTime } from '../utils/version'
 import {
   LayoutDashboard, ClipboardList, Users, Trophy, Flag, BookOpen,
   Info, Target, Inbox, Settings, Shield, LogOut, ChevronLeft, ChevronRight, Building2, Menu
@@ -10,6 +11,7 @@ import {
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const appVersion = useAppVersion()
   const { user, logout } = useContext(AuthContext)
   const navigate = useNavigate()
   const location = useLocation()
@@ -205,6 +207,17 @@ export const MainLayout = () => {
               Logout
             </span>
           </button>
+          {appVersion && (
+            <p
+              className={`mt-2 px-3 text-[11px] text-slate-500 truncate ${!sidebarOpen ? 'md:hidden' : ''}`}
+              title={[
+                appVersion.branch && `Branch: ${appVersion.branch}`,
+                formatDateTime(appVersion.buildTime) && `Built: ${formatDateTime(appVersion.buildTime)}`
+              ].filter(Boolean).join('\n')}
+            >
+              {formatVersionShort(appVersion)}
+            </p>
+          )}
         </div>
       </aside>
 

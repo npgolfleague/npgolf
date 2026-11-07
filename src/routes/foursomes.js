@@ -1,9 +1,10 @@
 const express = require('express');
 const pool = require('../db');
+const { requireAdmin, requireAuth } = require('../middleware/admin');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/foursomes/:foursome - return players in a foursome
-router.get('/:tournamentId/foursomes/:foursome', async (req, res) => {
+router.get('/:tournamentId/foursomes/:foursome', requireAuth, async (req, res) => {
   const { tournamentId, foursome } = req.params;
   try {
     const [rows] = await pool.query(
@@ -24,7 +25,7 @@ router.get('/:tournamentId/foursomes/:foursome', async (req, res) => {
 
 // POST /api/tournaments/:tournamentId/foursomes/:foursome/players - add a player to a foursome
 // Body: { playerId, pair }
-router.post('/:tournamentId/foursomes/:foursome/players', async (req, res) => {
+router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, async (req, res) => {
   const { tournamentId, foursome } = req.params;
   const { playerId, pair } = req.body;
   if (!playerId) return res.status(400).json({ error: 'playerId required' });
@@ -59,7 +60,7 @@ router.post('/:tournamentId/foursomes/:foursome/players', async (req, res) => {
 });
 
 // DELETE /api/tournaments/:tournamentId/foursomes/:foursome/players/:playerId - remove player from tournament (or remove from foursome)
-router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', async (req, res) => {
+router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', requireAdmin, async (req, res) => {
   const { tournamentId, foursome, playerId } = req.params;
   try {
     // Remove the foursome/pair info for this player in this tournament

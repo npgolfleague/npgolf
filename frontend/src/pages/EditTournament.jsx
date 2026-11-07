@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { tournamentsAPI, coursesAPI } from '../api'
+import { tournamentsAPI, coursesAPI, leaguesAPI } from '../api'
 
 export const EditTournament = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const [date, setDate] = useState('')
+  const [firstTeeTime, setFirstTeeTime] = useState('')
+  const [shotgunStart, setShotgunStart] = useState(false)
+  const [standardQuotaGame, setStandardQuotaGame] = useState(true)
+  const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
+  const [playoffStage, setPlayoffStage] = useState('regular')
   const [courseId, setCourseId] = useState('')
   const [numberOfHoles, setNumberOfHoles] = useState(18)
   const [nineHoleSide, setNineHoleSide] = useState('front')
@@ -21,16 +26,23 @@ export const EditTournament = () => {
   const fetchData = async () => {
     try {
       setFetching(true)
-      const [tournamentRes, coursesRes] = await Promise.all([
+      const [tournamentRes, leagueRes, coursesRes] = await Promise.all([
         tournamentsAPI.get(id),
+        leaguesAPI.current(),
         coursesAPI.list()
       ])
       
       const tournament = tournamentRes.data
+      const currentLeague = leagueRes.data
       setDate(tournament.date.split('T')[0]) // Convert to YYYY-MM-DD format
+      setFirstTeeTime(tournament.first_tee_time ? String(tournament.first_tee_time).slice(0, 5) : '')
+      setShotgunStart(Boolean(tournament.shotgun_start))
+      setStandardQuotaGame(tournament.standard_quota_game !== 0 && tournament.standard_quota_game !== false)
       setCourseId(tournament.course_id)
       setNumberOfHoles(tournament.number_of_holes)
       setNineHoleSide(tournament.nine_hole_side || 'front')
+      setSeasonYear(Number(tournament.season_year) || Number(currentLeague?.season_year) || new Date().getFullYear())
+      setPlayoffStage(tournament.playoff_stage || 'regular')
       setCourses(coursesRes.data)
     } catch (err) {
       console.error('Error fetching data:', err)
@@ -44,14 +56,14 @@ export const EditTournament = () => {
     e.preventDefault()
     setError('')
 
-    if (!date || !courseId) {
+    if (!date || !courseId || !firstTeeTime) {
       setError('Please fill in all required fields')
       return
     }
 
     setLoading(true)
     try {
-      await tournamentsAPI.update(id, date, courseId, numberOfHoles, nineHoleSide)
+      await tournamentsAPI.update(id, date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame, seasonYear, playoffStage)
       navigate('/tournaments')
     } catch (err) {
       console.error('Error updating tournament:', err)
@@ -98,6 +110,82 @@ export const EditTournament = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Tournament Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={firstTeeTime}
+                  onChange={(e) => setFirstTeeTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={shotgunStart}
+                    onChange={(e) => setShotgunStart(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Shotgun Start (all groups start at the same time)
+                </label>
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={standardQuotaGame}
+                    onChange={(e) => setStandardQuotaGame(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Standard quota game is being played
+                </label>
+                <p className="text-sm text-gray-500 mt-1 ml-6">
+                  Leave checked for normal quota leaderboard scoring. Uncheck for side-game-only events.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Season Year <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={seasonYear}
+                  onChange={(e) => setSeasonYear(Number(e.target.value) || new Date().getFullYear())}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Use the league season year this tournament belongs to.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  Playoff Stage
+                </label>
+                <select
+                  value={playoffStage}
+                  onChange={(e) => setPlayoffStage(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="regular">Regular Season</option>
+                  <option value="semifinal">Playoff Semifinal</option>
+                  <option value="final">Playoff Final</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  Leave as regular season unless this event is part of the playoffs.
+                </p>
               </div>
 
               <div>

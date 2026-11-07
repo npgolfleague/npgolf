@@ -6,8 +6,11 @@ import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_SETTINGS = {
   tournament_fee_18_holes: 20,
+  skins_ctp_fee_18_holes: 10,
   tournament_fee_9_holes: 10,
+  skins_ctp_fee_9_holes: 5,
   golf_course_email: '',
+  outgoing_email_from: '',
   quota_points_albatross: 8,
   quota_points_eagle: 8,
   quota_points_birdie: 6,
@@ -15,6 +18,9 @@ const DEFAULT_SETTINGS = {
   quota_points_bogey: 2,
   quota_points_double_bogey: 1,
   quota_points_worse: 0,
+  playoff_format: 'none',
+  championship_pot: 0,
+  losers_bracket_pot: 0,
   live_scoring: 1
 }
 
@@ -23,8 +29,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function settingsFromResponse(data) {
   return {
     tournament_fee_18_holes: data.tournament_fee_18_holes ?? DEFAULT_SETTINGS.tournament_fee_18_holes,
+    skins_ctp_fee_18_holes: data.skins_ctp_fee_18_holes ?? DEFAULT_SETTINGS.skins_ctp_fee_18_holes,
     tournament_fee_9_holes: data.tournament_fee_9_holes ?? DEFAULT_SETTINGS.tournament_fee_9_holes,
+    skins_ctp_fee_9_holes: data.skins_ctp_fee_9_holes ?? DEFAULT_SETTINGS.skins_ctp_fee_9_holes,
     golf_course_email: data.golf_course_email || '',
+    outgoing_email_from: data.outgoing_email_from || '',
     quota_points_albatross: data.quota_points_albatross ?? DEFAULT_SETTINGS.quota_points_albatross,
     quota_points_eagle: data.quota_points_eagle ?? DEFAULT_SETTINGS.quota_points_eagle,
     quota_points_birdie: data.quota_points_birdie ?? DEFAULT_SETTINGS.quota_points_birdie,
@@ -32,6 +41,9 @@ function settingsFromResponse(data) {
     quota_points_bogey: data.quota_points_bogey ?? DEFAULT_SETTINGS.quota_points_bogey,
     quota_points_double_bogey: data.quota_points_double_bogey ?? DEFAULT_SETTINGS.quota_points_double_bogey,
     quota_points_worse: data.quota_points_worse ?? DEFAULT_SETTINGS.quota_points_worse,
+    playoff_format: data.playoff_format || DEFAULT_SETTINGS.playoff_format,
+    championship_pot: data.championship_pot ?? DEFAULT_SETTINGS.championship_pot,
+    losers_bracket_pot: data.losers_bracket_pot ?? DEFAULT_SETTINGS.losers_bracket_pot,
     live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1
   }
 }
@@ -103,7 +115,7 @@ export const Settings = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    const newValue = name.includes('fee') ? (parseFloat(value) || 0)
+    const newValue = name.includes('fee') || name.includes('pot') ? (parseFloat(value) || 0)
       : name.startsWith('quota_points') ? (parseInt(value, 10) || 0)
       : value
     setSettings(prev => ({ ...prev, [name]: newValue }))
@@ -123,6 +135,11 @@ export const Settings = () => {
         if (invalid) {
           throw new Error(`Invalid email address: ${invalid}`)
         }
+      }
+
+      const outgoingFrom = String(settings.outgoing_email_from || '').trim()
+      if (outgoingFrom && !EMAIL_REGEX.test(outgoingFrom)) {
+        throw new Error(`Invalid email address: ${outgoingFrom}`)
       }
 
       const response = await leaguesAPI.updateSettings(selectedLeagueId, settings)
@@ -196,7 +213,7 @@ export const Settings = () => {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                18 Hole Tournament Fee ($)
+                18 Hole Quota Fee ($)
               </label>
               <input
                 type="number"
@@ -212,12 +229,44 @@ export const Settings = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                9 Hole Tournament Fee ($)
+                18 Hole Skins/Pins Fee ($)
+              </label>
+              <input
+                type="number"
+                name="skins_ctp_fee_18_holes"
+                value={settings.skins_ctp_fee_18_holes}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                9 Hole Quota Fee ($)
               </label>
               <input
                 type="number"
                 name="tournament_fee_9_holes"
                 value={settings.tournament_fee_9_holes}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                9 Hole Skins/Pins Fee ($)
+              </label>
+              <input
+                type="number"
+                name="skins_ctp_fee_9_holes"
+                value={settings.skins_ctp_fee_9_holes}
                 onChange={handleChange}
                 step="0.01"
                 min="0"
@@ -241,6 +290,69 @@ export const Settings = () => {
               <p className="text-sm text-gray-500 mt-1">
                 One or more emails separated by a semicolon (;)
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Outgoing From Email
+              </label>
+              <input
+                type="email"
+                name="outgoing_email_from"
+                value={settings.outgoing_email_from}
+                onChange={handleChange}
+                placeholder="league@example.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Optional. When set, invitation and results emails are sent from this address.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Playoff Format
+              </label>
+              <select
+                name="playoff_format"
+                value={settings.playoff_format}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="none">Disabled</option>
+                <option value="fedex_cup">FedEx Cup</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Championship Pot ($)
+                </label>
+                <input
+                  type="number"
+                  name="championship_pot"
+                  value={settings.championship_pot}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Losers Bracket Pot ($)
+                </label>
+                <input
+                  type="number"
+                  name="losers_bracket_pot"
+                  value={settings.losers_bracket_pot}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <hr className="border-gray-200" />

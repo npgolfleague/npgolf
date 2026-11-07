@@ -28,16 +28,8 @@ const refreshClient = axios.create({
   baseURL: '/api'
 })
 
-// Add league prefix and JWT token to requests
-apiClient.interceptors.request.use((config) => {
-  // Detect league prefix at request time
-  const leaguePrefix = detectLeaguePrefix();
-  if (leaguePrefix) {
-    // Update baseURL to include league prefix
-    config.baseURL = `${leaguePrefix}/api`;
-  }
-  
-  // Add JWT token if available
+// Add JWT token to a request if available
+function attachToken(config) {
   const token = localStorage.getItem('token')
   if (token) {
     if (config.headers && typeof config.headers.set === 'function') {
@@ -48,9 +40,24 @@ apiClient.interceptors.request.use((config) => {
     }
   }
   return config
+}
+
+// Add league prefix and JWT token to requests
+apiClient.interceptors.request.use((config) => {
+  // Detect league prefix at request time
+  const leaguePrefix = detectLeaguePrefix();
+  if (leaguePrefix) {
+    // Update baseURL to include league prefix
+    config.baseURL = `${leaguePrefix}/api`;
+  }
+  return attachToken(config)
 })
 
-apiClient.interceptors.response.use(
+// Global endpoints (no league prefix) still need the login token
+globalApiClient.interceptors.request.use(attachToken)
+
+// On a 401, try once to refresh the access token and retry the request
+const addRefreshOn401 = (client) => client.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
@@ -88,7 +95,7 @@ apiClient.interceptors.response.use(
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
-        return apiClient.request(originalRequest)
+        return client.request(originalRequest)
       }
     } catch (refreshError) {
       localStorage.removeItem('token')
@@ -99,6 +106,13 @@ apiClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+addRefreshOn401(apiClient)
+addRefreshOn401(globalApiClient)
+
+export const systemAPI = {
+  version: () => globalApiClient.get('/version')
+}
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
@@ -147,8 +161,8 @@ export const tournamentsAPI = {
   upcoming: () => apiClient.get('/tournaments/upcoming'),
   next: () => apiClient.get('/tournaments/next'),
   get: (id) => apiClient.get(`/tournaments/${id}`),
-  create: (date, course_id, number_of_holes, nine_hole_side = 'front') => apiClient.post('/tournaments', { date, course_id, number_of_holes, nine_hole_side }),
-  update: (id, date, course_id, number_of_holes, nine_hole_side = 'front') => apiClient.put(`/tournaments/${id}`, { date, course_id, number_of_holes, nine_hole_side }),
+  create: (date, course_id, number_of_holes, nine_hole_side = 'front', first_tee_time = null, shotgun_start = false, standard_quota_game = true, season_year = null, playoff_stage = 'regular') => apiClient.post('/tournaments', { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, season_year, playoff_stage }),
+  update: (id, date, course_id, number_of_holes, nine_hole_side = 'front', first_tee_time = null, shotgun_start = false, standard_quota_game = true, season_year = null, playoff_stage = 'regular') => apiClient.put(`/tournaments/${id}`, { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, season_year, playoff_stage }),
   delete: (id) => apiClient.delete(`/tournaments/${id}`),
   complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
@@ -170,6 +184,10 @@ export const tournamentsAPI = {
   getAttendance: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/attendance`),
   // pairs is optional: either an object { playerId: pairNumber } or array [{ playerId, pair }]
   assignFoursomeGroup: (tournamentId, group, playerIds, pairs) => apiClient.post(`/tournaments/${tournamentId}/foursome-group`, { group, playerIds, pairs }),
+  setPlayoffSemifinalParticipants: (tournamentId, playerIds) => apiClient.post(`/tournaments/${tournamentId}/playoff/semifinal-participants`, { playerIds }),
+  setPlayoffFinalParticipants: (tournamentId, playerIds) => apiClient.post(`/tournaments/${tournamentId}/playoff/finals-participants`, { playerIds }),
+  setPlayoffPoints: (tournamentId, bracket_type, playoff_week, points) => apiClient.post(`/tournaments/${tournamentId}/playoff/points`, { bracket_type, playoff_week, points }),
+  setChampionTiebreakWinner: (tournamentId, playerId) => apiClient.post(`/tournaments/${tournamentId}/playoff/champion-tiebreak`, { playerId }),
   getResultsEmail: (id) => apiClient.get(`/tournaments/${id}/results-email`),
     generateResultsEmail: (id, customMessage) => apiClient.post(`/tournaments/${id}/results-email/generate`, customMessage ? { customMessage } : {}),
   sendResultsEmail: (id, email) => apiClient.post(`/tournaments/${id}/results-email/send`, email ? { email } : {}),
@@ -204,6 +222,7 @@ export const leaguesAPI = {
   get: (id) => apiClient.get(`/leagues/${id}`),
   getSettings: (id) => apiClient.get(`/leagues/${id}/settings`),
   updateSettings: (id, data) => apiClient.put(`/leagues/${id}/settings`, data),
+  getPlayoffOverview: (id) => apiClient.get(`/leagues/${id}/playoff-overview`),
   getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
   getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`),
   current: () => apiClient.get('/leagues/current'),

@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI, playersAPI } from '../api'
+import { tournamentsAPI, playersAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { ToastContext } from '../context/ToastContext'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -18,6 +18,8 @@ export const Dashboard = () => {
   const isAdmin = isAdminCapable(user)
   const [tournaments, setTournaments] = useState([])
   const [players, setPlayers] = useState([])
+  const [currentLeague, setCurrentLeague] = useState(null)
+  const [playoffOverview, setPlayoffOverview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshingQuotas, setRefreshingQuotas] = useState(false)
@@ -30,12 +32,28 @@ export const Dashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [tournamentsRes, playersRes] = await Promise.all([
+      const [tournamentsRes, playersRes, leagueRes] = await Promise.all([
         tournamentsAPI.upcoming(),
-        playersAPI.list()
+        // The player list needs a login (it includes contact details)
+        user ? playersAPI.list() : Promise.resolve({ data: [] }),
+        leaguesAPI.current()
       ])
       setTournaments(tournamentsRes.data)
       setPlayers(playersRes.data.filter(p => p.active).sort((a, b) => (b.fedex_points || 0) - (a.fedex_points || 0)))
+      setCurrentLeague(leagueRes.data)
+
+      if (leagueRes.data?.id) {
+        try {
+          const playoffRes = await leaguesAPI.getPlayoffOverview(leagueRes.data.id)
+          setPlayoffOverview(playoffRes.data)
+        } catch (playoffErr) {
+          console.error('Error fetching playoff overview:', playoffErr)
+          setPlayoffOverview(null)
+        }
+      } else {
+        setPlayoffOverview(null)
+      }
+
       setError(null)
     } catch (err) {
       console.error('Error fetching data:', err)
@@ -51,6 +69,8 @@ export const Dashboard = () => {
       day: 'numeric'
     })
   }
+
+  const cupName = currentLeague?.cup_name || 'Paradise Cup'
 
   const menuItems = [
     { path: '/scores', label: 'Score Entry', icon: ClipboardList, color: 'blue' },
@@ -152,7 +172,7 @@ export const Dashboard = () => {
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">Paradise Cup — 2026 Season</p>
+          <p className="text-slate-500 text-sm mt-1">{cupName} — {currentLeague?.season_year || new Date().getFullYear()} Season</p>
         </div>
         {/* Priority 5: Dashboard Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -212,6 +232,71 @@ export const Dashboard = () => {
             </div>
           </div>
         </div>
+
+          {playoffOverview && playoffOverview.playoff_format === 'fedex_cup' && (
+            <div className="mb-8 grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 xl:col-span-1">
+                <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">Playoff Season</p>
+                <h2 className="mt-2 text-xl font-bold text-slate-900">{playoffOverview.season_year}</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Championship Pot: ${Number(playoffOverview.championship_pot || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-slate-600">
+                  Losers Bracket Pot: ${Number(playoffOverview.losers_bracket_pot || 0).toFixed(2)}
+                </p>
+                <div className="mt-4 space-y-2 text-sm">
+                  <div className="rounded-lg bg-fairway-50 px-3 py-2 text-fairway-900">
+                    Champion: {playoffOverview.champion_player_id ? 'Recorded' : 'Pending'}
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-slate-800">
+                    Tiebreak: {playoffOverview.champion_tiebreak_player_id ? 'Manual selection recorded' : 'Not needed yet'}
+                  </div>
+                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+                    Losers Winner: {playoffOverview.losers_winner_player_id ? 'Recorded' : 'Pending'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 xl:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-slate-900">Playoff Standings</h2>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {playoffOverview.season_year}
+                  </span>
+                </div>
+                {playoffOverview.standings?.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-slate-500 uppercase tracking-wider text-xs">
+                        <tr>
+                          <th className="py-2 pr-4">Rank</th>
+                          <th className="py-2 pr-4">Player</th>
+                          <th className="py-2 pr-4 text-right">Regular</th>
+                          <th className="py-2 pr-4 text-right">Playoff</th>
+                          <th className="py-2 pr-4 text-right">Losers</th>
+                          <th className="py-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {playoffOverview.standings.slice(0, 8).map((row) => (
+                          <tr key={row.player_id} className="border-t border-slate-100">
+                            <td className="py-2 pr-4 font-semibold text-slate-700">#{row.rank}</td>
+                            <td className="py-2 pr-4 text-slate-900">{row.name}</td>
+                            <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.regular_points)}</td>
+                            <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.playoff_points)}</td>
+                            <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.losers_bracket_points)}</td>
+                            <td className="py-2 text-right font-semibold text-slate-900">{Math.round(row.total_points)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No playoff standings are available yet.</p>
+                )}
+              </div>
+            </div>
+          )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Upcoming Tournaments */}
@@ -279,7 +364,7 @@ export const Dashboard = () => {
                   <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                     <Trophy className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Paradise Cup Standings</h2>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">{cupName} Standings</h2>
                 </div>
                 {isAdmin && (
                   <button
@@ -311,8 +396,8 @@ export const Dashboard = () => {
                         <th scope="col" aria-label="Player" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Player
                         </th>
-                        <th scope="col" aria-label="Paradise Cup Points" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Paradise Pts
+                        <th scope="col" aria-label={`${cupName} Points`} className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {cupName} Pts
                         </th>
                         <th scope="col" aria-label="18-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
                           Quota 18H

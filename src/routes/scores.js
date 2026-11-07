@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/admin');
-const { isAdminCapableRole, isSuperAdminRole } = require('../middleware/admin');
-const jwt = require('jsonwebtoken');
+const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
 
 async function getPar3HolesForCourse(courseId) {
   try {
@@ -126,7 +124,7 @@ router.get('/tournament/:tournamentId/foursome/:group', async (req, res) => {
 });
 
 // POST /api/scores - Create score(s)
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const { scores } = req.body; // Array of score objects
     
@@ -134,44 +132,29 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Scores array is required' });
     }
 
-    // Check if the foursome is posted/locked — if so, require admin
-    const firstScore = scores[0];
-    const foursomeVal = firstScore.foursome || firstScore.foursome_group || null;
-    if (foursomeVal && firstScore.tournament_id) {
+    // If any foursome in this submission has been posted (locked), only an admin
+    // may change it. Check every (tournament, foursome) pair, not just the first.
+    const groupKeys = new Map();
+    for (const score of scores) {
+      const foursomeVal = score?.foursome || score?.foursome_group || null;
+      if (foursomeVal && score?.tournament_id) {
+        groupKeys.set(`${score.tournament_id}::${foursomeVal}`, [score.tournament_id, foursomeVal]);
+      }
+    }
+    if (groupKeys.size > 0) {
+      const pairs = [...groupKeys.values()];
       const [postRows] = await pool.query(
-        'SELECT id FROM foursome_posts WHERE tournament_id = ? AND foursome_group = ? LIMIT 1',
-        [firstScore.tournament_id, foursomeVal]
+        `SELECT id FROM foursome_posts WHERE ${pairs.map(() => '(tournament_id = ? AND foursome_group = ?)').join(' OR ')} LIMIT 1`,
+        pairs.flat()
       );
       if (postRows.length > 0) {
-        // Scores are locked — verify admin JWT
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
-        }
         try {
-          const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
-          const [userRows] = await pool.query('SELECT id, role FROM players WHERE id = ? LIMIT 1', [decoded.sub]);
-          const user = userRows[0];
-          if (!user || !isAdminCapableRole(user.role)) {
-            return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+          await assertLeagueAdmin(req, req.user);
+        } catch (authErr) {
+          if (authErr instanceof AuthError) {
+            return res.status(403).json({ error: 'Scores for this group have been posted. Ask an admin to make changes.' });
           }
-
-          if (!isSuperAdminRole(user.role)) {
-            if (!req.league?.id) {
-              return res.status(403).json({ error: 'Scores have been posted. League admin access requires league context.' });
-            }
-
-            const [leagueMembership] = await pool.query(
-              'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
-              [req.league.id, user.id]
-            );
-
-            if (!leagueMembership.length) {
-              return res.status(403).json({ error: 'Scores have been posted. League admin is not a member of this league.' });
-            }
-          }
-        } catch {
-          return res.status(403).json({ error: 'Scores have been posted. Admin access required to modify.' });
+          throw authErr;
         }
       }
     }
@@ -182,20 +165,51 @@ router.post('/', async (req, res) => {
       
       const results = [];
       for (const score of scores) {
-        const { tournament_id, player_id, hole_id, score: scoreValue, quota, ctp_feet, ctp_inches, ctp_image_url } = score;
+        const {
+          tournament_id,
+          player_id,
+          hole_id,
+          score: scoreValue,
+          quota,
+          ctp_feet,
+          ctp_inches,
+          ctp_image_url,
+          foursome_ctp_feet,
+          foursome_ctp_inches,
+          foursome_ctp_image_url
+        } = score;
         // Accept either `foursome` (new name) or `foursome_group` (legacy) in incoming payloads
         const foursomeVal = score.foursome || score.foursome_group || null;
         
         // First, always save the score and quota (without CTP data initially)
         const [result] = await connection.query(
-           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group) 
-           VALUES (?, ?, ?, ?, ?, ?)
+           `INSERT INTO scores (tournament_id, player_id, hole_id, score, quota, foursome_group, ctp_feet, ctp_inches, ctp_image_url, foursome_ctp_feet, foursome_ctp_inches, foursome_ctp_image_url) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE 
              score = VALUES(score), 
              quota = VALUES(quota), 
              foursome_group = VALUES(foursome_group),
+             ctp_feet = VALUES(ctp_feet),
+             ctp_inches = VALUES(ctp_inches),
+             ctp_image_url = VALUES(ctp_image_url),
+             foursome_ctp_feet = VALUES(foursome_ctp_feet),
+             foursome_ctp_inches = VALUES(foursome_ctp_inches),
+             foursome_ctp_image_url = VALUES(foursome_ctp_image_url),
              entered_at = CURRENT_TIMESTAMP`,
-          [tournament_id, player_id, hole_id, scoreValue, quota, foursomeVal]
+          [
+            tournament_id,
+            player_id,
+            hole_id,
+            scoreValue,
+            quota,
+            foursomeVal,
+            ctp_feet,
+            ctp_inches,
+            ctp_image_url,
+            foursome_ctp_feet,
+            foursome_ctp_inches,
+            foursome_ctp_image_url
+          ]
         );
         
         // Now handle CTP data separately if provided
@@ -248,6 +262,51 @@ router.post('/', async (req, res) => {
             console.log(`Not saving CTP as it's not the closest.`);
           }
         }
+
+        if (foursome_ctp_feet !== null && foursome_ctp_feet !== undefined) {
+          const newDistance = (parseInt(foursome_ctp_feet) * 12) + parseFloat(foursome_ctp_inches || 0);
+          console.log(`New side-game CTP submission: Player ${player_id}, Hole ${hole_id}, Distance: ${foursome_ctp_feet}' ${foursome_ctp_inches}" (${newDistance} inches)`);
+
+          const [existingFoursomeCtps] = await connection.query(
+            `SELECT s.player_id, s.foursome_ctp_feet, s.foursome_ctp_inches, p.name
+             FROM scores s 
+             JOIN players p ON s.player_id = p.id
+             WHERE s.tournament_id = ? AND s.hole_id = ? AND s.player_id != ? AND s.foursome_ctp_feet IS NOT NULL`,
+            [tournament_id, hole_id, player_id]
+          );
+
+          console.log(`Found ${existingFoursomeCtps.length} existing side-game CTP(s) for this hole`);
+
+          let hasCloser = false;
+          for (const existingCtp of existingFoursomeCtps) {
+            const existingDistance = (parseInt(existingCtp.foursome_ctp_feet) * 12) + parseFloat(existingCtp.foursome_ctp_inches || 0);
+            console.log(`Comparing side-game CTP with ${existingCtp.name}: ${existingCtp.foursome_ctp_feet}' ${existingCtp.foursome_ctp_inches}" (${existingDistance} inches)`);
+            if (existingDistance <= newDistance) {
+              console.log(`Existing side-game CTP is closer or equal. Rejecting new CTP.`);
+              hasCloser = true;
+              break;
+            }
+          }
+
+          if (!hasCloser) {
+            console.log(`New side-game CTP is closest! Saving and clearing other side-game CTPs.`);
+            await connection.query(
+              `UPDATE scores 
+               SET foursome_ctp_feet = ?, foursome_ctp_inches = ?, foursome_ctp_image_url = ?
+               WHERE tournament_id = ? AND hole_id = ? AND player_id = ?`,
+              [foursome_ctp_feet, foursome_ctp_inches, foursome_ctp_image_url, tournament_id, hole_id, player_id]
+            );
+
+            await connection.query(
+              `UPDATE scores 
+               SET foursome_ctp_feet = NULL, foursome_ctp_inches = NULL, foursome_ctp_image_url = NULL 
+               WHERE tournament_id = ? AND hole_id = ? AND player_id != ?`,
+              [tournament_id, hole_id, player_id]
+            );
+          } else {
+            console.log(`Not saving side-game CTP as it's not the closest.`);
+          }
+        }
         
         results.push({ id: result.insertId, ...score, foursome: foursomeVal });
       }
@@ -267,7 +326,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/scores/:id - Update score
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const { score, quota } = req.body;
     // Accept either name for foursome field
@@ -284,7 +343,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/scores/:id - Delete score
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM scores WHERE id = ?', [req.params.id]);
     res.json({ message: 'Score deleted' });
@@ -588,7 +647,7 @@ router.get('/tournament/:tournamentId/foursome/:group/post-status', async (req, 
 });
 
 // POST /api/scores/tournament/:tournamentId/foursome/:group/post - Mark foursome scores as posted
-router.post('/tournament/:tournamentId/foursome/:group/post', async (req, res) => {
+router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, async (req, res) => {
   const requestId = `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const { tournamentId, group } = req.params;
   console.log(`[${requestId}] Post foursome request`, {
@@ -598,20 +657,7 @@ router.post('/tournament/:tournamentId/foursome/:group/post', async (req, res) =
     hasLeagueContext: Boolean(req.league?.id)
   });
 
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.warn(`[${requestId}] Missing or invalid auth header`);
-    return res.status(401).json({ error: 'Authentication required', request_id: requestId });
-  }
-
-  let userId;
-  try {
-    const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET);
-    userId = decoded.sub;
-  } catch (err) {
-    console.warn(`[${requestId}] Token verification failed:`, err.message);
-    return res.status(401).json({ error: 'Invalid token', request_id: requestId });
-  }
+  const userId = req.user.id;
 
   try {
     await pool.query(

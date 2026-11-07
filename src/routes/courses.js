@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { OpenAI } = require('openai');
 const pool = require('../db');
+const { requireAnyAdmin } = require('../middleware/admin');
 const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/courses/parse-scorecard - parse a scorecard image with OpenAI vision
 // NOTE: defined before /:id so Express does not treat "parse-scorecard" as a numeric id
-router.post('/parse-scorecard', upload.single('image'), async (req, res) => {
+router.post('/parse-scorecard', requireAnyAdmin, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'image file is required' });
   }
@@ -295,7 +296,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/courses - create course { name, address?, phone? }
-router.post('/', async (req, res) => {
+router.post('/', requireAnyAdmin, async (req, res) => {
   const { name, address, phone } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
 
@@ -315,7 +316,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/courses/:id - update course info
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAnyAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, address, phone } = req.body;
 
@@ -340,7 +341,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/courses/:id - delete course and all its data (cascade via FK)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAnyAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     // Check for linked tournaments before attempting delete
@@ -385,7 +386,7 @@ router.get('/:id/tees', async (req, res) => {
 
 // POST /api/courses/:id/tees - add a tee box to a course
 // body: { tee_name, tee_color?, gender, course_rating?, slope_rating? }
-router.post('/:id/tees', async (req, res) => {
+router.post('/:id/tees', requireAnyAdmin, async (req, res) => {
   const { id } = req.params;
   const { tee_name, tee_color, gender, course_rating, slope_rating } = req.body;
 
@@ -416,7 +417,7 @@ router.post('/:id/tees', async (req, res) => {
 });
 
 // PUT /api/courses/:id/tees/:teeId - update tee metadata
-router.put('/:id/tees/:teeId', async (req, res) => {
+router.put('/:id/tees/:teeId', requireAnyAdmin, async (req, res) => {
   const { id, teeId } = req.params;
   const { tee_name, tee_color, gender, course_rating, slope_rating } = req.body;
 
@@ -455,7 +456,7 @@ router.put('/:id/tees/:teeId', async (req, res) => {
 });
 
 // DELETE /api/courses/:id/tees/:teeId - delete a tee and its hole_tee rows (cascade)
-router.delete('/:id/tees/:teeId', async (req, res) => {
+router.delete('/:id/tees/:teeId', requireAnyAdmin, async (req, res) => {
   const { id, teeId } = req.params;
   try {
     const [result] = await pool.execute(
@@ -471,7 +472,7 @@ router.delete('/:id/tees/:teeId', async (req, res) => {
 
 // PUT /api/courses/:id/tees/:teeId/holes - upsert all hole data for one tee
 // body: { holes: [{ hole_number, distance, par, handicap }] }
-router.put('/:id/tees/:teeId/holes', async (req, res) => {
+router.put('/:id/tees/:teeId/holes', requireAnyAdmin, async (req, res) => {
   const { id, teeId } = req.params;
   const { holes } = req.body;
 

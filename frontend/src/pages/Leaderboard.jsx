@@ -10,16 +10,27 @@ export function Leaderboard() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const canManageCtp = isAdminCapable(user);
+  const canManagePlayoffs = isAdminCapable(user);
   const [tournament, setTournament] = useState(null);
   const [tournamentPlayers, setTournamentPlayers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardStats, setLeaderboardStats] = useState(null);
+  const [playoffData, setPlayoffData] = useState(null);
+  const [activeView, setActiveView] = useState('regular');
   const [ctpWinners, setCtpWinners] = useState([]);
   const [ctpAdminOptions, setCtpAdminOptions] = useState({ holes: [], players: [] });
   const [ctpDraftRows, setCtpDraftRows] = useState([]);
   const [savingCtp, setSavingCtp] = useState(false);
   const [ctpAdminError, setCtpAdminError] = useState('');
   const [ctpAdminSuccess, setCtpAdminSuccess] = useState('');
+  const [playoffAdminError, setPlayoffAdminError] = useState('');
+  const [playoffAdminSuccess, setPlayoffAdminSuccess] = useState('');
+  const [selectedSemifinalPlayerIds, setSelectedSemifinalPlayerIds] = useState([]);
+  const [selectedFinalPlayerIds, setSelectedFinalPlayerIds] = useState([]);
+  const [selectedTiebreakWinnerId, setSelectedTiebreakWinnerId] = useState('');
+  const [playoffPointsWeek, setPlayoffPointsWeek] = useState('');
+  const [playoffPointsDraftRows, setPlayoffPointsDraftRows] = useState({ playoff: [], losers: [] });
+  const [savingPlayoffAdmin, setSavingPlayoffAdmin] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [selectedPlayerScores, setSelectedPlayerScores] = useState([]);
   const [loadingPlayerScores, setLoadingPlayerScores] = useState(false);
@@ -56,6 +67,41 @@ export function Leaderboard() {
     });
   };
 
+  const parseIdList = (value) => {
+    if (Array.isArray(value)) {
+      return value.map((id) => String(Number(id))).filter((id) => id !== 'NaN');
+    }
+
+    if (value == null || value === '') {
+      return [];
+    }
+
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed)
+          ? parsed.map((id) => String(Number(id))).filter((id) => id !== 'NaN')
+          : [];
+      } catch (_err) {
+        return [];
+      }
+    }
+
+    return [];
+  };
+
+  const buildPlayoffPointsDraftRows = (rows) => {
+    return (rows || []).map((row) => ({
+      player_id: String(row.player_id ?? row.id ?? ''),
+      name: row.name || '',
+      rank_position: row.rank_position ?? '',
+      tie_group_size: row.tie_group_size ?? 1,
+      over_under: row.over_under ?? 0,
+      points_awarded: row.points_awarded ?? 0,
+      cumulative_points_after: row.cumulative_points_after ?? 0
+    }));
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -84,15 +130,39 @@ export function Leaderboard() {
           totalPlayers: leaderboardRes.data.totalPlayers,
           playersWithCompleteScores: leaderboardRes.data.playersWithCompleteScores,
           expectedHoles: leaderboardRes.data.expectedHoles,
-          liveScoring: leaderboardRes.data.liveScoring
+          liveScoring: leaderboardRes.data.liveScoring,
+          playoffStage: leaderboardRes.data.playoff?.stage || null
         });
+        setPlayoffData(leaderboardRes.data.playoff || null);
+        setActiveView(leaderboardRes.data.playoff ? 'playoff' : 'regular');
       } else {
         // Fallback for old format
         setLeaderboard(leaderboardRes.data);
         setLeaderboardStats(null);
+        setPlayoffData(null);
+        setActiveView('regular');
       }
       
       setCtpWinners(ctpRes.data);
+
+      const semifinalOverrideIds = parseIdList(
+        tournamentRes.data?.playoff_override_semifinal_player_ids || leaderboardRes.data?.playoff?.semifinalOverridePlayerIds
+      );
+      const finalOverrideIds = parseIdList(
+        tournamentRes.data?.playoff_override_final_player_ids || leaderboardRes.data?.playoff?.finalOverridePlayerIds
+      );
+      const tiebreakWinnerId = tournamentRes.data?.champion_tiebreak_player_id || leaderboardRes.data?.playoff?.championTiebreakPlayerId;
+
+      setSelectedSemifinalPlayerIds(semifinalOverrideIds);
+      setSelectedFinalPlayerIds(finalOverrideIds);
+      setSelectedTiebreakWinnerId(tiebreakWinnerId != null && tiebreakWinnerId !== '' ? String(tiebreakWinnerId) : '');
+
+      const playoffWeek = Number(leaderboardRes.data?.playoff?.playoffWeek || (leaderboardRes.data?.playoff?.stage === 'final' ? 2 : 1)) || 1;
+      setPlayoffPointsWeek(String(playoffWeek));
+      setPlayoffPointsDraftRows({
+        playoff: buildPlayoffPointsDraftRows(leaderboardRes.data?.playoff?.playoffResults),
+        losers: buildPlayoffPointsDraftRows(leaderboardRes.data?.playoff?.losersResults)
+      });
 
       if (canManageCtp && ctpAdminRes?.data) {
         const holes = ctpAdminRes.data.holes || [];
@@ -110,6 +180,8 @@ export function Leaderboard() {
       setPlayerScoresError('');
       setCtpAdminError('');
       setCtpAdminSuccess('');
+      setPlayoffAdminError('');
+      setPlayoffAdminSuccess('');
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
       setError(err.response?.data?.error || 'Failed to load leaderboard data');
@@ -165,6 +237,103 @@ export function Leaderboard() {
     }
   };
 
+  const toggleSelectedPlayerId = (setter, currentIds, playerId) => {
+    const normalizedId = String(playerId);
+    setter(currentIds.includes(normalizedId)
+      ? currentIds.filter((id) => id !== normalizedId)
+      : [...currentIds, normalizedId]);
+  };
+
+  const handleSavePlayoffSemifinalParticipants = async () => {
+    try {
+      setSavingPlayoffAdmin(true);
+      setPlayoffAdminError('');
+      setPlayoffAdminSuccess('');
+      await tournamentsAPI.setPlayoffSemifinalParticipants(tournamentId, selectedSemifinalPlayerIds.map((id) => Number(id)));
+      setPlayoffAdminSuccess('Semifinal playoff participants saved.');
+    } catch (err) {
+      console.error('Failed to save semifinal playoff participants:', err);
+      setPlayoffAdminError(err.response?.data?.error || 'Failed to save semifinal playoff participants');
+    } finally {
+      setSavingPlayoffAdmin(false);
+    }
+  };
+
+  const handleSavePlayoffFinalParticipants = async () => {
+    try {
+      setSavingPlayoffAdmin(true);
+      setPlayoffAdminError('');
+      setPlayoffAdminSuccess('');
+      await tournamentsAPI.setPlayoffFinalParticipants(tournamentId, selectedFinalPlayerIds.map((id) => Number(id)));
+      setPlayoffAdminSuccess('Finals playoff participants saved.');
+    } catch (err) {
+      console.error('Failed to save finals playoff participants:', err);
+      setPlayoffAdminError(err.response?.data?.error || 'Failed to save finals playoff participants');
+    } finally {
+      setSavingPlayoffAdmin(false);
+    }
+  };
+
+  const handleSaveChampionTiebreakWinner = async () => {
+    try {
+      if (!selectedTiebreakWinnerId) {
+        setPlayoffAdminError('Select a championship tiebreak winner first.');
+        return;
+      }
+
+      setSavingPlayoffAdmin(true);
+      setPlayoffAdminError('');
+      setPlayoffAdminSuccess('');
+      await tournamentsAPI.setChampionTiebreakWinner(tournamentId, Number(selectedTiebreakWinnerId));
+      setPlayoffAdminSuccess('Championship tiebreak winner saved.');
+    } catch (err) {
+      console.error('Failed to save tiebreak winner:', err);
+      setPlayoffAdminError(err.response?.data?.error || 'Failed to save championship tiebreak winner');
+    } finally {
+      setSavingPlayoffAdmin(false);
+    }
+  };
+
+  const handlePlayoffPointsDraftChange = (bracketType, rowIndex, field, value) => {
+    setPlayoffPointsDraftRows((prev) => ({
+      ...prev,
+      [bracketType]: prev[bracketType].map((row, index) => (
+        index === rowIndex ? { ...row, [field]: value } : row
+      ))
+    }));
+  };
+
+  const handleSavePlayoffPoints = async (bracketType) => {
+    try {
+      if (!playoffPointsWeek) {
+        setPlayoffAdminError('Select a playoff week before saving points.');
+        return;
+      }
+
+      const rows = playoffPointsDraftRows[bracketType] || [];
+      const payload = rows.map((row) => ({
+        player_id: Number(row.player_id),
+        rank_position: row.rank_position === '' || row.rank_position == null ? null : Number(row.rank_position),
+        tie_group_size: row.tie_group_size === '' || row.tie_group_size == null ? 1 : Number(row.tie_group_size),
+        over_under: row.over_under === '' || row.over_under == null ? 0 : Number(row.over_under),
+        points_awarded: row.points_awarded === '' || row.points_awarded == null ? 0 : Number(row.points_awarded),
+        cumulative_points_after: row.cumulative_points_after === '' || row.cumulative_points_after == null ? 0 : Number(row.cumulative_points_after)
+      })).filter((row) => Number.isInteger(row.player_id));
+
+      setSavingPlayoffAdmin(true);
+      setPlayoffAdminError('');
+      setPlayoffAdminSuccess('');
+      await tournamentsAPI.setPlayoffPoints(tournamentId, bracketType, Number(playoffPointsWeek), payload);
+      setPlayoffAdminSuccess(`${bracketType === 'playoff' ? 'Playoff' : 'Losers bracket'} points saved.`);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to save playoff points:', err);
+      setPlayoffAdminError(err.response?.data?.error || 'Failed to save playoff points');
+    } finally {
+      setSavingPlayoffAdmin(false);
+    }
+  };
+
   const loadSelectedPlayerScores = async (playerId) => {
     try {
       setLoadingPlayerScores(true);
@@ -209,6 +378,231 @@ export function Leaderboard() {
   const prizeAmountsReady = leaderboard.length > 0 &&
     (leaderboard[0].quota_collected != null || leaderboard[0].skins_collected != null);
 
+  const getSortedPlayoffRows = (rows) => {
+    const sortedRows = [...(rows || [])].sort((left, right) => {
+      const rightCumulative = Number(right.cumulative_points_after ?? right.points_awarded ?? 0);
+      const leftCumulative = Number(left.cumulative_points_after ?? left.points_awarded ?? 0);
+
+      if (rightCumulative !== leftCumulative) {
+        return rightCumulative - leftCumulative;
+      }
+
+      const rightPoints = Number(right.points_awarded ?? 0);
+      const leftPoints = Number(left.points_awarded ?? 0);
+      if (rightPoints !== leftPoints) {
+        return rightPoints - leftPoints;
+      }
+
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+
+    let previousCumulative = null;
+    let previousRank = 0;
+
+    return sortedRows.map((row, index) => {
+      const cumulative = Number(row.cumulative_points_after ?? row.points_awarded ?? 0);
+      const rank = previousCumulative !== null && cumulative === previousCumulative
+        ? previousRank
+        : index + 1;
+
+      previousCumulative = cumulative;
+      previousRank = rank;
+
+      return {
+        ...row,
+        display_rank_position: rank
+      };
+    });
+  };
+
+  const renderPlayoffTable = (rows, emptyMessage) => {
+    if (!rows || rows.length === 0) {
+      return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <p className="text-yellow-800 text-sm">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    const sortedRows = getSortedPlayoffRows(rows);
+
+    return (
+      <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
+        <table className="min-w-[900px] w-full divide-y divide-gray-200">
+          <thead className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Player</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Rank</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Bracket</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Week</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Over/Under</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Points</th>
+              <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Cumulative</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {sortedRows.map((row, index) => (
+              <tr key={`${row.player_id || row.id}-${index}`} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{row.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">
+                  {row.display_rank_position != null ? `#${row.display_rank_position}` : '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 capitalize">
+                  {row.bracket_type || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">
+                  {row.playoff_week != null ? row.playoff_week : '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700">
+                  {row.over_under != null ? Number(row.over_under).toFixed(2) : '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-semibold text-emerald-700">
+                  {row.points_awarded != null ? Number(row.points_awarded).toFixed(2) : '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-semibold text-gray-900">
+                  {row.cumulative_points_after != null ? Number(row.cumulative_points_after).toFixed(2) : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderPlayerSelectionList = (selectedIds, setSelectedIds, players, title, description) => {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="mb-3">
+          <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+          <p className="text-xs text-slate-500 mt-1">{description}</p>
+        </div>
+        <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+          {players.map((player) => (
+            <label key={`playoff-admin-${player.id}`} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(String(player.id))}
+                onChange={() => toggleSelectedPlayerId(setSelectedIds, selectedIds, player.id)}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="flex-1 text-slate-900">{player.name}</span>
+              <span className="text-xs text-slate-500">{player.email}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPlayoffPointsEditor = (bracketType, title, description) => {
+    const rows = playoffPointsDraftRows[bracketType] || [];
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+            <p className="text-xs text-slate-500 mt-1">{description}</p>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Playoff Week</label>
+            <input
+              type="number"
+              min="1"
+              max="2"
+              value={playoffPointsWeek}
+              onChange={(e) => setPlayoffPointsWeek(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <p className="text-sm text-slate-500">No rows available for manual points editing.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[760px] w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Player</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Rank</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Tie Size</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Over/Under</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Points</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Cumulative</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row, index) => (
+                  <tr key={`playoff-points-${bracketType}-${row.player_id || index}`}>
+                    <td className="px-3 py-2 text-sm font-medium text-slate-900">{row.name}</td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        min="1"
+                        value={row.rank_position}
+                        onChange={(e) => handlePlayoffPointsDraftChange(bracketType, index, 'rank_position', e.target.value)}
+                        className="w-20 rounded border border-slate-300 px-2 py-1 text-sm text-center"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        min="1"
+                        value={row.tie_group_size}
+                        onChange={(e) => handlePlayoffPointsDraftChange(bracketType, index, 'tie_group_size', e.target.value)}
+                        className="w-20 rounded border border-slate-300 px-2 py-1 text-sm text-center"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.over_under}
+                        onChange={(e) => handlePlayoffPointsDraftChange(bracketType, index, 'over_under', e.target.value)}
+                        className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-center"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.points_awarded}
+                        onChange={(e) => handlePlayoffPointsDraftChange(bracketType, index, 'points_awarded', e.target.value)}
+                        className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-center"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.cumulative_points_after}
+                        onChange={(e) => handlePlayoffPointsDraftChange(bracketType, index, 'cumulative_points_after', e.target.value)}
+                        className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-center"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => handleSavePlayoffPoints(bracketType)}
+            disabled={savingPlayoffAdmin || rows.length === 0}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-300"
+          >
+            {savingPlayoffAdmin ? 'Saving...' : `Save ${title}`}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -220,12 +614,20 @@ export function Leaderboard() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6">
-        <button
-          onClick={() => navigate('/app/dashboard')}
-          className="text-blue-600 hover:text-blue-800 mb-2"
-        >
-          ← Back to Dashboard
-        </button>
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => navigate('/app/dashboard')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            ← Back to Dashboard
+          </button>
+          <button
+            onClick={() => navigate(`/tournaments/${tournamentId}/hole-scores`)}
+            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            View Hole Scores
+          </button>
+        </div>
         <h1 className="text-3xl font-bold">🏆 Tournament Leaderboard</h1>
         {tournament && (
           <p className="text-gray-600 mt-2">
@@ -268,167 +670,357 @@ export function Leaderboard() {
         </div>
       ) : (
         <>
-        {payoutSummary && prizeAmountsReady && (
-          <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-            <h3 className="font-semibold text-indigo-900 mb-1">Pins &amp; Skins Split</h3>
-            <p className="text-sm text-indigo-800">
-              Paid players: {payoutSummary.skinsPlayers} × ${payoutSummary.skinsFee.toFixed(2)} = ${payoutSummary.totalPot.toFixed(2)} total
-            </p>
-            <p className="text-sm text-indigo-800">
-              Skins Pot (60%): <span className="font-semibold">${payoutSummary.skinsPot.toFixed(2)}</span> | Pins Pot (40%): <span className="font-semibold">${payoutSummary.pinsPot.toFixed(2)}</span>
-            </p>
+        {playoffData && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveView('regular')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeView === 'regular' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Regular
+            </button>
+            <button
+              onClick={() => setActiveView('playoff')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeView === 'playoff' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Playoff
+            </button>
+            <button
+              onClick={() => setActiveView('losers')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeView === 'losers' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Losers
+            </button>
           </div>
         )}
-        {payoutSummary && !prizeAmountsReady && (
-          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-700 mb-1">Pins &amp; Skins Split</h3>
-            <p className="text-sm text-gray-500 italic">Prize amounts will be displayed once the commissioner enters actual collected amounts.</p>
-          </div>
-        )}
-        <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
-          <table className="min-w-[1200px] w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                  Rank
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                  Player
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Quota
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Total Pts
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Over/Under
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Quota Prize
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Skins
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Skin Prize
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  CTP Prize
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Holes
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                  Strokes
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {leaderboard.map((player) => (
-                <tr 
-                  key={player.id} 
-                  className={`hover:bg-gray-50 ${
-                    player.rank && player.rank <= 3 ? 'bg-yellow-50' : player.holes_played === 0 ? 'bg-gray-50' : ''
-                  }`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`text-2xl font-bold ${player.rank ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {getMedalEmoji(player.rank)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{player.name}</div>
-                    <div className="text-xs text-gray-500">{player.email}</div>
-                    {player.holes_played === 0 && (
-                      <div className="text-xs text-red-500 italic">No scores yet</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-900">{Math.round(player.player_quota)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className={`text-sm ${player.holes_played > 0 ? 'font-semibold text-blue-600' : 'text-gray-400'}`}>
-                      {player.holes_played > 0 ? Math.round(player.total_quota_points) : '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {player.holes_played > 0 ? (
-                      <div className={`text-lg ${getScoreColor(player.over_under)}`}>
-                        {player.over_under > 0 ? '+' : ''}{Math.round(player.over_under)}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">-</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {prizeAmountsReady ? (
-                      player.quota_prize_money > 0 ? (
-                        <div className="text-sm font-bold text-green-600">
-                          ${player.quota_prize_money}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">-</div>
-                      )
-                    ) : (
-                      <div className="text-sm text-gray-400 italic">TBD</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {player.skins > 0 ? (
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-orange-600">
-                          {player.skins} 🔥
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          Holes: {player.skin_holes.sort((a, b) => a - b).join(', ')}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">-</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {prizeAmountsReady ? (
-                      player.skin_prize_money > 0 ? (
-                        <div className="text-sm font-bold text-green-600">
-                          ${player.skin_prize_money}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">-</div>
-                      )
-                    ) : (
-                      <div className="text-sm text-gray-400 italic">TBD</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {prizeAmountsReady ? (
-                      player.ctp_prize_money > 0 ? (
-                        <div className="text-sm font-bold text-green-600">
-                          ${player.ctp_prize_money}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">-</div>
-                      )
-                    ) : (
-                      <div className="text-sm text-gray-400 italic">TBD</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {player.holes_played > 0 ? player.holes_played : '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {player.holes_played > 0 ? player.total_strokes : '-'}
-                    </div>
-                  </td>
+
+        {activeView === 'regular' && (
+          <>
+          {payoutSummary && prizeAmountsReady && (
+            <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <h3 className="font-semibold text-indigo-900 mb-1">Pins &amp; Skins Split</h3>
+              <p className="text-sm text-indigo-800">
+                Paid players: {payoutSummary.skinsPlayers} × ${payoutSummary.skinsFee.toFixed(2)} = ${payoutSummary.totalPot.toFixed(2)} total
+              </p>
+              <p className="text-sm text-indigo-800">
+                Skins Pot (60%): <span className="font-semibold">${payoutSummary.skinsPot.toFixed(2)}</span> | Pins Pot (40%): <span className="font-semibold">${payoutSummary.pinsPot.toFixed(2)}</span>
+              </p>
+            </div>
+          )}
+          {payoutSummary && !prizeAmountsReady && (
+            <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-700 mb-1">Pins &amp; Skins Split</h3>
+              <p className="text-sm text-gray-500 italic">Prize amounts will be displayed once the commissioner enters actual collected amounts.</p>
+            </div>
+          )}
+          <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
+            <table className="min-w-[1200px] w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                    Rank
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                    Player
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Quota
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Total Pts
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Over/Under
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Quota Prize
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Skins
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Skin Prize
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    CTP Prize
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Holes
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                    Strokes
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {leaderboard.map((player) => (
+                  <tr 
+                    key={player.id} 
+                    className={`hover:bg-gray-50 ${
+                      player.rank && player.rank <= 3 ? 'bg-yellow-50' : player.holes_played === 0 ? 'bg-gray-50' : ''
+                    }`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-2xl font-bold ${player.rank ? 'text-gray-900' : 'text-gray-400'}`}>
+                        {getMedalEmoji(player.rank)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{player.name}</div>
+                      <div className="text-xs text-gray-500">{player.email}</div>
+                      {player.holes_played === 0 && (
+                        <div className="text-xs text-red-500 italic">No scores yet</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-sm text-gray-900">{Math.round(player.player_quota)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className={`text-sm ${player.holes_played > 0 ? 'font-semibold text-blue-600' : 'text-gray-400'}`}>
+                        {player.holes_played > 0 ? Math.round(player.total_quota_points) : '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {player.holes_played > 0 ? (
+                        <div className={`text-lg ${getScoreColor(player.over_under)}`}>
+                          {player.over_under > 0 ? '+' : ''}{Math.round(player.over_under)}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {prizeAmountsReady ? (
+                        player.quota_prize_money > 0 ? (
+                          <div className="text-sm font-bold text-green-600">
+                            ${player.quota_prize_money}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">-</div>
+                        )
+                      ) : (
+                        <div className="text-sm text-gray-400 italic">TBD</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {player.skins > 0 ? (
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-orange-600">
+                            {player.skins} 🔥
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            Holes: {player.skin_holes.sort((a, b) => a - b).join(', ')}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {prizeAmountsReady ? (
+                        player.skin_prize_money > 0 ? (
+                          <div className="text-sm font-bold text-green-600">
+                            ${player.skin_prize_money}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">-</div>
+                        )
+                      ) : (
+                        <div className="text-sm text-gray-400 italic">TBD</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {prizeAmountsReady ? (
+                        player.ctp_prize_money > 0 ? (
+                          <div className="text-sm font-bold text-green-600">
+                            ${player.ctp_prize_money}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">-</div>
+                        )
+                      ) : (
+                        <div className="text-sm text-gray-400 italic">TBD</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
+                        {player.holes_played > 0 ? player.holes_played : '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className={`text-sm ${player.holes_played > 0 ? 'text-gray-500' : 'text-gray-400'}`}>
+                        {player.holes_played > 0 ? player.total_strokes : '-'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </>
+        )}
+
+        {activeView === 'playoff' && playoffData && (
+          <div className="space-y-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <h3 className="font-semibold text-emerald-900 mb-1">Playoff {playoffData.stage === 'final' ? 'Finals' : 'Semifinals'}</h3>
+              <p className="text-sm text-emerald-800">
+                Season {playoffData.seasonYear || 'current'} | Week {playoffData.playoffWeek || '-'}
+              </p>
+            </div>
+            {renderPlayoffTable(playoffData.playoffResults, 'No playoff results recorded yet.')}
+            <div className="bg-white border border-emerald-100 rounded-lg p-4">
+              <h3 className="font-semibold text-emerald-900 mb-3">Season Playoff Standings</h3>
+              {playoffData.standings?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[700px] w-full text-sm">
+                    <thead className="text-left text-emerald-700 uppercase tracking-wider text-xs">
+                      <tr>
+                        <th className="py-2 pr-4">Rank</th>
+                        <th className="py-2 pr-4">Player</th>
+                        <th className="py-2 pr-4 text-right">Regular</th>
+                        <th className="py-2 pr-4 text-right">Playoff</th>
+                        <th className="py-2 pr-4 text-right">Losers</th>
+                        <th className="py-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {playoffData.standings.slice(0, 8).map((row) => (
+                        <tr key={row.playerId} className="border-t border-emerald-100">
+                          <td className="py-2 pr-4 font-semibold text-emerald-900">#{row.rank}</td>
+                          <td className="py-2 pr-4 text-slate-900">{row.name}</td>
+                          <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.regularPoints)}</td>
+                          <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.playoffPoints)}</td>
+                          <td className="py-2 pr-4 text-right text-slate-600">{Math.round(row.losersBracketPoints)}</td>
+                          <td className="py-2 text-right font-semibold text-slate-900">{Math.round(row.totalPoints)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No season standings recorded yet.</p>
+              )}
+            </div>
+
+            {canManagePlayoffs && tournamentPlayers.length > 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-1">Playoff Admin Overrides</h3>
+                  <p className="text-sm text-slate-600">Manual override controls for playoff participants and tiebreak selection.</p>
+                </div>
+
+                {playoffAdminError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {playoffAdminError}
+                  </div>
+                )}
+
+                {playoffAdminSuccess && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {playoffAdminSuccess}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {renderPlayoffPointsEditor(
+                    'playoff',
+                    'Playoff Points Override',
+                    'Edit the championship bracket points before saving them back through the manual override endpoint.'
+                  )}
+                  {renderPlayoffPointsEditor(
+                    'losers',
+                    'Losers Bracket Points Override',
+                    'Edit the losers bracket points before saving them back through the manual override endpoint.'
+                  )}
+                </div>
+
+                {playoffData.stage === 'semifinal' && (
+                  <div className="space-y-4">
+                    {renderPlayerSelectionList(
+                      selectedSemifinalPlayerIds,
+                      setSelectedSemifinalPlayerIds,
+                      tournamentPlayers,
+                      'Semifinal Participants',
+                      'Select the players who should be included in the semifinal playoff field.'
+                    )}
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleSavePlayoffSemifinalParticipants}
+                        disabled={savingPlayoffAdmin}
+                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:bg-emerald-300"
+                      >
+                        {savingPlayoffAdmin ? 'Saving...' : 'Save Semifinal Participants'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {playoffData.stage === 'final' && (
+                  <div className="space-y-4">
+                    {renderPlayerSelectionList(
+                      selectedFinalPlayerIds,
+                      setSelectedFinalPlayerIds,
+                      tournamentPlayers,
+                      'Finals Participants',
+                      'Select the players who should compete in the championship final.'
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-lg border border-slate-200 bg-white p-4">
+                        <h4 className="text-sm font-semibold text-slate-900 mb-2">Champion Tiebreak Winner</h4>
+                        <select
+                          value={selectedTiebreakWinnerId}
+                          onChange={(e) => setSelectedTiebreakWinnerId(e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="">-- Select winner --</option>
+                          {(playoffData.standings || []).slice(0, 4).map((row) => (
+                            <option key={`tie-${row.playerId}`} value={row.playerId}>
+                              {row.name}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-2 text-xs text-slate-500">Use this when the championship is decided by regular-season tiebreak rules or a manual putt-off result.</p>
+                      </div>
+                      <div className="flex flex-col justify-end gap-3">
+                        <button
+                          onClick={handleSavePlayoffFinalParticipants}
+                          disabled={savingPlayoffAdmin}
+                          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:bg-emerald-300"
+                        >
+                          {savingPlayoffAdmin ? 'Saving...' : 'Save Finals Participants'}
+                        </button>
+                        <button
+                          onClick={handleSaveChampionTiebreakWinner}
+                          disabled={savingPlayoffAdmin}
+                          className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:border-emerald-300 disabled:text-emerald-300"
+                        >
+                          {savingPlayoffAdmin ? 'Saving...' : 'Save Tiebreak Winner'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeView === 'losers' && playoffData && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h3 className="font-semibold text-amber-900 mb-1">Losers Bracket</h3>
+              <p className="text-sm text-amber-800">
+                Season {playoffData.seasonYear || 'current'} | Prize pool tracked separately from the championship bracket.
+              </p>
+            </div>
+            {renderPlayoffTable(
+              playoffData.stage === 'final' && Array.isArray(playoffData.losersStandings) && playoffData.losersStandings.length > 0
+                ? playoffData.losersStandings
+                : playoffData.losersResults,
+              'No losers bracket results recorded yet.'
+            )}
+          </div>
+        )}
         </>
       )}
 

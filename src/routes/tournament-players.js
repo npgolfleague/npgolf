@@ -1,10 +1,11 @@
 const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
+const { requireAdmin, requireAuth } = require('../middleware/admin');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/players - Get all players in a tournament
-router.get('/:tournamentId/players', async (req, res) => {
+router.get('/:tournamentId/players', requireAuth, async (req, res) => {
   const { tournamentId } = req.params;
   const leagueId = getLeagueId(req);
   
@@ -35,7 +36,7 @@ router.get('/:tournamentId/players', async (req, res) => {
 
 // POST /api/tournaments/:tournamentId/players - Add a player to a tournament
 // Body: { playerId }
-router.post('/:tournamentId/players', async (req, res) => {
+router.post('/:tournamentId/players', requireAdmin, async (req, res) => {
   const { tournamentId } = req.params;
   const { playerId, teeId } = req.body;
   const leagueId = getLeagueId(req);
@@ -95,6 +96,30 @@ router.post('/:tournamentId/players', async (req, res) => {
       }
     }
 
+    // If the player already has a tournament row (for example previously RSVP'd "no"),
+    // reactivate them instead of failing on duplicate key.
+    const [existingRows] = await pool.query(
+      `SELECT id
+       FROM tournament_players
+       WHERE tournament_id = ? AND player_id = ?
+       LIMIT 1`,
+      [tournamentId, playerId]
+    );
+
+    if (existingRows.length > 0) {
+      await pool.query(
+        `UPDATE tournament_players
+         SET attending_status = 'yes',
+             response_date = NOW(),
+             tournament_quota = COALESCE(tournament_quota, ?),
+             tee_id = COALESCE(?, tee_id)
+         WHERE tournament_id = ? AND player_id = ?`,
+        [tournamentQuota, resolvedTeeId, tournamentId, playerId]
+      );
+
+      return res.json({ message: 'Player re-added to tournament successfully' });
+    }
+
     // Add player to tournament as actively playing (yes)
     // so admin-added players appear in confirmed lists immediately
     await pool.query(
@@ -102,7 +127,7 @@ router.post('/:tournamentId/players', async (req, res) => {
        VALUES (?, ?, 'yes', NOW(), ?, ?)`,
       [tournamentId, playerId, tournamentQuota, resolvedTeeId]
     );
-    
+
     res.status(201).json({ message: 'Player added to tournament successfully' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -114,7 +139,7 @@ router.post('/:tournamentId/players', async (req, res) => {
 });
 
 // DELETE /api/tournaments/:tournamentId/players/:playerId - Remove a player from a tournament
-router.delete('/:tournamentId/players/:playerId', async (req, res) => {
+router.delete('/:tournamentId/players/:playerId', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const leagueId = getLeagueId(req);
   
@@ -142,7 +167,7 @@ router.delete('/:tournamentId/players/:playerId', async (req, res) => {
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/tee - Update the tee for a player in a tournament
 // body: { teeId: int }
-router.put('/:tournamentId/players/:playerId/tee', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/tee', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { teeId } = req.body;
   const leagueId = getLeagueId(req);
@@ -177,7 +202,7 @@ router.put('/:tournamentId/players/:playerId/tee', async (req, res) => {
 
 // POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome identifier to one or more tournament players
 // Body: { group: string, playerIds: [int], pairs?: { playerId: pairNumber } }
-router.post('/:tournamentId/foursome-group', async (req, res) => {
+router.post('/:tournamentId/foursome-group', requireAuth, async (req, res) => {
   const { tournamentId } = req.params;
   const { group, playerIds } = req.body;
 
@@ -276,7 +301,7 @@ router.post('/:tournamentId/foursome-group', async (req, res) => {
 })
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/paid - Update paid status
-router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/paid', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { paid } = req.body;
   
@@ -302,7 +327,7 @@ router.put('/:tournamentId/players/:playerId/paid', async (req, res) => {
 });
 
 // PUT /api/tournaments/:tournamentId/players/:playerId/skins-ctp-paid - Update skins/CTP paid status
-router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) => {
+router.put('/:tournamentId/players/:playerId/skins-ctp-paid', requireAdmin, async (req, res) => {
   const { tournamentId, playerId } = req.params;
   const { skins_ctp_paid } = req.body;
   
@@ -327,8 +352,8 @@ router.put('/:tournamentId/players/:playerId/skins-ctp-paid', async (req, res) =
   }
 });
 
-// GET /api/tournaments/:tournamentId/available-players - Get players NOT in the tournament
-router.get('/:tournamentId/available-players', async (req, res) => {
+// GET /api/tournaments/:tournamentId/available-players - Get players that can be added to the tournament
+router.get('/:tournamentId/available-players', requireAdmin, async (req, res) => {
   const { tournamentId } = req.params;
   const leagueId = getLeagueId(req);
   
@@ -342,15 +367,14 @@ router.get('/:tournamentId/available-players', async (req, res) => {
       SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, p.default_tee_name
       FROM players p
       INNER JOIN league_players lp ON lp.player_id = p.id
+      LEFT JOIN tournament_players tp
+        ON tp.player_id = p.id
+       AND tp.tournament_id = ?
       WHERE p.active = 1
         AND lp.league_id = ?
-        AND p.id NOT IN (
-          SELECT player_id 
-          FROM tournament_players 
-          WHERE tournament_id = ?
-        )
+        AND (tp.player_id IS NULL OR tp.attending_status = 'no')
       ORDER BY p.name ASC
-    `, [leagueId, tournamentId]);
+    `, [tournamentId, leagueId]);
     
     res.json(rows);
   } catch (err) {
