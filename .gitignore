@@ -4,6 +4,7 @@ node_modules/
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Logs
 logs/
@@ -48,8 +49,6 @@ Thumbs.db
 .pnp.js
 npgolf-multi.tar
 npgolf-backend.tar
-npgolf-multi.tar
-npgolf-backend.tar
 
 # Database dumps and exports (contain player personal data - never commit)
 backups/
@@ -62,3 +61,30 @@ npgolf.sql
 *.sql.gz
 .tmp_*.json
 server.err
+
+# Any other dump names saved in the repo root (migrations/ and course inserts are unaffected)
+/*dump*.sql
+/*backup*.sql
+/*prod*.sql
+/*export*.sql
+*.dump
+*.bak
+*.sql.zip
+
+# Spreadsheets and reports exported from the app (player names, emails, phones)
+*.csv
+*.xlsx
+*.xls
+
+# PDFs generated or downloaded from the app (cart tags, results) - keep design docs in ux_audit/
+/*.pdf
+*cart*tags*.pdf
+*cart-tags*.pdf
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
