@@ -61,7 +61,7 @@ export const MainLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-ink-100 flex">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-fairway-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold"
@@ -82,7 +82,7 @@ export const MainLayout = () => {
       {/* On md+: inline collapsible. On <md: off-canvas drawer. */}
       <aside
         className={`
-          bg-slate-900 text-slate-100 flex flex-col shrink-0
+          bg-tour-900 text-slate-100 flex flex-col shrink-0
           fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300
           md:relative md:translate-x-0 md:z-auto
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -91,7 +91,7 @@ export const MainLayout = () => {
         `}
       >
         {/* Header */}
-        <div className="p-4 border-b border-slate-700">
+        <div className="p-4 border-b border-tour-800">
           <div className="flex items-center justify-between">
             {/* Logo: always show on mobile (drawer is always full-width), conditionally on desktop */}
             <img
@@ -102,7 +102,7 @@ export const MainLayout = () => {
             {/* Desktop collapse toggle — hidden on mobile */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="hidden md:block p-1.5 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+              className="hidden md:block p-1.5 hover:bg-tour-800 rounded-lg transition text-tour-200 hover:text-white"
               aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
               {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -110,7 +110,7 @@ export const MainLayout = () => {
             {/* Mobile close button */}
             <button
               onClick={() => setMobileOpen(false)}
-              className="md:hidden p-1.5 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+              className="md:hidden p-1.5 hover:bg-tour-800 rounded-lg transition text-tour-200 hover:text-white"
               aria-label="Close menu"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -120,15 +120,15 @@ export const MainLayout = () => {
 
         {/* User Info */}
         {user && (
-          <div className="p-4 border-b border-slate-700">
+          <div className="p-4 border-b border-tour-800">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-fairway-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+              <div className="w-9 h-9 bg-flag-400 text-tour-900 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
                 {user.name?.charAt(0).toUpperCase()}
               </div>
               {/* Always show on mobile; conditionally on desktop */}
               <div className={`overflow-hidden ${!sidebarOpen ? 'md:hidden' : ''}`}>
                 <div className="font-semibold text-sm truncate">{user.name}</div>
-                <div className="text-xs text-slate-400 truncate">{user.email}</div>
+                <div className="text-xs text-tour-200 truncate">{user.email}</div>
               </div>
             </div>
           </div>
@@ -147,12 +147,12 @@ export const MainLayout = () => {
                     title={item.label}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                       isActive(item.path)
-                        ? 'bg-fairway-700 text-white shadow-sm'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-tour-800 text-white shadow-[inset_3px_0_0_theme(colors.flag.400)]'
+                        : 'text-tour-200 hover:bg-tour-800 hover:text-white'
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
-                    <span className={`font-medium text-sm ${!sidebarOpen ? 'md:hidden' : ''}`}>
+                    <span className={`font-semibold text-[15px] tracking-wide ${!sidebarOpen ? 'md:hidden' : ''}`}>
                       {item.label}
                     </span>
                   </button>
@@ -162,11 +162,11 @@ export const MainLayout = () => {
             {adminCapable && (
               <li className="pt-3 pb-1">
                 {sidebarOpen ? (
-                  <p className="px-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-widest text-tour-300">
                     Admin
                   </p>
                 ) : (
-                  <hr className="border-slate-700 mx-2" />
+                  <hr className="border-tour-800 mx-2" />
                 )}
               </li>
             )}
@@ -180,12 +180,12 @@ export const MainLayout = () => {
                     title={item.label}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                       isActive(item.path)
-                        ? 'bg-fairway-700 text-white shadow-sm'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-tour-800 text-white shadow-[inset_3px_0_0_theme(colors.flag.400)]'
+                        : 'text-tour-200 hover:bg-tour-800 hover:text-white'
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
-                    <span className={`font-medium text-sm ${!sidebarOpen ? 'md:hidden' : ''}`}>
+                    <span className={`font-semibold text-[15px] tracking-wide ${!sidebarOpen ? 'md:hidden' : ''}`}>
                       {item.label}
                     </span>
                   </button>
@@ -196,20 +196,20 @@ export const MainLayout = () => {
         </nav>
 
         {/* Logout Button */}
-        <div className="p-3 border-t border-slate-700">
+        <div className="p-3 border-t border-tour-800">
           <button
             onClick={handleLogout}
             aria-label="Log out"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-tour-200 hover:bg-red-900/40 hover:text-red-300 transition-colors"
           >
             <LogOut className="w-5 h-5 shrink-0" />
-            <span className={`font-medium text-sm ${!sidebarOpen ? 'md:hidden' : ''}`}>
+            <span className={`font-semibold text-[15px] tracking-wide ${!sidebarOpen ? 'md:hidden' : ''}`}>
               Logout
             </span>
           </button>
           {appVersion && (
             <p
-              className={`mt-2 px-3 text-[11px] text-slate-500 truncate ${!sidebarOpen ? 'md:hidden' : ''}`}
+              className={`mt-2 px-3 text-[11px] text-tour-300 truncate ${!sidebarOpen ? 'md:hidden' : ''}`}
               title={[
                 appVersion.branch && `Branch: ${appVersion.branch}`,
                 formatDateTime(appVersion.buildTime) && `Built: ${formatDateTime(appVersion.buildTime)}`
@@ -224,10 +224,10 @@ export const MainLayout = () => {
       {/* ── Main Content ── */}
       <main id="main-content" className="flex-1 overflow-auto min-w-0">
         {/* Mobile hamburger button */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-700">
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-tour-900 border-b border-tour-800">
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-tour-100 hover:text-white hover:bg-tour-800 rounded-lg transition"
             aria-label="Open menu"
           >
             <Menu className="w-5 h-5" />

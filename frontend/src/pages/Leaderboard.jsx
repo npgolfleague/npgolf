@@ -192,17 +192,14 @@ export function Leaderboard() {
   };
 
   const getMedalEmoji = (rank) => {
-    if (rank === null) return '-';
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
+    if (rank === null || rank === undefined) return '–';
     return `${rank}`;
   };
 
   const getScoreColor = (overUnder) => {
-    if (overUnder > 0) return 'text-green-600 font-bold';
-    if (overUnder < 0) return 'text-red-600 font-bold';
-    return 'text-gray-600 font-bold';
+    if (overUnder > 0) return 'num text-tour-600 font-bold';
+    if (overUnder < 0) return 'num text-red-600 font-bold';
+    return 'num text-ink-600 font-bold';
   };
 
   const handleCtpDraftChange = (holeNumber, field, value) => {
@@ -428,9 +425,9 @@ export function Leaderboard() {
     const sortedRows = getSortedPlayoffRows(rows);
 
     return (
-      <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
+      <div className="bg-white border border-ink-200 rounded-lg overflow-x-auto w-full">
         <table className="min-w-[900px] w-full divide-y divide-gray-200">
-          <thead className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+          <thead className="bg-tour-800 text-white">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Player</th>
               <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Rank</th>
@@ -628,18 +625,22 @@ export function Leaderboard() {
             View Hole Scores
           </button>
         </div>
-        <h1 className="text-3xl font-bold">🏆 Tournament Leaderboard</h1>
+        <h1 className="text-4xl font-bold text-ink-900">Leaderboard</h1>
         {tournament && (
-          <p className="text-gray-600 mt-2">
-            Date: {formatDateOnly(tournament.date)} | 
-            Course: {tournament.course_name} | 
-            Holes: {tournament.number_of_holes}
+          <p className="mt-1 font-display text-base uppercase tracking-wider text-ink-500">
+            {formatDateOnly(tournament.date)} · {tournament.course_name} · {tournament.number_of_holes} holes
           </p>
         )}
         {leaderboardStats && (
-          <div className="mt-3 inline-block bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-            <span className="text-blue-900 font-semibold">
-              Players with Complete Scores: {leaderboardStats.playersWithCompleteScores} / {leaderboardStats.totalPlayers}
+          <div className="mt-3 inline-flex items-center gap-2 rounded-md bg-tour-800 px-3 py-1.5">
+            <span className="live-tag">
+              {leaderboardStats.playersWithCompleteScores < leaderboardStats.totalPlayers && (
+                <span className="h-2 w-2 rounded-full bg-flag-400 animate-pulse" aria-hidden="true" />
+              )}
+              {leaderboardStats.playersWithCompleteScores < leaderboardStats.totalPlayers ? 'Live' : 'Final'}
+            </span>
+            <span className="font-display text-sm uppercase tracking-wider text-tour-100">
+              {leaderboardStats.playersWithCompleteScores} / {leaderboardStats.totalPlayers} cards in
             </span>
           </div>
         )}
@@ -722,9 +723,9 @@ export function Leaderboard() {
               <p className="text-sm text-gray-500 italic">Prize amounts will be displayed once the commissioner enters actual collected amounts.</p>
             </div>
           )}
-          <div className="bg-white shadow-md rounded-lg overflow-x-auto w-full">
+          <div className="bg-white border border-ink-200 rounded-lg overflow-x-auto w-full">
             <table className="min-w-[1200px] w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <thead className="bg-tour-800 text-white">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
                     Rank
@@ -763,19 +764,19 @@ export function Leaderboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {leaderboard.map((player) => (
-                  <tr 
-                    key={player.id} 
-                    className={`hover:bg-gray-50 ${
-                      player.rank && player.rank <= 3 ? 'bg-yellow-50' : player.holes_played === 0 ? 'bg-gray-50' : ''
+                  <tr
+                    key={player.id}
+                    className={`hover:bg-ink-50 ${
+                      player.rank === 1 ? 'bg-flag-50 shadow-[inset_4px_0_0_theme(colors.flag.400)]' : player.holes_played === 0 ? 'bg-ink-50' : ''
                     }`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-2xl font-bold ${player.rank ? 'text-gray-900' : 'text-gray-400'}`}>
+                    <td className="px-6 py-3 whitespace-nowrap">
+                      <div className={`num text-2xl font-bold ${player.rank ? 'text-ink-900' : 'text-ink-400'}`}>
                         {getMedalEmoji(player.rank)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{player.name}</div>
+                    <td className="px-6 py-3 whitespace-nowrap">
+                      <div className="text-base font-semibold uppercase tracking-wide text-ink-900">{player.name}</div>
                       {player.holes_played === 0 && (
                         <div className="text-xs text-red-500 italic">No scores yet</div>
                       )}
@@ -784,13 +785,13 @@ export function Leaderboard() {
                       <div className="text-sm text-gray-900">{Math.round(player.player_quota)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className={`text-sm ${player.holes_played > 0 ? 'font-semibold text-blue-600' : 'text-gray-400'}`}>
+                      <div className={player.holes_played > 0 ? 'num text-xl font-semibold text-ink-900' : 'text-sm text-ink-400'}>
                         {player.holes_played > 0 ? Math.round(player.total_quota_points) : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {player.holes_played > 0 ? (
-                        <div className={`text-lg ${getScoreColor(player.over_under)}`}>
+                        <div className={`text-2xl ${getScoreColor(player.over_under)}`}>
                           {player.over_under > 0 ? '+' : ''}{Math.round(player.over_under)}
                         </div>
                       ) : (
@@ -813,8 +814,8 @@ export function Leaderboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {player.skins > 0 ? (
                         <div className="text-center">
-                          <div className="text-lg font-bold text-orange-600">
-                            {player.skins} 🔥
+                          <div className="num text-xl font-bold text-tour-700">
+                            {player.skins}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
                             Holes: {player.skin_holes.sort((a, b) => a - b).join(', ')}
@@ -1036,7 +1037,7 @@ export function Leaderboard() {
       {/* CTP Winners */}
       {ctpWinners.length > 0 && (
         <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-green-900 mb-4">📍 Closest to the Pin Winners</h2>
+          <h2 className="text-2xl font-bold text-green-900 mb-4">Closest to the Pin Winners</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {ctpWinners.map((winner) => (
               <div key={`hole-${winner.hole_number}`} className="bg-white rounded-lg p-4 shadow">
