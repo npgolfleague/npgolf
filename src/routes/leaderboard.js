@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
+const { getHoleReveal } = require('../utils/holeReveal');
 const router = express.Router();
 
 function calculateRecentAverageQuota(playerRow, holeCount) {
@@ -103,14 +104,33 @@ router.get('/:tournamentId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid quota column' });
     }
     
-    // Always fetch all scores — frontend controls visibility based on liveScoring + completeness
-    const scoreJoinClause = `LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?`;
+    // Only holes that every player has finished count toward what anyone sees
+    // (enforced here, not just hidden on screen). With live scoring off, nothing
+    // shows until every hole is finished. Completed tournaments show everything.
+    const reveal = isCompleted ? { all: true, holeIds: new Set() } : await getHoleReveal(pool, tournamentId);
+    let revealedHoleIds = reveal.all ? null : [...reveal.holeIds].map(Number).filter(Number.isInteger);
+    if (revealedHoleIds && !liveScoring && revealedHoleIds.length < holeCount) {
+      revealedHoleIds = [];
+    }
+    const revealFilter = revealedHoleIds === null
+      ? ''
+      : (revealedHoleIds.length > 0 ? ` AND s.hole_id IN (${revealedHoleIds.join(',')})` : ' AND 1 = 0');
+    let revealedHoleNumbers = null;
+    if (revealedHoleIds && revealedHoleIds.length > 0) {
+      const [holeRows] = await pool.query(
+        `SELECT hole_number FROM hole WHERE id IN (${revealedHoleIds.join(',')}) ORDER BY hole_number`
+      );
+      revealedHoleNumbers = holeRows.map((h) => Number(h.hole_number));
+    } else if (revealedHoleIds) {
+      revealedHoleNumbers = [];
+    }
+
+    const scoreJoinClause = `LEFT JOIN scores s ON p.id = s.player_id AND s.tournament_id = ?${revealFilter}`;
 
     const [rows] = await pool.query(`
       SELECT 
         p.id,
         p.name,
-        p.email,
         tp.tournament_quota,
         lpq.${quotaColumn} as default_player_quota,
         q.points_1,
@@ -144,7 +164,7 @@ router.get('/:tournamentId', async (req, res) => {
        AND tpp.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
-      GROUP BY p.id, p.name, p.email, tp.tournament_quota, lpq.${quotaColumn},
+      GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
                q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
                tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points
@@ -207,7 +227,7 @@ router.get('/:tournamentId', async (req, res) => {
         JOIN hole h ON s.hole_id = h.id
         JOIN players p ON s.player_id = p.id
         JOIN tournament_players tp ON tp.tournament_id = s.tournament_id AND tp.player_id = s.player_id
-        WHERE s.tournament_id = ? AND p.active = 1 AND tp.skins_ctp_paid = 1
+        WHERE s.tournament_id = ? AND p.active = 1 AND tp.skins_ctp_paid = 1${revealFilter}
         ORDER BY s.hole_id, s.score ASC
       `, [tournamentId]);
 
@@ -385,7 +405,6 @@ router.get('/:tournamentId', async (req, res) => {
       return {
         id: player.id,
         name: player.name,
-        email: player.email,
         player_quota: playerQuota,
         total_quota_points: totalQuotaPoints,
         over_under: overUnder,
@@ -463,7 +482,6 @@ router.get('/:tournamentId', async (req, res) => {
           rank: currentPosition + 1,
           id: player.id,
           name: player.name,
-          email: player.email,
           player_quota: player.player_quota,
           total_quota_points: player.total_quota_points,
           over_under: player.over_under,
@@ -495,7 +513,6 @@ router.get('/:tournamentId', async (req, res) => {
         rank: null,
         id: player.id,
         name: player.name,
-        email: player.email,
         player_quota: player.player_quota,
         total_quota_points: 0,
         over_under: 0,
@@ -660,6 +677,8 @@ router.get('/:tournamentId', async (req, res) => {
       playersWithCompleteScores: completeScoresCount,
       expectedHoles: holeCount,
       liveScoring,
+      // null = every hole is shown (completed); otherwise the holes shown so far
+      revealedHoles: revealedHoleNumbers,
       playoff
     });
   } catch (err) {

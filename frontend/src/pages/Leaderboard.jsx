@@ -131,6 +131,7 @@ export function Leaderboard() {
           playersWithCompleteScores: leaderboardRes.data.playersWithCompleteScores,
           expectedHoles: leaderboardRes.data.expectedHoles,
           liveScoring: leaderboardRes.data.liveScoring,
+          revealedHoles: leaderboardRes.data.revealedHoles ?? null,
           playoffStage: leaderboardRes.data.playoff?.stage || null
         });
         setPlayoffData(leaderboardRes.data.playoff || null);
@@ -489,7 +490,6 @@ export function Leaderboard() {
                 className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className="flex-1 text-slate-900">{player.name}</span>
-              <span className="text-xs text-slate-500">{player.email}</span>
             </label>
           ))}
         </div>
@@ -651,6 +651,16 @@ export function Leaderboard() {
         </div>
       )}
 
+      {/* During play, results only include holes every player has finished */}
+      {leaderboardStats && leaderboardStats.liveScoring !== false && Array.isArray(leaderboardStats.revealedHoles) &&
+        leaderboardStats.revealedHoles.length < leaderboardStats.expectedHoles && (
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status">
+          {leaderboardStats.revealedHoles.length === 0
+            ? 'Results appear hole by hole once every player has finished that hole.'
+            : `Showing holes every player has finished: ${leaderboardStats.revealedHoles.join(', ')}. Other holes appear once everyone has finished them.`}
+        </div>
+      )}
+
       {/* When live scoring is off and not all players are done, hide the leaderboard */}
       {leaderboardStats && leaderboardStats.liveScoring === false &&
         leaderboardStats.playersWithCompleteScores < leaderboardStats.totalPlayers ? (
@@ -766,7 +776,6 @@ export function Leaderboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{player.name}</div>
-                      <div className="text-xs text-gray-500">{player.email}</div>
                       {player.holes_played === 0 && (
                         <div className="text-xs text-red-500 italic">No scores yet</div>
                       )}

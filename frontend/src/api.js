@@ -167,6 +167,7 @@ export const tournamentsAPI = {
   complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   getFoursome: (tournamentId, foursome) => apiClient.get(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}`),
+  saveFoursomeRoster: (tournamentId, foursome, playerIds, pairs) => apiClient.put(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}/roster`, { playerIds, pairs }),
   addPlayer: (tournamentId, playerId, teeId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId, teeId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
   updatePlayerTee: (tournamentId, playerId, teeId) => apiClient.put(`/tournaments/${tournamentId}/players/${playerId}/tee`, { teeId }),
@@ -195,7 +196,7 @@ export const tournamentsAPI = {
 
 export const scoresAPI = {
   list: (params) => apiClient.get('/scores', { params }),
-  getFoursomeScores: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${group}`),
+  getFoursomeScores: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}`),
   getFoursomeGroups: (tournamentId) => apiClient.get(`/scores/tournament/${tournamentId}/groups`),
   saveScores: (scores) => apiClient.post('/scores', { scores }),
   update: (id, score, quota, foursome_group) => apiClient.put(`/scores/${id}`, { score, quota, foursome_group }),
@@ -205,7 +206,9 @@ export const scoresAPI = {
   updateCtpWinners: (tournamentId, winners) => apiClient.put(`/scores/tournament/${tournamentId}/ctp-winners`, { winners }),
   getCtpLeader: (tournamentId, holeId) => apiClient.get(`/scores/tournament/${tournamentId}/hole/${holeId}/ctp-leader`),
   getFoursomePostStatus: (tournamentId, group) => apiClient.get(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post-status`),
-  postFoursomeScores: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post`)
+  postFoursomeScores: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/post`),
+  attestCard: (tournamentId, group, decision, note) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/attest`, { decision, note }),
+  reopenCard: (tournamentId, group) => apiClient.post(`/scores/tournament/${tournamentId}/foursome/${encodeURIComponent(group)}/reopen`)
 }
 
 export const leaderboardAPI = {

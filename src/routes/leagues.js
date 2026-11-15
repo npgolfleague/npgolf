@@ -210,6 +210,7 @@ router.get('/:id/settings', async (req, res) => {
         quota_points_double_bogey: 1,
         quota_points_worse: 0,
         live_scoring: 1,
+        require_card_attest: 0,
         playoff_format: 'none',
         championship_pot: Number(seasonRow?.championship_pot) || 0,
         losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
@@ -245,7 +246,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     losers_bracket_pot,
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
-    live_scoring
+    live_scoring,
+    require_card_attest
   } = req.body;
 
   const normalizedEmailResult = normalizeSemicolonEmails(golf_course_email);
@@ -284,8 +286,9 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         playoff_format,
         quota_points_albatross, quota_points_eagle, quota_points_birdie,
         quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
-        live_scoring
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        live_scoring,
+        require_card_attest
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         tournament_fee_18_holes = VALUES(tournament_fee_18_holes),
         tournament_fee_9_holes = VALUES(tournament_fee_9_holes),
@@ -301,7 +304,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         quota_points_bogey = VALUES(quota_points_bogey),
         quota_points_double_bogey = VALUES(quota_points_double_bogey),
         quota_points_worse = VALUES(quota_points_worse),
-        live_scoring = VALUES(live_scoring)`,
+        live_scoring = VALUES(live_scoring),
+        require_card_attest = VALUES(require_card_attest)`,
       [
         id,
         tournament_fee_18_holes ?? 20.00, tournament_fee_9_holes ?? 10.00,
@@ -312,7 +316,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
         quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
         quota_points_worse ?? 0,
-        live_scoring != null ? (live_scoring ? 1 : 0) : 1
+        live_scoring != null ? (live_scoring ? 1 : 0) : 1,
+        require_card_attest ? 1 : 0
       ]
     );
 
