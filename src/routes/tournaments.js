@@ -5,6 +5,7 @@ const pool = require('../db');
 const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
+const { rebuildTournamentPayouts } = require('../payouts');
 const {
   PLAYOFF_STAGE,
   FINAL_FIELD_SIZE,
@@ -105,7 +106,7 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
        p.id AS player_id,
        p.name,
        tp.tournament_quota,
-       p.${quotaColumn} AS default_player_quota,
+       lpq.${quotaColumn} AS default_player_quota,
        q.points_1,
        q.points_2,
        q.points_3,
@@ -128,13 +129,15 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
        COUNT(DISTINCT s.hole_id) AS holes_played
      FROM players p
      JOIN tournament_players tp ON p.id = tp.player_id
-     LEFT JOIN quota q ON q.player_id = p.id
+     JOIN tournament t ON t.id = tp.tournament_id
+     LEFT JOIN league_players lpq ON lpq.player_id = p.id AND lpq.league_id = t.league_id
+     LEFT JOIN quota q ON q.player_id = p.id AND q.league_id = t.league_id
      LEFT JOIN tournament_paradise_points tpp
        ON tpp.tournament_id = tp.tournament_id
       AND tpp.player_id = p.id
      LEFT JOIN scores s ON s.player_id = p.id AND s.tournament_id = ?
      WHERE tp.tournament_id = ? AND p.active = 1
-     GROUP BY p.id, p.name, tp.tournament_quota, p.${quotaColumn},
+     GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
               q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
               tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points`,
@@ -539,107 +542,14 @@ const ensureTournamentResultsEmailTable = async (db) => {
   `);
 };
 
-const recalculateAllPlayersPrizeMoney = async (db) => {
-  const [settingsRows] = await db.query(
-    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = 1 LIMIT 1'
-  );
-  const settings = settingsRows[0] || {};
-
-  const [tournaments] = await db.query('SELECT id, number_of_holes FROM tournament');
-  const winningsByPlayer = new Map();
-  const addWinnings = (playerId, amount) => {
-    const numeric = Number(amount) || 0;
-    if (!playerId || numeric === 0) return;
-    winningsByPlayer.set(playerId, (winningsByPlayer.get(playerId) || 0) + numeric);
-  };
-
-  for (const tournament of tournaments) {
-    const tournamentId = tournament.id;
-    const holeCount = Number(tournament.number_of_holes) === 9 ? 9 : 18;
-    const tournamentFee = Number(
-      holeCount === 9 ? settings.tournament_fee_9_holes : settings.tournament_fee_18_holes
-    ) || 0;
-
-    const [paidRows] = await db.query(
-      'SELECT SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players FROM tournament_players WHERE tournament_id = ?',
-      [tournamentId]
-    );
-    const quotaPrizePot = (Number(paidRows[0]?.paid_players) || 0) * tournamentFee;
-
-    const [paradiseRows] = await db.query(
-      `SELECT player_id, over_under
-       FROM tournament_paradise_points
-       WHERE tournament_id = ?
-       ORDER BY over_under DESC, player_id ASC`,
-      [tournamentId]
-    );
-
-    const prizePercentages = [0.5, 0.3, 0.2];
-    let currentPosition = 0;
-    while (currentPosition < paradiseRows.length) {
-      const currentOverUnder = Number(paradiseRows[currentPosition].over_under);
-      let tiedCount = 1;
-
-      while (
-        currentPosition + tiedCount < paradiseRows.length &&
-        Number(paradiseRows[currentPosition + tiedCount].over_under) === currentOverUnder
-      ) {
-        tiedCount++;
-      }
-
-      let pooledPrizePercentage = 0;
-      for (let i = 0; i < tiedCount; i++) {
-        const prizePosition = currentPosition + i;
-        if (prizePosition < prizePercentages.length) {
-          pooledPrizePercentage += prizePercentages[prizePosition];
-        }
-      }
-
-      const prizePerPlayer = tiedCount > 0
-        ? Math.floor(quotaPrizePot * (pooledPrizePercentage / tiedCount))
-        : 0;
-
-      for (let i = 0; i < tiedCount; i++) {
-        const row = paradiseRows[currentPosition + i];
-        addWinnings(row.player_id, prizePerPlayer);
-      }
-
-      currentPosition += tiedCount;
-    }
-
-    const [skinRows] = await db.query(
-      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
-       FROM tournament_skin_winners
-       WHERE tournament_id = ?
-       GROUP BY player_id`,
-      [tournamentId]
-    );
-    skinRows.forEach((row) => addWinnings(row.player_id, row.total));
-
-    const [ctpRows] = await db.query(
-      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
-       FROM tournament_ctp_winners
-       WHERE tournament_id = ?
-       GROUP BY player_id`,
-      [tournamentId]
-    );
-    ctpRows.forEach((row) => addWinnings(row.player_id, row.total));
-  }
-
-  await db.query('UPDATE players SET prize_money = 0');
-  for (const [playerId, total] of winningsByPlayer.entries()) {
-    await db.query('UPDATE players SET prize_money = ? WHERE id = ?', [Number(total.toFixed(2)), playerId]);
-  }
-};
-
 const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
   const [rows] = await db.query(
     `SELECT CASE
-              WHEN t.number_of_holes = 9 THEN p.quota_9
-              ELSE p.quota_18
+              WHEN t.number_of_holes = 9 THEN lp.quota_9
+              ELSE lp.quota_18
             END AS tournament_quota
      FROM tournament t
-     JOIN players p ON p.id = ?
+     LEFT JOIN league_players lp ON lp.player_id = ? AND lp.league_id = t.league_id
      WHERE t.id = ?
      LIMIT 1`,
     [playerId, tournamentId]
@@ -1170,29 +1080,33 @@ const createPreCompleteBackup = async (db, tournamentId) => {
   let quotaRows = [];
   let skinsQuotaRows = [];
 
+  const backupLeagueId = tournamentRows[0]?.league_id ?? null;
+
   if (playerIds.length > 0) {
+    // Quota is per league: back up this tournament's league values only.
     [playerRows] = await db.query(
-      `SELECT id, quota_18, quota_9, fedex_points, tournaments_played, prize_money
-       FROM players
-       WHERE id IN (${playerIdPlaceholders})
-       ORDER BY id ASC`,
-      playerIds
+      `SELECT p.id, lp.quota_18, lp.quota_9
+       FROM players p
+       LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       WHERE p.id IN (${playerIdPlaceholders})
+       ORDER BY p.id ASC`,
+      [backupLeagueId, ...playerIds]
     );
 
     [quotaRows] = await db.query(
       `SELECT *
        FROM quota
-       WHERE player_id IN (${playerIdPlaceholders})
+       WHERE league_id = ? AND player_id IN (${playerIdPlaceholders})
        ORDER BY player_id ASC`,
-      playerIds
+      [backupLeagueId, ...playerIds]
     );
 
     [skinsQuotaRows] = await db.query(
       `SELECT *
        FROM skins_quota
-       WHERE player_id IN (${playerIdPlaceholders})
+       WHERE league_id = ? AND player_id IN (${playerIdPlaceholders})
        ORDER BY player_id ASC`,
-      playerIds
+      [backupLeagueId, ...playerIds]
     );
   }
 
@@ -1462,7 +1376,8 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
     const tournamentSeasonId = Number(tournamentRows[0].season_id) || (await getOrCreateLeagueSeason(connection, leagueId)).id;
     const tournamentPlayoffStage = normalizePlayoffStage(tournamentRows[0].playoff_stage);
     const isNineHoleTournament = tournamentHoleCount === 9;
-    const quotaColumn = isNineHoleTournament ? 'p.quota_9' : 'p.quota_18';
+    // Quota is per league: current quota lives on league_players (lp).
+    const quotaColumn = isNineHoleTournament ? 'lp.quota_9' : 'lp.quota_18';
 
     if (!Number(tournamentRows[0].season_id)) {
       await connection.query('UPDATE tournament SET season_id = ? WHERE id = ?', [tournamentSeasonId, tournamentId]);
@@ -1540,15 +1455,23 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
 
     await connection.beginTransaction();
     transactionStarted = true;
+
+    // Anyone who scored in this league's tournament is a member of the league,
+    // so they have a league_players row to hold their quota for this league.
+    await connection.query(
+      `INSERT IGNORE INTO league_players (league_id, player_id)
+       SELECT DISTINCT ?, s.player_id FROM scores s WHERE s.tournament_id = ?`,
+      [leagueId, tournamentId]
+    );
     
     // Include all scored players in quota-game updates
     const [scoresRows] = await connection.query(
       `SELECT s.player_id, ${quotaColumn} AS current_quota, SUM(CAST(COALESCE(s.quota, 0) AS SIGNED)) as total_points
        FROM scores s
-       JOIN players p ON s.player_id = p.id
+       JOIN league_players lp ON lp.player_id = s.player_id AND lp.league_id = ?
        WHERE s.tournament_id = ?
        GROUP BY s.player_id, ${quotaColumn}`,
-      [tournamentId]
+      [leagueId, tournamentId]
     );
 
     // Seed quota for players who played but do not yet have a current quota
@@ -1570,6 +1493,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
          ) AS seeded_quota
        FROM scores s
        JOIN players p ON s.player_id = p.id
+       JOIN league_players lp ON lp.player_id = s.player_id AND lp.league_id = ?
        JOIN hole h ON s.hole_id = h.id
        LEFT JOIN tournament_players tp_inner
          ON tp_inner.player_id = s.player_id AND tp_inner.tournament_id = s.tournament_id
@@ -1584,7 +1508,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
        WHERE s.tournament_id = ?
          AND ${quotaColumn} IS NULL
        GROUP BY s.player_id`,
-      [tournamentId]
+      [leagueId, tournamentId]
     );
 
     for (const seedRow of newPlayerSeedRows) {
@@ -1592,24 +1516,24 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
       if (Number.isNaN(seededQuota)) continue
 
       await connection.query(
-        `UPDATE players
+        `UPDATE league_players
          SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ?
-         WHERE id = ?
+         WHERE player_id = ? AND league_id = ?
            AND ${isNineHoleTournament ? 'quota_9' : 'quota_18'} IS NULL`,
-        [Math.round(seededQuota), seedRow.player_id]
+        [Math.round(seededQuota), seedRow.player_id, leagueId]
       )
     }
 
     await connection.query(
       `UPDATE tournament_players tp
-       JOIN players p ON p.id = tp.player_id
+       JOIN league_players lp ON lp.player_id = tp.player_id AND lp.league_id = ?
        SET tp.tournament_quota = CASE
-         WHEN ? = 9 THEN p.quota_9
-         ELSE p.quota_18
+         WHEN ? = 9 THEN lp.quota_9
+         ELSE lp.quota_18
        END
        WHERE tp.tournament_id = ?
          AND tp.tournament_quota IS NULL`,
-      [tournamentHoleCount, tournamentId]
+      [leagueId, tournamentHoleCount, tournamentId]
     );
 
     const [scoresRowsWithSnapshot] = await connection.query(
@@ -1619,12 +1543,13 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
               SUM(CAST(COALESCE(s.quota, 0) AS SIGNED)) AS total_points
        FROM scores s
        JOIN players p ON s.player_id = p.id
+       LEFT JOIN league_players lp ON lp.player_id = s.player_id AND lp.league_id = ?
        LEFT JOIN tournament_players tp
          ON tp.player_id = s.player_id
         AND tp.tournament_id = s.tournament_id
        WHERE s.tournament_id = ?
        GROUP BY s.player_id, p.name, COALESCE(tp.tournament_quota, ${quotaColumn})`,
-      [tournamentId]
+      [leagueId, tournamentId]
     );
 
     // Each player's result for the day: quota points earned minus their quota.
@@ -1665,19 +1590,9 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
       );
     }
 
-    await connection.query(
-      `UPDATE players p
-       LEFT JOIN (
-         SELECT
-           player_id,
-           SUM(points_awarded) AS total_points,
-           COUNT(*) AS total_tournaments
-         FROM tournament_paradise_points
-         GROUP BY player_id
-       ) awards ON awards.player_id = p.id
-       SET p.fedex_points = COALESCE(awards.total_points, 0),
-           p.tournaments_played = COALESCE(awards.total_tournaments, 0)`
-    );
+    // FedEx points and tournaments played are no longer stored on players:
+    // the league_player_totals view adds them up per league from
+    // tournament_paradise_points.
 
     const [skinScoreRows] = await connection.query(
       `SELECT s.hole_id,
@@ -1796,8 +1711,8 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
 
       // Get current quota record for this player
       const [quotaRows] = await connection.query(
-        'SELECT * FROM quota WHERE player_id = ? LIMIT 1',
-        [playerId]
+        'SELECT * FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1',
+        [playerId, leagueId]
       );
 
       if (quotaRows.length === 0) {
@@ -1819,7 +1734,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
             date_3 = ?, points_3 = ?, quota_diff_3 = ?, holes_3 = ?,
             date_2 = ?, points_2 = ?, quota_diff_2 = ?, holes_2 = ?,
             date_1 = ?, points_1 = ?, quota_diff_1 = ?, holes_1 = ?
-           WHERE player_id = ?`,
+           WHERE player_id = ? AND league_id = ?`,
           [
             quota.date_6, quota.points_6, quota.quota_diff_6, quota.holes_6,
             quota.date_5, quota.points_5, quota.quota_diff_5, quota.holes_5,
@@ -1828,15 +1743,15 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
             quota.date_2, quota.points_2, quota.quota_diff_2, quota.holes_2,
             quota.date_1, quota.points_1, quota.quota_diff_1, quota.holes_1,
             tournamentDate, totalPoints, quotaDiff, tournamentHoleCount,
-            playerId
+            playerId, leagueId
           ]
         );
       }
 
       // Recompute player quota = floor(average of all non-null points slots 1-7)
       const [updatedQuotaRows] = await connection.query(
-        'SELECT points_1, points_2, points_3, points_4, points_5, points_6, points_7 FROM quota WHERE player_id = ? LIMIT 1',
-        [playerId]
+        'SELECT points_1, points_2, points_3, points_4, points_5, points_6, points_7 FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1',
+        [playerId, leagueId]
       );
       if (updatedQuotaRows.length > 0) {
         const q = updatedQuotaRows[0];
@@ -1846,8 +1761,8 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
         if (values.length > 0) {
           const newQuota = Math.floor(values.reduce((sum, v) => sum + v, 0) / values.length);
           await connection.query(
-            `UPDATE players SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ? WHERE id = ?`,
-            [newQuota, playerId]
+            `UPDATE league_players SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ? WHERE player_id = ? AND league_id = ?`,
+            [newQuota, playerId, leagueId]
           );
         }
       }
@@ -1862,8 +1777,8 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
       
       // Get current skins_quota record for this player
       const [skinsQuotaRows] = await connection.query(
-        'SELECT * FROM skins_quota WHERE player_id = ? LIMIT 1',
-        [playerId]
+        'SELECT * FROM skins_quota WHERE player_id = ? AND league_id = ? LIMIT 1',
+        [playerId, leagueId]
       );
       
       if (skinsQuotaRows.length === 0) {
@@ -1898,7 +1813,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
             date_3 = ?, points_3 = ?, quota_diff_3 = ?,
             date_2 = ?, points_2 = ?, quota_diff_2 = ?,
             date_1 = ?, points_1 = ?, quota_diff_1 = ?
-           WHERE player_id = ?`,
+           WHERE player_id = ? AND league_id = ?`,
           [
             sq.date_19, sq.points_19, sq.quota_diff_19,
             sq.date_18, sq.points_18, sq.quota_diff_18,
@@ -1920,7 +1835,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
             sq.date_2, sq.points_2, sq.quota_diff_2,
             sq.date_1, sq.points_1, sq.quota_diff_1,
             tournamentDate, totalPoints, quotaDiff,
-            playerId
+            playerId, leagueId
           ]
         );
       }
@@ -2135,6 +2050,9 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
     // Admin playoff overrides: roster and points adjustments.
     // These endpoints are intentionally destructive and recompute season totals from the playoff ledger.
 
+
+    // Prize money for this tournament, from this tournament's league fees.
+    await rebuildTournamentPayouts(connection, tournamentId);
     
     await connection.commit();
     transactionStarted = false;
@@ -2146,17 +2064,17 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
       const tournamentDate = formatDateOnly(tournamentRows[0].date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const courseName = tournamentRows[0].course_name || 'Unknown Course';
       const emailRankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
-      await recalculateAllPlayersPrizeMoney(pool);
       const rankedPlayerIds = [...new Set(emailRankedPlayers.map((p) => p.player_id).filter(Boolean))];
       let dashboardTotals = [];
       if (rankedPlayerIds.length > 0) {
         const placeholders = rankedPlayerIds.map(() => '?').join(', ');
         const [dashboardRows] = await pool.query(
-          `SELECT id AS player_id, name, fedex_points, prize_money
-           FROM players
-           WHERE id IN (${placeholders})
-           ORDER BY fedex_points DESC, name ASC`,
-          rankedPlayerIds
+          `SELECT lpt.player_id, p.name, lpt.fedex_points, lpt.prize_money
+           FROM league_player_totals lpt
+           JOIN players p ON p.id = lpt.player_id
+           WHERE lpt.league_id = ? AND lpt.player_id IN (${placeholders})
+           ORDER BY lpt.fedex_points DESC, p.name ASC`,
+          [leagueId, ...rankedPlayerIds]
         );
         dashboardTotals = dashboardRows;
       }
@@ -2433,29 +2351,31 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   try {
     await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
-      `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, t.season_id, t.playoff_stage, c.name AS course_name
+      `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, t.season_id, t.playoff_stage, t.league_id, c.name AS course_name
        FROM tournament t
        JOIN course c ON t.course_id = c.id
        WHERE t.id = ?`,
       [tournamentId]
     );
     if (tournamentRows.length === 0) return res.status(404).json({ error: 'Tournament not found' });
-    const { date, number_of_holes, quota_collected, skins_collected, season_id, playoff_stage, course_name } = tournamentRows[0];
+    const { date, number_of_holes, quota_collected, skins_collected, season_id, playoff_stage, course_name, league_id: tournamentLeagueId } = tournamentRows[0];
     const tournamentHoleCount = Number(number_of_holes) === 9 ? 9 : 18;
     const rankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
     if (rankedPlayers.length === 0) return res.status(400).json({ error: 'No score data found for this tournament' });
 
-    // Prize money is already calculated during tournament completion — no need to recalculate here.
+    // Refresh this tournament's payouts in case paid flags or winners changed since completion.
+    await rebuildTournamentPayouts(pool, tournamentId);
     const rankedPlayerIds = [...new Set(rankedPlayers.map((p) => p.player_id).filter(Boolean))];
     let dashboardTotals = [];
     if (rankedPlayerIds.length > 0) {
       const placeholders = rankedPlayerIds.map(() => '?').join(', ');
       const [dashboardRows] = await pool.query(
-        `SELECT id AS player_id, name, fedex_points, prize_money
-         FROM players
-         WHERE id IN (${placeholders})
-         ORDER BY fedex_points DESC, name ASC`,
-        rankedPlayerIds
+        `SELECT lpt.player_id, p.name, lpt.fedex_points, lpt.prize_money
+         FROM league_player_totals lpt
+         JOIN players p ON p.id = lpt.player_id
+         WHERE lpt.league_id = ? AND lpt.player_id IN (${placeholders})
+         ORDER BY lpt.fedex_points DESC, p.name ASC`,
+        [tournamentLeagueId, ...rankedPlayerIds]
       );
       dashboardTotals = dashboardRows;
     }
@@ -2714,32 +2634,31 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
 
     const playerIds = players.map((row) => Number(row.id)).filter((id) => Number.isInteger(id));
 
+    // Quota is per league: only restore this tournament's league. Older backups
+    // may hold quota rows for other leagues; those are left untouched.
+    const [leagueRows] = await connection.query('SELECT league_id FROM tournament WHERE id = ? LIMIT 1', [tournamentId]);
+    const restoreLeagueId = Number(leagueRows[0]?.league_id ?? tournamentBackup?.league_id);
+    const inRestoreLeague = (row) => Number(row.league_id) === restoreLeagueId;
+
     await connection.beginTransaction();
 
     for (const player of players) {
       await connection.query(
-        `UPDATE players
-         SET quota_18 = ?, quota_9 = ?, fedex_points = ?, tournaments_played = ?, prize_money = ?
-         WHERE id = ?`,
-        [
-          player.quota_18 ?? null,
-          player.quota_9 ?? null,
-          player.fedex_points ?? 0,
-          player.tournaments_played ?? 0,
-          player.prize_money ?? 0,
-          player.id
-        ]
+        `INSERT INTO league_players (league_id, player_id, quota_18, quota_9)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE quota_18 = VALUES(quota_18), quota_9 = VALUES(quota_9)`,
+        [restoreLeagueId, player.id, player.quota_18 ?? null, player.quota_9 ?? null]
       );
     }
 
     if (playerIds.length > 0) {
       const placeholders = playerIds.map(() => '?').join(', ');
-      await connection.query(`DELETE FROM quota WHERE player_id IN (${placeholders})`, playerIds);
-      await connection.query(`DELETE FROM skins_quota WHERE player_id IN (${placeholders})`, playerIds);
+      await connection.query(`DELETE FROM quota WHERE league_id = ? AND player_id IN (${placeholders})`, [restoreLeagueId, ...playerIds]);
+      await connection.query(`DELETE FROM skins_quota WHERE league_id = ? AND player_id IN (${placeholders})`, [restoreLeagueId, ...playerIds]);
     }
 
-    await insertRows(connection, 'quota', quotaRows);
-    await insertRows(connection, 'skins_quota', skinsQuotaRows);
+    await insertRows(connection, 'quota', quotaRows.filter(inRestoreLeague));
+    await insertRows(connection, 'skins_quota', skinsQuotaRows.filter(inRestoreLeague));
 
     await connection.query('DELETE FROM tournament_players WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_skin_winners WHERE tournament_id = ?', [tournamentId]);
@@ -2751,6 +2670,9 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
     await insertRows(connection, 'tournament_skin_winners', skinWinners);
     await insertRows(connection, 'tournament_ctp_winners', ctpWinners);
     await insertRows(connection, 'tournament_paradise_points', paradisePoints);
+
+    // Payouts follow the restored results (FedEx totals come from the view).
+    await rebuildTournamentPayouts(connection, tournamentId);
 
     if (Number.isInteger(seasonId) && seasonId > 0) {
       await recalculateSeasonStatsFromLedger(connection, seasonId);

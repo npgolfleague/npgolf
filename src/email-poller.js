@@ -53,12 +53,15 @@ async function storeEmail(parsed) {
     }
   }
 
-  await pool.query(
+  // message_id is UNIQUE: if another poll stored this message in the meantime,
+  // the no-op update leaves affectedRows at 0 instead of throwing.
+  const [result] = await pool.query(
     `INSERT INTO emails (from_email, from_name, to_email, subject, text, html, message_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE id = id`,
     [fromEmail, fromName, toEmail, subject, text, html, messageId]
   );
-  return true;
+  return result.affectedRows === 1;
 }
 
 async function pollInbox() {

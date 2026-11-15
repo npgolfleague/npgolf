@@ -16,16 +16,17 @@ router.get('/:tournamentId/players', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role,
+      SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, p.role,
              tp.registration_date, tp.paid, tp.skins_ctp_paid, tp.attending_status, tp.response_date,
              tp.foursome AS foursome, tp.pair AS pair,
              tp.tee_id, ct.tee_name, ct.tee_color
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
+      LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
       LEFT JOIN course_tee ct ON ct.id = tp.tee_id
       WHERE tp.tournament_id = ?
       ORDER BY p.name ASC
-    `, [tournamentId]);
+    `, [leagueId, tournamentId]);
     
     res.json(rows);
   } catch (err) {
@@ -54,7 +55,7 @@ router.post('/:tournamentId/players', requireAdmin, async (req, res) => {
     
     // Check if player exists in current league
     const [players] = await pool.query(
-      `SELECT p.id, p.quota_18, p.quota_9, p.sex, p.default_tee_name
+      `SELECT p.id, lp.quota_18, lp.quota_9, p.sex, p.default_tee_name
        FROM players p
        INNER JOIN league_players lp ON lp.player_id = p.id
        WHERE p.id = ? AND lp.league_id = ?
@@ -216,7 +217,7 @@ router.post('/:tournamentId/foursome-group', requireAuth, async (req, res) => {
 
   try {
     // Ensure tournament exists and get hole count
-    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ?', [tournamentId])
+    const [tournaments] = await pool.query('SELECT id, number_of_holes, league_id FROM tournament WHERE id = ?', [tournamentId])
     if (tournaments.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' })
     }
@@ -239,10 +240,21 @@ router.post('/:tournamentId/foursome-group', requireAuth, async (req, res) => {
       await conn.beginTransaction()
 
       if (missingIds.length > 0) {
-        // Fetch player quotas to seed tournament_quota
+        // Players added to a tournament become members of its league (a player
+        // can play in several leagues); each league keeps its own quota.
+        await conn.query(
+          `INSERT IGNORE INTO league_players (league_id, player_id)
+           SELECT ?, id FROM players WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+          [tournament.league_id, ...missingIds]
+        )
+
+        // Fetch this league's player quotas to seed tournament_quota
         const [players] = await conn.query(
-          `SELECT id, quota_18, quota_9 FROM players WHERE id IN (${missingIds.map(() => '?').join(',')})`,
-          missingIds
+          `SELECT p.id, lp.quota_18, lp.quota_9
+           FROM players p
+           LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+           WHERE p.id IN (${missingIds.map(() => '?').join(',')})`,
+          [tournament.league_id, ...missingIds]
         )
 
         const holeCount = Number(tournament.number_of_holes)
@@ -364,7 +376,7 @@ router.get('/:tournamentId/available-players', requireAdmin, async (req, res) =>
     }
 
     const [rows] = await pool.query(`
-      SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.role, p.default_tee_name
+      SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, p.role, p.default_tee_name
       FROM players p
       INNER JOIN league_players lp ON lp.player_id = p.id
       LEFT JOIN tournament_players tp

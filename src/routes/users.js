@@ -3,6 +3,7 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
+const { rebuildLeaguePayouts } = require('../payouts');
 const { requireAdmin, requireAuth, isSuperAdminRole } = require('../middleware/admin');
 const router = express.Router();
 
@@ -24,115 +25,23 @@ function canActorAssignRole(actorRole, requestedRole) {
   return true;
 }
 
-const recalculateAllPlayersPrizeMoney = async (db, leagueId = 1) => {
-  const [settingsRows] = await db.query(
-    'SELECT tournament_fee_18_holes, tournament_fee_9_holes FROM league_settings WHERE league_id = ? LIMIT 1',
-    [leagueId]
-  );
-  const settings = settingsRows[0] || {};
-
-  const [tournaments] = await db.query('SELECT id, number_of_holes FROM tournament');
-  const winningsByPlayer = new Map();
-  const addWinnings = (playerId, amount) => {
-    const numeric = Number(amount) || 0;
-    if (!playerId || numeric === 0) return;
-    winningsByPlayer.set(playerId, (winningsByPlayer.get(playerId) || 0) + numeric);
-  };
-
-  for (const tournament of tournaments) {
-    const tournamentId = tournament.id;
-    const holeCount = Number(tournament.number_of_holes) === 9 ? 9 : 18;
-    const tournamentFee = Number(
-      holeCount === 9 ? settings.tournament_fee_9_holes : settings.tournament_fee_18_holes
-    ) || 0;
-
-    const [paidRows] = await db.query(
-      'SELECT SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_players FROM tournament_players WHERE tournament_id = ?',
-      [tournamentId]
-    );
-    const quotaPrizePot = (Number(paidRows[0]?.paid_players) || 0) * tournamentFee;
-
-    const [paradiseRows] = await db.query(
-      `SELECT player_id, over_under
-       FROM tournament_paradise_points
-       WHERE tournament_id = ?
-       ORDER BY over_under DESC, player_id ASC`,
-      [tournamentId]
-    );
-
-    const prizePercentages = [0.5, 0.3, 0.2];
-    let currentPosition = 0;
-    while (currentPosition < paradiseRows.length) {
-      const currentOverUnder = Number(paradiseRows[currentPosition].over_under);
-      let tiedCount = 1;
-
-      while (
-        currentPosition + tiedCount < paradiseRows.length &&
-        Number(paradiseRows[currentPosition + tiedCount].over_under) === currentOverUnder
-      ) {
-        tiedCount++;
-      }
-
-      let pooledPrizePercentage = 0;
-      for (let i = 0; i < tiedCount; i++) {
-        const prizePosition = currentPosition + i;
-        if (prizePosition < prizePercentages.length) {
-          pooledPrizePercentage += prizePercentages[prizePosition];
-        }
-      }
-
-      const prizePerPlayer = tiedCount > 0
-        ? Math.floor(quotaPrizePot * (pooledPrizePercentage / tiedCount))
-        : 0;
-
-      for (let i = 0; i < tiedCount; i++) {
-        const row = paradiseRows[currentPosition + i];
-        addWinnings(row.player_id, prizePerPlayer);
-      }
-
-      currentPosition += tiedCount;
-    }
-
-    const [skinRows] = await db.query(
-      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
-       FROM tournament_skin_winners
-       WHERE tournament_id = ?
-       GROUP BY player_id`,
-      [tournamentId]
-    );
-    skinRows.forEach((row) => addWinnings(row.player_id, row.total));
-
-    const [ctpRows] = await db.query(
-      `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
-       FROM tournament_ctp_winners
-       WHERE tournament_id = ?
-       GROUP BY player_id`,
-      [tournamentId]
-    );
-    ctpRows.forEach((row) => addWinnings(row.player_id, row.total));
-  }
-
-  await db.query('UPDATE players SET prize_money = 0');
-  for (const [playerId, total] of winningsByPlayer.entries()) {
-    await db.query('UPDATE players SET prize_money = ? WHERE id = ?', [Number(total.toFixed(2)), playerId]);
-  }
-
-  return winningsByPlayer.size;
-};
 
 // GET /api/users - list players
 router.get('/', requireAuth, async (req, res) => {
   try {
-    await recalculateAllPlayersPrizeMoney(pool, getLeagueId(req));
     const leagueId = getLeagueId(req);
-    let query = `SELECT p.id, p.name, p.email, p.phone, p.sex, p.quota_18, p.quota_9, p.fedex_points,
-                 p.tournaments_played, p.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at
+    // Keep this league's payouts current (paid flags and winners can change
+    // after completion), then read this league's totals.
+    await rebuildLeaguePayouts(pool, leagueId);
+    let query = `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, lpt.fedex_points,
+                 lpt.tournaments_played, lpt.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at
                  FROM players p
                  INNER JOIN league_players lp ON p.id = lp.player_id
+                 INNER JOIN league_player_totals lpt ON lpt.league_id = lp.league_id AND lpt.player_id = p.id
                  WHERE lp.league_id = ?`;
     let params = [leagueId];
 
-    query += ' ORDER BY fedex_points DESC, name ASC';
+    query += ' ORDER BY lpt.fedex_points DESC, p.name ASC';
     
     const [rows] = await pool.query(query, params);
     res.json(rows);
@@ -155,9 +64,6 @@ router.post('/', requireAdmin, async (req, res) => {
     active,
     quota_18,
     quota_9,
-    fedex_points,
-    tournaments_played,
-    prize_money,
     role,
     sms_allowed,
     email_allowed
@@ -212,9 +118,8 @@ router.post('/', requireAdmin, async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO players (
         billing_entity_id, name, email, phone, sex, active,
-        quota_18, quota_9, fedex_points, tournaments_played, prize_money,
         role, sms_allowed, email_allowed, password
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.league.billing_entity_id,
         name,
@@ -222,11 +127,6 @@ router.post('/', requireAdmin, async (req, res) => {
         phone || null,
         sex || null,
         activeValue,
-        quota_18 || null,
-        quota_9 || null,
-        fedex_points || 0,
-        tournaments_played || 0,
-        prize_money || 0,
         requestedRole,
         sms_allowed !== undefined ? sms_allowed : 0,
         email_allowed !== undefined ? email_allowed : 1,
@@ -238,9 +138,10 @@ router.post('/', requireAdmin, async (req, res) => {
     // Add the player to the league
     if (req.league && req.league.id) {
       try {
+        // Quota is stored per league on the membership row.
         await pool.query(
-          'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
-          [req.league.id, insertedId]
+          'INSERT IGNORE INTO league_players (league_id, player_id, quota_18, quota_9) VALUES (?, ?, ?, ?)',
+          [req.league.id, insertedId, quota_18 || null, quota_9 || null]
         );
         console.log(`Player ${insertedId} added to league ${req.league.id} (${req.league.name})`);
       } catch (leagueErr) {
@@ -249,7 +150,13 @@ router.post('/', requireAdmin, async (req, res) => {
       }
     }
     
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, active, quota_18, quota_9, sms_allowed, email_allowed, created_at FROM players WHERE id = ?', [insertedId]);
+    const [rows] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.phone, p.sex, p.active, lp.quota_18, lp.quota_9, p.sms_allowed, p.email_allowed, p.created_at
+       FROM players p
+       LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       WHERE p.id = ?`,
+      [req.league.id, insertedId]
+    );
     
     // Send SMS opt-in message if phone number is provided
     if (phone) {
@@ -281,9 +188,11 @@ router.post('/', requireAdmin, async (req, res) => {
 });
 
 // POST /api/users/refresh-quotas - Refresh players quota_18/quota_9 from average of latest 7 quota history slots (admin only)
-router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
+router.post('/refresh-quotas', requireAdmin, async (req, res) => {
   try {
-    const [quotaRows] = await pool.query('SELECT * FROM quota');
+    // Quota is per league: refresh only the current league's quotas.
+    const leagueId = getLeagueId(req);
+    const [quotaRows] = await pool.query('SELECT * FROM quota WHERE league_id = ?', [leagueId]);
 
     let updated18 = 0;
     let updated9 = 0;
@@ -340,17 +249,17 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
         updated9++;
       }
 
-      values.push(quotaRow.player_id);
+      values.push(quotaRow.player_id, leagueId);
 
       await pool.execute(
-        `UPDATE players SET ${updates.join(', ')} WHERE id = ?`,
+        `UPDATE league_players SET ${updates.join(', ')} WHERE player_id = ? AND league_id = ?`,
         values
       );
 
       playersTouched++;
     }
 
-    const prizePlayersTouched = await recalculateAllPlayersPrizeMoney(pool, getLeagueId(_req));
+    const prizePlayersTouched = await rebuildLeaguePayouts(pool, leagueId);
 
     res.json({
       message: 'Quota values refreshed successfully',
@@ -368,7 +277,9 @@ router.post('/refresh-quotas', requireAdmin, async (_req, res) => {
 // PUT /api/users/:id - update player
 router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, active, role, default_tee_name } = req.body;
+  // FedEx points, tournaments played and prize money are calculated per league
+  // from results (league_player_totals), so they are not editable here.
+  const { name, email, phone, sex, quota_18, quota_9, active, role, default_tee_name } = req.body;
   
   try {
     const leagueId = getLeagueId(req);
@@ -406,26 +317,42 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (email !== undefined) { updates.push('email = ?'); values.push(email); }
     if (phone !== undefined) { updates.push('phone = ?'); values.push(phone); }
     if (sex !== undefined) { updates.push('sex = ?'); values.push(sex); }
-    if (quota_18 !== undefined) { updates.push('quota_18 = ?'); values.push(quota_18); }
-    if (quota_9 !== undefined) { updates.push('quota_9 = ?'); values.push(quota_9); }
-    if (fedex_points !== undefined) { updates.push('fedex_points = ?'); values.push(fedex_points); }
-    if (tournaments_played !== undefined) { updates.push('tournaments_played = ?'); values.push(tournaments_played); }
-    if (prize_money !== undefined) { updates.push('prize_money = ?'); values.push(prize_money); }
     if (active !== undefined) { updates.push('active = ?'); values.push(active); }
     if (role !== undefined) { updates.push('role = ?'); values.push(role); }
     if (req.body.sms_allowed !== undefined) { updates.push('sms_allowed = ?'); values.push(req.body.sms_allowed); }
     if (req.body.email_allowed !== undefined) { updates.push('email_allowed = ?'); values.push(req.body.email_allowed); }
     if (default_tee_name !== undefined) { updates.push('default_tee_name = ?'); values.push(default_tee_name || null); }
     
-    if (updates.length === 0) {
+    // Quota belongs to this league's membership row, not the player.
+    const quotaUpdates = [];
+    const quotaValues = [];
+    if (quota_18 !== undefined) { quotaUpdates.push('quota_18 = ?'); quotaValues.push(quota_18); }
+    if (quota_9 !== undefined) { quotaUpdates.push('quota_9 = ?'); quotaValues.push(quota_9); }
+
+    if (updates.length === 0 && quotaUpdates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
     
-    values.push(id);
-    const sql = `UPDATE players SET ${updates.join(', ')} WHERE id = ?`;
-    
-    await pool.execute(sql, values);
-    const [rows] = await pool.query('SELECT id, name, email, phone, sex, quota_18, quota_9, fedex_points, tournaments_played, prize_money, role, active, sms_allowed, email_allowed, default_tee_name, created_at FROM players WHERE id = ?', [id]);
+    if (updates.length > 0) {
+      values.push(id);
+      await pool.execute(`UPDATE players SET ${updates.join(', ')} WHERE id = ?`, values);
+    }
+    if (quotaUpdates.length > 0) {
+      quotaValues.push(id, leagueId);
+      await pool.execute(
+        `UPDATE league_players SET ${quotaUpdates.join(', ')} WHERE player_id = ? AND league_id = ?`,
+        quotaValues
+      );
+    }
+    const [rows] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, lpt.fedex_points, lpt.tournaments_played, lpt.prize_money,
+              p.role, p.active, p.sms_allowed, p.email_allowed, p.default_tee_name, p.created_at
+       FROM players p
+       LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       LEFT JOIN league_player_totals lpt ON lpt.league_id = lp.league_id AND lpt.player_id = p.id
+       WHERE p.id = ?`,
+      [leagueId, id]
+    );
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
@@ -686,13 +613,14 @@ router.post('/sms-webhook', async (req, res) => {
 router.get('/:id/quota', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
+    const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
-      `SELECT * FROM quota WHERE player_id = ? LIMIT 1`,
-      [id]
+      `SELECT * FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1`,
+      [id, leagueId]
     );
 
     if (rows.length === 0) {
-      return res.json({ player_id: Number(id) });
+      return res.json({ player_id: Number(id), league_id: leagueId });
     }
 
     res.json(rows[0]);
@@ -729,25 +657,27 @@ router.put('/:id/quota', requireAdmin, async (req, res) => {
   }
 
   try {
-    const [existing] = await pool.query('SELECT id FROM quota WHERE player_id = ? LIMIT 1', [id]);
+    // Quota history is per league.
+    const leagueId = getLeagueId(req);
+    const [existing] = await pool.query('SELECT id FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1', [id, leagueId]);
     if (existing.length === 0) {
-      const columns = ['player_id', ...updates.map(u => u.split(' = ')[0])];
+      const columns = ['player_id', 'league_id', ...updates.map(u => u.split(' = ')[0])];
       const placeholders = columns.map(() => '?').join(', ');
-      const insertValues = [Number(id), ...values];
+      const insertValues = [Number(id), leagueId, ...values];
       await pool.execute(
         `INSERT INTO quota (${columns.join(', ')}) VALUES (${placeholders})`,
         insertValues
       );
     } else {
-      values.push(id);
+      values.push(id, leagueId);
       await pool.execute(
-        `UPDATE quota SET ${updates.join(', ')} WHERE player_id = ?`,
+        `UPDATE quota SET ${updates.join(', ')} WHERE player_id = ? AND league_id = ?`,
         values
       );
     }
 
-    const [rows] = await pool.query('SELECT * FROM quota WHERE player_id = ? LIMIT 1', [id]);
-    res.json(rows[0] || { player_id: Number(id) });
+    const [rows] = await pool.query('SELECT * FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1', [id, leagueId]);
+    res.json(rows[0] || { player_id: Number(id), league_id: leagueId });
   } catch (err) {
     console.error('Error updating quota row:', err);
     res.status(500).json({ error: 'Failed to update quota row' });
@@ -762,8 +692,8 @@ router.get('/:id/quota-history', requireAuth, async (req, res) => {
       `SELECT date_1, points_1, date_2, points_2, date_3, points_3, 
               date_4, points_4, date_5, points_5, date_6, points_6, 
               date_7, points_7
-       FROM quota WHERE player_id = ? LIMIT 1`,
-      [id]
+       FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1`,
+      [id, getLeagueId(req)]
     );
     
     if (rows.length === 0) {

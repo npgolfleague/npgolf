@@ -635,7 +635,7 @@ router.get('/tournament/:tournamentId/foursome/:group/post-status', async (req, 
     const [rows] = await pool.query(
       `SELECT fp.id, fp.posted_at, p.name as posted_by_name
        FROM foursome_posts fp
-       JOIN players p ON fp.posted_by = p.id
+       LEFT JOIN players p ON fp.posted_by = p.id
        WHERE fp.tournament_id = ? AND fp.foursome_group = ? LIMIT 1`,
       [tournamentId, group]
     );
@@ -669,7 +669,7 @@ router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, async
     const [rows] = await pool.query(
       `SELECT fp.id, fp.posted_at, p.name as posted_by_name
        FROM foursome_posts fp
-       JOIN players p ON fp.posted_by = p.id
+       LEFT JOIN players p ON fp.posted_by = p.id
        WHERE fp.tournament_id = ? AND fp.foursome_group = ? LIMIT 1`,
       [tournamentId, group]
     );

@@ -9,7 +9,7 @@ Node backend + MySQL scaffold for the npgolf project.
 - `src/db.js` — MySQL pool (mysql2/promise)
 - `src/routes/users.js` — example GET/POST /api/users
 - `.env.example` — env vars template
-- `schema.sql` — SQL to create `npgolf` database and `users` table
+- `schema.sql` — current table structure (no data); refresh with `scripts/export-schema.sh` after migrating
 
 ## Quick start (local development)
 
@@ -30,7 +30,7 @@ Node backend + MySQL scaffold for the npgolf project.
 3. Start a local MySQL instance using Docker (recommended):
 
 
-	The compose file seeds the `npgolf` database using `schema.sql` on first run.
+	`docker compose up -d mysql` starts the `npgolf-mysql` container on host port 3308.
 
 4. Run migrations (needs a privileged account, e.g. root) to create the dedicated DB user and other schema changes:
 

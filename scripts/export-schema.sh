@@ -1,30 +1,26 @@
 #!/bin/bash
-# Export current database schema to create a consolidated baseline
+# Refresh schema.sql (structure only, no data) from the MySQL container.
+# Run from the project root after applying migrations:  bash scripts/export-schema.sh
+# Override the container with MYSQL_CONTAINER=npgolf-mysql-pi on the Pi.
 
-# Configuration
-DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-3308}"
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-npgolf-mysql}"
 DB_USER="${DB_USER:-root}"
 DB_PASS="${DB_PASS:-root}"
 DB_NAME="${DB_NAME:-npgolf}"
-OUTPUT_FILE="schema_consolidated.sql"
+OUTPUT_FILE="schema.sql"
 
-echo "Exporting schema from $DB_NAME..."
+echo "Exporting schema of $DB_NAME from $MYSQL_CONTAINER..."
 
-# Export schema only (no data) using mysqldump
-docker exec npgolf-mysql-pi mysqldump \
-  -u"$DB_USER" \
-  -p"$DB_PASS" \
-  --no-data \
-  --skip-add-drop-table \
-  --skip-comments \
-  --compact \
-  "$DB_NAME" > "$OUTPUT_FILE"
+{
+  echo "-- npgolf schema snapshot (structure only). Regenerate with scripts/export-schema.sh."
+  docker exec -e MYSQL_PWD="$DB_PASS" "$MYSQL_CONTAINER" mysqldump \
+    -u"$DB_USER" \
+    --no-data \
+    --skip-comments \
+    --skip-add-drop-table \
+    --no-tablespaces \
+    --set-gtid-purged=OFF \
+    "$DB_NAME" | sed -E 's/ AUTO_INCREMENT=[0-9]+//'
+} > "$OUTPUT_FILE"
 
 echo "Schema exported to $OUTPUT_FILE"
-echo ""
-echo "Next steps:"
-echo "1. Review the consolidated schema"
-echo "2. Archive old migrations: mkdir migrations/archive && mv migrations/*.sql migrations/archive/"
-echo "3. Create new baseline: migrations/001_baseline_schema.sql"
-echo "4. Add new migrations for multi-league and billing features"
