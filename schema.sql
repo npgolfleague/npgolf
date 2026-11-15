@@ -1,4 +1,4 @@
--- npgolf schema snapshot (structure only), as of migration 061. Regenerate with scripts/export-schema.sh.
+-- npgolf schema snapshot (structure only), as of migration 063. Regenerate with scripts/export-schema.sh.
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -107,9 +107,19 @@ CREATE TABLE `foursome_posts` (
   `foursome_group` varchar(100) NOT NULL,
   `posted_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `posted_by` int unsigned DEFAULT NULL,
+  `status` enum('posted','awaiting_marker','disputed') NOT NULL DEFAULT 'posted',
+  `attested_by` int unsigned DEFAULT NULL,
+  `attested_at` datetime DEFAULT NULL,
+  `dispute_note` varchar(500) DEFAULT NULL,
+  `disputed_by` int unsigned DEFAULT NULL,
+  `disputed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tournament_foursome` (`tournament_id`,`foursome_group`),
   KEY `fk_fp_player` (`posted_by`),
+  KEY `fk_fp_attested_by` (`attested_by`),
+  KEY `fk_fp_disputed_by` (`disputed_by`),
+  CONSTRAINT `fk_fp_attested_by` FOREIGN KEY (`attested_by`) REFERENCES `players` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_fp_disputed_by` FOREIGN KEY (`disputed_by`) REFERENCES `players` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_fp_player` FOREIGN KEY (`posted_by`) REFERENCES `players` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_fp_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -260,7 +270,8 @@ CREATE TABLE `league_settings` (
   `quota_points_double_bogey` int NOT NULL DEFAULT '1' COMMENT 'Points for double bogey (2 over par)',
   `quota_points_worse` int NOT NULL DEFAULT '0' COMMENT 'Points for worse than double bogey',
   `live_scoring` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'If 1, scores are visible on leaderboard as they are entered. If 0, only visible after foursome posts scores.',
-  `playoff_format` enum('none','fedex_cup') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'none',
+  `require_card_attest` tinyint(1) NOT NULL DEFAULT '0',
+  `playoff_format` enum('none','fedex_cup') NOT NULL DEFAULT 'none',
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_league` (`league_id`),
   CONSTRAINT `league_settings_ibfk_1` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE
@@ -376,7 +387,7 @@ CREATE TABLE `schema_migrations` (
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `scores` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `entered_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `entered_at` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
   `tournament_id` int unsigned NOT NULL,
   `player_id` int unsigned NOT NULL,
   `hole_id` int unsigned NOT NULL,

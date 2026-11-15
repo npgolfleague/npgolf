@@ -1,5 +1,5 @@
 import './index.css'
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useContext } from 'react'
@@ -9,31 +9,59 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { MainLayout } from './components/MainLayout'
 import { Login } from './pages/Login'
 import { LeagueSelect } from './pages/LeagueSelect'
-import { Register } from './pages/Register'
-import { Dashboard } from './pages/Dashboard'
-import { Users } from './pages/Users'
-import { Courses } from './pages/Courses'
-import { AddCourse } from './pages/AddCourse'
-import { EditCourse } from './pages/EditCourse'
-import { ScoreEntry } from './pages/ScoreEntry'
-import { TournamentPlayers } from './pages/TournamentPlayers'
-import { Leaderboard } from './pages/Leaderboard'
-import { Settings } from './pages/Settings'
-import { League } from './pages/League'
-import { Tournaments } from './pages/Tournaments'
-import { AddTournament } from './pages/AddTournament'
-import { EditTournament } from './pages/EditTournament'
-import { TournamentHoleScores } from './pages/TournamentHoleScores'
-import { Rules } from './pages/Rules'
-import { RulesManager } from './pages/RulesManager'
-import { Quota } from './pages/Quota'
-import { SMSConsent } from './pages/SMSConsent'
-import { Inbox } from './pages/Inbox'
-import { BillingEntities } from './pages/BillingEntities'
-import { ScorecardUpload } from './pages/ScorecardUpload'
-import { About } from './pages/About'
-import { ForgotPassword } from './pages/ForgotPassword'
-import { ResetPassword } from './pages/ResetPassword'
+
+// Pages load on demand, so a phone only downloads the page it opens.
+// If a deploy replaced the files a page needs, reload once to pick up the new build.
+const lazyPage = (load, name) => lazy(() =>
+  load()
+    .then((mod) => {
+      try { sessionStorage.removeItem('npgolf_chunk_reload') } catch { /* ignore */ }
+      return { default: mod[name] }
+    })
+    .catch((err) => {
+      let reloaded = false
+      try { reloaded = sessionStorage.getItem('npgolf_chunk_reload') === '1' } catch { /* ignore */ }
+      if (!reloaded) {
+        try { sessionStorage.setItem('npgolf_chunk_reload', '1') } catch { /* ignore */ }
+        window.location.reload()
+        return new Promise(() => {})
+      }
+      throw err
+    })
+)
+
+const Register = lazyPage(() => import('./pages/Register'), 'Register')
+const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard')
+const Users = lazyPage(() => import('./pages/Users'), 'Users')
+const Courses = lazyPage(() => import('./pages/Courses'), 'Courses')
+const AddCourse = lazyPage(() => import('./pages/AddCourse'), 'AddCourse')
+const EditCourse = lazyPage(() => import('./pages/EditCourse'), 'EditCourse')
+const ScoreEntry = lazyPage(() => import('./pages/ScoreEntry'), 'ScoreEntry')
+const TournamentPlayers = lazyPage(() => import('./pages/TournamentPlayers'), 'TournamentPlayers')
+const Leaderboard = lazyPage(() => import('./pages/Leaderboard'), 'Leaderboard')
+const Settings = lazyPage(() => import('./pages/Settings'), 'Settings')
+const League = lazyPage(() => import('./pages/League'), 'League')
+const Tournaments = lazyPage(() => import('./pages/Tournaments'), 'Tournaments')
+const AddTournament = lazyPage(() => import('./pages/AddTournament'), 'AddTournament')
+const EditTournament = lazyPage(() => import('./pages/EditTournament'), 'EditTournament')
+const TournamentHoleScores = lazyPage(() => import('./pages/TournamentHoleScores'), 'TournamentHoleScores')
+const Rules = lazyPage(() => import('./pages/Rules'), 'Rules')
+const RulesManager = lazyPage(() => import('./pages/RulesManager'), 'RulesManager')
+const Quota = lazyPage(() => import('./pages/Quota'), 'Quota')
+const SMSConsent = lazyPage(() => import('./pages/SMSConsent'), 'SMSConsent')
+const Inbox = lazyPage(() => import('./pages/Inbox'), 'Inbox')
+const BillingEntities = lazyPage(() => import('./pages/BillingEntities'), 'BillingEntities')
+const ScorecardUpload = lazyPage(() => import('./pages/ScorecardUpload'), 'ScorecardUpload')
+const About = lazyPage(() => import('./pages/About'), 'About')
+const ForgotPassword = lazyPage(() => import('./pages/ForgotPassword'), 'ForgotPassword')
+const ResetPassword = lazyPage(() => import('./pages/ResetPassword'), 'ResetPassword')
+
+const PageLoading = () => (
+  <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-fairway-600" />
+    <span className="sr-only">Loading…</span>
+  </div>
+)
 
 // Wrapper to show LeagueSelect or Login based on league context
 const LoginEntry = () => {
@@ -65,6 +93,7 @@ try {
       <AuthProvider>
         <ToastProvider>
           <Router basename={basename}>
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -107,6 +136,7 @@ try {
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
+          </Suspense>
         </Router>        </ToastProvider>      </AuthProvider>
     </React.StrictMode>
   )

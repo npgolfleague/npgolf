@@ -95,7 +95,7 @@ export const MainLayout = () => {
           <div className="flex items-center justify-between">
             {/* Logo: always show on mobile (drawer is always full-width), conditionally on desktop */}
             <img
-              src="/npgolf-logo.svg"
+              src="/npgolf-logo-light.svg"
               alt="NPGOLF"
               className={`h-8 w-auto ${!sidebarOpen ? 'md:hidden' : ''}`}
             />
@@ -227,12 +227,12 @@ export const MainLayout = () => {
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-700">
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
             aria-label="Open menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-7 w-auto" />
+          <img src="/npgolf-logo-light.svg" alt="NPGOLF" className="h-7 w-auto" />
         </div>
         <Outlet />
       </main>

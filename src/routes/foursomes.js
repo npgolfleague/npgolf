@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin, requireAuth } = require('../middleware/admin');
+const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/foursomes/:foursome - return players in a foursome
@@ -8,7 +8,7 @@ router.get('/:tournamentId/foursomes/:foursome', requireAuth, async (req, res) =
   const { tournamentId, foursome } = req.params;
   try {
     const [rows] = await pool.query(
-      `SELECT tp.player_id, p.name, p.email, p.phone, tp.pair
+      `SELECT tp.player_id, p.name, tp.pair
        FROM tournament_players tp
        JOIN players p ON tp.player_id = p.id
        WHERE tp.tournament_id = ? AND tp.foursome = ?
@@ -87,6 +87,108 @@ router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', requireAdm
     res.json({ message: 'Player removed from foursome' });
   } catch (err) {
     console.error('DB error removing player from foursome', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/tournaments/:tournamentId/foursomes/:foursome/roster
+// Body: { playerIds: [int], pairs?: { playerId: pairNumber|null } }
+// Replaces the foursome's line-up: listed players are put in this foursome
+// (moving them out of any other), and players no longer listed are taken out
+// of it. Any signed-in player can change their foursome while scores are
+// being entered; once the foursome is posted or the tournament is completed,
+// only a league admin can.
+router.put('/:tournamentId/foursomes/:foursome/roster', requireAuth, async (req, res) => {
+  const { tournamentId, foursome } = req.params;
+  const playerIds = Array.isArray(req.body?.playerIds)
+    ? [...new Set(req.body.playerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+    : null;
+  const pairsInput = req.body?.pairs && typeof req.body.pairs === 'object' ? req.body.pairs : {};
+
+  if (!foursome || !String(foursome).trim()) return res.status(400).json({ error: 'foursome is required' });
+  if (!playerIds) return res.status(400).json({ error: 'playerIds must be an array' });
+  if (playerIds.length > 5) return res.status(400).json({ error: 'A foursome can have at most 5 players' });
+
+  try {
+    const [tournaments] = await pool.query(
+      `SELECT t.id, t.number_of_holes, t.league_id,
+              EXISTS (SELECT 1 FROM tournament_paradise_points x WHERE x.tournament_id = t.id) AS is_completed
+       FROM tournament t WHERE t.id = ?`,
+      [tournamentId]
+    );
+    const tournament = tournaments[0];
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+
+    const [posted] = await pool.query(
+      'SELECT id FROM foursome_posts WHERE tournament_id = ? AND foursome_group = ? LIMIT 1',
+      [tournamentId, foursome]
+    );
+    if (Number(tournament.is_completed) === 1 || posted.length > 0) {
+      try {
+        await assertLeagueAdmin(req, req.user);
+      } catch (authErr) {
+        if (authErr instanceof AuthError) {
+          return res.status(403).json({ error: 'This foursome is locked. Ask an admin to change it.' });
+        }
+        throw authErr;
+      }
+    }
+
+    if (playerIds.length > 0) {
+      const [found] = await pool.query(
+        `SELECT id FROM players WHERE id IN (${playerIds.map(() => '?').join(',')})`,
+        playerIds
+      );
+      if (found.length !== playerIds.length) return res.status(400).json({ error: 'Unknown player in playerIds' });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Players no longer in the line-up leave this foursome.
+      await conn.query(
+        `UPDATE tournament_players SET foursome = NULL, pair = NULL
+         WHERE tournament_id = ? AND foursome = ?${playerIds.length ? ` AND player_id NOT IN (${playerIds.map(() => '?').join(',')})` : ''}`,
+        [tournamentId, foursome, ...playerIds]
+      );
+
+      for (const pid of playerIds) {
+        // Playing in this tournament makes the player a member of its league.
+        await conn.query('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)', [tournament.league_id, pid]);
+        const rawPair = pairsInput[pid];
+        const pair = rawPair === undefined || rawPair === null || rawPair === '' ? null : Number(rawPair);
+        await conn.query(
+          `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota, foursome, pair)
+           SELECT ?, ?, 'yes', NOW(),
+                  CASE WHEN ? = 9 THEN lp.quota_9 ELSE lp.quota_18 END,
+                  ?, ?
+           FROM (SELECT 1) one
+           LEFT JOIN league_players lp ON lp.league_id = ? AND lp.player_id = ?
+           ON DUPLICATE KEY UPDATE foursome = VALUES(foursome), pair = VALUES(pair),
+             attending_status = IF(tournament_players.attending_status = 'no', 'yes', tournament_players.attending_status)`,
+          [tournamentId, pid, Number(tournament.number_of_holes), foursome, Number.isFinite(pair) ? pair : null, tournament.league_id, pid]
+        );
+      }
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+
+    const [rows] = await pool.query(
+      `SELECT tp.player_id, p.name, tp.pair
+       FROM tournament_players tp JOIN players p ON p.id = tp.player_id
+       WHERE tp.tournament_id = ? AND tp.foursome = ?
+       ORDER BY tp.pair IS NULL, tp.pair, p.name`,
+      [tournamentId, foursome]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('DB error saving foursome roster', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Disc3 } from 'lucide-react'
 import { authAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
@@ -76,9 +76,11 @@ export const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-slate-700 text-sm font-bold mb-1.5 ml-1">Email Address</label>
+            <label htmlFor="login-email" className="block text-slate-700 text-sm font-bold mb-1.5 ml-1">Email Address</label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -89,13 +91,15 @@ export const Login = () => {
 
           <div>
             <div className="flex justify-between items-center mb-1.5 ml-1">
-              <label className="block text-slate-700 text-sm font-bold">Password</label>
-              <a href="/forgot-password" disabled className="text-xs font-semibold text-fairway-700 hover:text-fairway-800 transition-colors">
+              <label htmlFor="login-password" className="block text-slate-700 text-sm font-bold">Password</label>
+              <Link to="/forgot-password" className="text-xs font-semibold text-fairway-700 hover:text-fairway-800 transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -127,12 +131,12 @@ export const Login = () => {
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <a
-              href="/register"
+            <Link
+              to="/register"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
             >
               Join a League
-            </a>
+            </Link>
             <a
               href="/login"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-fairway-500 hover:text-fairway-700 transition-colors"
@@ -142,9 +146,9 @@ export const Login = () => {
           </div>
           <p className="text-slate-500 text-sm">
             Don't have an account?{' '}
-            <a href="/register" className="font-bold text-slate-900 hover:text-fairway-700 transition-colors">
+            <Link to="/register" className="font-bold text-slate-900 hover:text-fairway-700 transition-colors">
               Request Access
-            </a>
+            </Link>
           </p>
         </div>
       </div>

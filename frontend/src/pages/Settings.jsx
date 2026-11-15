@@ -21,7 +21,8 @@ const DEFAULT_SETTINGS = {
   playoff_format: 'none',
   championship_pot: 0,
   losers_bracket_pot: 0,
-  live_scoring: 1
+  live_scoring: 1,
+  require_card_attest: 0
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -44,7 +45,8 @@ function settingsFromResponse(data) {
     playoff_format: data.playoff_format || DEFAULT_SETTINGS.playoff_format,
     championship_pot: data.championship_pot ?? DEFAULT_SETTINGS.championship_pot,
     losers_bracket_pot: data.losers_bracket_pot ?? DEFAULT_SETTINGS.losers_bracket_pot,
-    live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1
+    live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1,
+    require_card_attest: data.require_card_attest != null ? Number(data.require_card_attest) : 0
   }
 }
 
@@ -402,7 +404,19 @@ export const Settings = () => {
               />
               <div>
                 <span className="font-medium text-gray-800">Live Scoring</span>
-                <p className="text-sm text-gray-500">When enabled, scores appear on the leaderboard as they are entered. When disabled, scores only appear after a foursome posts their scores.</p>
+                <p className="text-sm text-gray-500">When enabled, each hole appears on the leaderboard once every player has finished it. When disabled, the leaderboard stays hidden until every player has finished the round.</p>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer mt-4">
+              <input
+                type="checkbox"
+                checked={!!settings.require_card_attest}
+                onChange={e => setSettings(prev => ({ ...prev, require_card_attest: e.target.checked ? 1 : 0 }))}
+                className="w-5 h-5 accent-blue-600"
+              />
+              <div>
+                <span className="font-medium text-gray-800">Marker signs the card</span>
+                <p className="text-sm text-gray-500">When enabled, a posted card must be signed by a player from the other pair in the foursome before it is final. The marker can flag a problem for an admin instead.</p>
               </div>
             </label>
           </div>
