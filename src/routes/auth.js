@@ -27,18 +27,20 @@ router.post('/login', async (req, res) => {
 
   try {
     const leagueBillingEntityId = req.league?.billing_entity_id ?? null;
+    // Quota is per league: report the quota for the league being signed into.
     const [rows] = await pool.query(
-      `SELECT id, billing_entity_id, name, email, sex, active, quota_18, quota_9, role, password
-       FROM players
-       WHERE LOWER(email) = LOWER(?)
+      `SELECT p.id, p.billing_entity_id, p.name, p.email, p.sex, p.active, lp.quota_18, lp.quota_9, p.role, p.password
+       FROM players p
+       LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       WHERE LOWER(p.email) = LOWER(?)
        ORDER BY
          CASE
-           WHEN ? IS NOT NULL AND billing_entity_id = ? THEN 0
+           WHEN ? IS NOT NULL AND p.billing_entity_id = ? THEN 0
            ELSE 1
          END,
-         id DESC
+         p.id DESC
        LIMIT 1`,
-      [normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
+      [req.league?.id ?? null, normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
     );
     const user = rows && rows[0];
     if (!user || !user.password) return res.status(401).json({ error: 'invalid credentials' });
@@ -137,15 +139,16 @@ router.post('/register', async (req, res) => {
 
     // Insert new player
     const [result] = await pool.query(
-      'INSERT INTO players (billing_entity_id, name, email, password, phone, sex, quota_18, quota_9, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [targetLeague.billing_entity_id, name, email, hashedPassword, phone, sex || 'M', normalizedQuota18, normalizedQuota9, 'player', 1, sms_allowed ? 1 : 0]
+      'INSERT INTO players (billing_entity_id, name, email, password, phone, sex, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [targetLeague.billing_entity_id, name, email, hashedPassword, phone, sex || 'M', 'player', 1, sms_allowed ? 1 : 0]
     );
 
     const userId = result.insertId;
 
+    // Quota is stored per league on the membership row.
     await pool.query(
-      'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
-      [targetLeague.id, userId]
+      'INSERT IGNORE INTO league_players (league_id, player_id, quota_18, quota_9) VALUES (?, ?, ?, ?)',
+      [targetLeague.id, userId, normalizedQuota18, normalizedQuota9]
     );
 
     // Send SMS opt-in message (only if SMS is enabled and user opted in)
@@ -205,7 +208,14 @@ router.post('/refresh', async (req, res) => {
 
   try {
     const hash = crypto.createHash('sha256').update(refreshToken).digest('hex')
-    const [rows] = await pool.query('SELECT id, name, email, sex, active, quota_18, quota_9, role FROM players WHERE refresh_token_hash = ? AND refresh_token_expires > NOW() LIMIT 1', [hash])
+    const [rows] = await pool.query(
+      `SELECT p.id, p.name, p.email, p.sex, p.active, lp.quota_18, lp.quota_9, p.role
+       FROM players p
+       LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       WHERE p.refresh_token_hash = ? AND p.refresh_token_expires > NOW()
+       LIMIT 1`,
+      [req.league?.id ?? null, hash]
+    )
     const user = rows && rows[0]
     if (!user) return res.status(401).json({ error: 'invalid or expired refresh token' })
 

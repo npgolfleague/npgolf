@@ -98,9 +98,6 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
           sex: formData.sex || null,
           quota_18: formData.quota_18 ? Number(formData.quota_18) : null,
           quota_9: formData.quota_9 ? Number(formData.quota_9) : null,
-          fedex_points: formData.fedex_points ? Number(formData.fedex_points) : null,
-          tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
-          prize_money: formData.prize_money ? Number(formData.prize_money) : null,
           active: formData.active,
           role: formData.role,
           password: formData.password || null,
@@ -124,9 +121,6 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
             sex: formData.sex || null,
             quota_18: formData.quota_18 ? Number(formData.quota_18) : null,
             quota_9: formData.quota_9 ? Number(formData.quota_9) : null,
-            fedex_points: formData.fedex_points ? Number(formData.fedex_points) : null,
-            tournaments_played: formData.tournaments_played ? Number(formData.tournaments_played) : null,
-            prize_money: formData.prize_money ? Number(formData.prize_money) : null,
             active: formData.active,
             role: formData.role,
             sms_allowed: formData.sms_allowed,
@@ -319,8 +313,9 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                     type="number"
                     name="fedex_points"
                     value={formData.fedex_points}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly
+                    title="Calculated from this league's tournament results"
+                    className="w-full px-3 py-2 border border-gray-200 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
                   />
                 </div>
 
@@ -332,8 +327,9 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                     type="number"
                     name="tournaments_played"
                     value={formData.tournaments_played}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly
+                    title="Calculated from this league's tournament results"
+                    className="w-full px-3 py-2 border border-gray-200 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
                   />
                 </div>
 
@@ -346,9 +342,11 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                     step="0.01"
                     name="prize_money"
                     value={formData.prize_money}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly
+                    title="Calculated from this league's tournament results"
+                    className="w-full px-3 py-2 border border-gray-200 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
                   />
+                  <p className="mt-1 text-xs text-gray-500">Points, tournaments played and prize money are calculated from this league's results.</p>
                 </div>
 
                 <div>

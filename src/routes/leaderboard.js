@@ -112,7 +112,7 @@ router.get('/:tournamentId', async (req, res) => {
         p.name,
         p.email,
         tp.tournament_quota,
-        p.${quotaColumn} as default_player_quota,
+        lpq.${quotaColumn} as default_player_quota,
         q.points_1,
         q.points_2,
         q.points_3,
@@ -136,13 +136,15 @@ router.get('/:tournamentId', async (req, res) => {
         COALESCE(SUM(s.score), 0) as total_strokes
       FROM players p
       JOIN tournament_players tp ON p.id = tp.player_id
-      LEFT JOIN quota q ON q.player_id = p.id
+      JOIN tournament t ON t.id = tp.tournament_id
+      LEFT JOIN league_players lpq ON lpq.player_id = p.id AND lpq.league_id = t.league_id
+      LEFT JOIN quota q ON q.player_id = p.id AND q.league_id = t.league_id
       LEFT JOIN tournament_paradise_points tpp
         ON tpp.tournament_id = tp.tournament_id
        AND tpp.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
-      GROUP BY p.id, p.name, p.email, tp.tournament_quota, p.${quotaColumn},
+      GROUP BY p.id, p.name, p.email, tp.tournament_quota, lpq.${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
                q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
                tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points

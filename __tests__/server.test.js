@@ -51,7 +51,10 @@ jest.mock('../src/db', () => {
         return [[{ id: 1, name: 'Test User', email: 'test@example.com', created_at: new Date() }], []];
       }
 
-      if (normalized.includes('from players where id = ?')) {
+      if (
+        normalized.includes('from players where id = ?') ||
+        (normalized.includes('left join league_players') && normalized.includes('where p.id = ?'))
+      ) {
         return [[{ id: 2, name: 'Alice', email: 'alice@example.com', created_at: new Date() }], []];
       }
 

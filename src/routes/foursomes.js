@@ -32,13 +32,24 @@ router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, async (r
 
   try {
     // Ensure tournament exists
-    const [tournaments] = await pool.query('SELECT id, number_of_holes FROM tournament WHERE id = ?', [tournamentId]);
+    const [tournaments] = await pool.query('SELECT id, number_of_holes, league_id FROM tournament WHERE id = ?', [tournamentId]);
     if (tournaments.length === 0) return res.status(404).json({ error: 'Tournament not found' });
     const tournament = tournaments[0];
 
     // Ensure player exists
-    const [players] = await pool.query('SELECT id, quota_18, quota_9 FROM players WHERE id = ?', [playerId]);
-    if (players.length === 0) return res.status(404).json({ error: 'Player not found' });
+    const [found] = await pool.query('SELECT id FROM players WHERE id = ?', [playerId]);
+    if (found.length === 0) return res.status(404).json({ error: 'Player not found' });
+
+    // Playing in this tournament makes the player a member of its league;
+    // quota comes from that league's membership row.
+    await pool.query(
+      'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
+      [tournament.league_id, playerId]
+    );
+    const [players] = await pool.query(
+      'SELECT player_id AS id, quota_18, quota_9 FROM league_players WHERE league_id = ? AND player_id = ?',
+      [tournament.league_id, playerId]
+    );
 
     // Insert or update tournament_players row
     const holeCount = Number(tournament.number_of_holes);
