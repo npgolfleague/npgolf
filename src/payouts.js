@@ -7,7 +7,8 @@
 // quota_collected when it is set, otherwise paid players x the league's fee.
 // It is split 50/30/20 among the top three by over/under; tied players pool
 // the places they cover and share them equally (rounded down to the dollar).
-// Skins and CTP payouts are the prize amounts saved on the winner rows.
+// Skins and CTP payouts are the prize amounts saved on the winner rows, and
+// side-game payouts are those saved on tournament_side_game_results.
 
 const QUOTA_PRIZE_SPLIT = [0.5, 0.3, 0.2];
 
@@ -89,6 +90,12 @@ const rebuildTournamentPayouts = async (db, tournamentId) => {
     [tournamentId]
   );
 
+  const [sideGameRows] = await db.query(
+    `SELECT player_id, SUM(COALESCE(prize_money, 0)) AS total
+     FROM tournament_side_game_results WHERE tournament_id = ? GROUP BY player_id`,
+    [tournamentId]
+  );
+
   const rows = [];
   for (const [playerId, amount] of computeQuotaPayouts(rankedRows, pot)) {
     rows.push([tournamentId, playerId, 'quota', amount]);
@@ -98,6 +105,9 @@ const rebuildTournamentPayouts = async (db, tournamentId) => {
   }
   for (const r of ctpRows) {
     if (Number(r.total) > 0) rows.push([tournamentId, Number(r.player_id), 'ctp', Number(Number(r.total).toFixed(2))]);
+  }
+  for (const r of sideGameRows) {
+    if (Number(r.total) > 0) rows.push([tournamentId, Number(r.player_id), 'side_games', Number(Number(r.total).toFixed(2))]);
   }
 
   await db.query('DELETE FROM tournament_payouts WHERE tournament_id = ?', [tournamentId]);

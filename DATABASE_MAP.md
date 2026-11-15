@@ -50,6 +50,7 @@ emails, schema_migrations  (standalone)
 | Tournaments | `tournament`, `tournament_players`, `scores`, `foursome_posts` |
 | Results | `tournament_paradise_points`, `tournament_skin_winners`, `tournament_ctp_winners`, `tournament_playoff_points`, `season_player_stats`, `tournament_results_email`, `tournament_completion_backups` |
 | Quota | `quota` (7 rolling slots), `skins_quota` (20 slots) |
+| Side games (migration 064) | `league_side_game_defaults`, `tournament_side_games`, `tournament_side_game_entries` (opt-in), `tournament_side_game_teams` (saved Blind Draw), `tournament_side_game_results`; prize money goes to `tournament_payouts` as `side_games` |
 | Other | `emails`, `schema_migrations` |
 
 ---

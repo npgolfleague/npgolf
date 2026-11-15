@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { rebuildTournamentPayouts } = require('../payouts');
+const { rebuildTournamentSideGames, getTournamentSideGames, applyLeagueDefaults } = require('../sideGames');
+const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../utils/sideGames');
 const {
   PLAYOFF_STAGE,
   FINAL_FIELD_SIZE,
@@ -753,7 +755,85 @@ const getPlayoffResultsEmailData = async (db, tournamentId, seasonId, playoffSta
   };
 };
 
-const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], playoffData = null, customMessage = null }) => {
+const formatMoney = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+const formatSigned = (value) => {
+  const n = Number(value) || 0;
+  const text = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return n > 0 ? `+${text}` : text;
+};
+
+// "Side Games" section of the results email: one table per game that has results.
+const buildSideGamesEmailSection = (sideGames) => {
+  if (!sideGames || !Array.isArray(sideGames.results) || sideGames.results.length === 0) return '';
+  const { results, games } = sideGames;
+  const cell = 'padding:8px 12px;';
+  const head = (cols) => `<thead><tr style="background:#f0f4f8;">${cols.map(([label, align]) =>
+    `<th style="${cell}text-align:${align};color:#555;">${label}</th>`).join('')}</tr></thead>`;
+  const rowBg = (idx) => (idx % 2 === 0 ? '#ffffff' : '#f9f9f9');
+  const potNote = (gameType) => {
+    const game = games.find((g) => g.game_type === gameType);
+    return game ? ` <span style="font-weight:normal;color:#777;font-size:13px;">(pot ${formatMoney(game.pot)})</span>` : '';
+  };
+
+  const blocks = [];
+
+  const teams = blindDrawTeamsFromResults(results);
+  if (teams.length > 0) {
+    blocks.push(`<h3 style="color:#1e3a5f;font-size:15px;margin:12px 0 8px 0;">Blind Draw Partners${potNote('blind_draw')}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        ${head([['Team', 'left'], ['Score', 'center'], ['Prize each', 'right']])}
+        <tbody>${teams.map((t, idx) => `<tr style="background:${rowBg(idx)};${t.is_winner ? 'font-weight:bold;' : ''}">
+          <td style="${cell}">${t.players.join(' &amp; ')}</td>
+          <td style="${cell}text-align:center;">${formatSigned(t.score)}</td>
+          <td style="${cell}text-align:right;">${t.prize_each > 0 ? formatMoney(t.prize_each) : '-'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`);
+  }
+
+  const nassauWinners = results.filter((r) => r.game_type === 'quota_nassau' && r.is_winner);
+  if (nassauWinners.length > 0) {
+    const segments = [...new Set(nassauWinners.map((r) => r.segment))].sort((a, b) => segmentOrder(a) - segmentOrder(b));
+    blocks.push(`<h3 style="color:#1e3a5f;font-size:15px;margin:16px 0 8px 0;">Quota Nassau${potNote('quota_nassau')}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        ${head([['Bet', 'left'], ['Winner', 'left'], ['Score', 'center'], ['Prize each', 'right']])}
+        <tbody>${segments.map((segment, idx) => {
+          const winners = nassauWinners.filter((r) => r.segment === segment);
+          return `<tr style="background:${rowBg(idx)}">
+            <td style="${cell}">${segmentLabel(segment)}</td>
+            <td style="${cell}">${winners.map((w) => w.name).join(', ')}</td>
+            <td style="${cell}text-align:center;">${formatSigned(winners[0].score)}</td>
+            <td style="${cell}text-align:right;">${formatMoney(winners[0].prize_money)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`);
+  }
+
+  const birdieRows = results.filter((r) => r.game_type === 'birdie_pot');
+  if (birdieRows.length > 0) {
+    const winners = birdieRows.filter((r) => r.shares > 0).sort((a, b) => b.shares - a.shares || a.name.localeCompare(b.name));
+    blocks.push(`<h3 style="color:#1e3a5f;font-size:15px;margin:16px 0 8px 0;">Birdie Pot${potNote('birdie_pot')}</h3>
+      ${winners.length === 0
+        ? '<p style="margin:0;color:#555;font-size:14px;">No birdies this round.</p>'
+        : `<table style="width:100%;border-collapse:collapse;font-size:14px;">
+        ${head([['Player', 'left'], ['Shares', 'center'], ['Prize', 'right']])}
+        <tbody>${winners.map((w, idx) => `<tr style="background:${rowBg(idx)}">
+          <td style="${cell}">${w.name}</td>
+          <td style="${cell}text-align:center;">${w.shares}</td>
+          <td style="${cell}text-align:right;">${formatMoney(w.prize_money)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`}`);
+  }
+
+  if (blocks.length === 0) return '';
+  return `
+    <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 4px 0;">🎲 Side Games</h2>
+      ${blocks.join('')}
+    </div>`;
+};
+
+const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise Cup', numberOfHoles, rankedPlayers, skinWinners, ctpWinners, skinPrizePerSkin, ctpPrizePerWinner, quotaPrizePot, dashboardTotals = [], playoffData = null, sideGames = null, customMessage = null }) => {
   const prizePercentages = [0.5, 0.3, 0.2];
   const prizePlayers = [];
   let i = 0;
@@ -982,6 +1062,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
   </div>
   ${skinsSection}
   ${ctpSection}
+  ${buildSideGamesEmailSection(sideGames)}
   ${playoffResultsSection}
   ${losersResultsSection}
   ${playoffStandingsSection}
@@ -1076,6 +1157,11 @@ const createPreCompleteBackup = async (db, tournamentId) => {
     [tournamentId]
   );
 
+  const [sideGameResultRows] = await db.query(
+    'SELECT * FROM tournament_side_game_results WHERE tournament_id = ? ORDER BY id ASC',
+    [tournamentId]
+  );
+
   let playerRows = [];
   let quotaRows = [];
   let skinsQuotaRows = [];
@@ -1118,7 +1204,8 @@ const createPreCompleteBackup = async (db, tournamentId) => {
     tournament_players: tournamentPlayersRows,
     tournament_skin_winners: skinWinnerRows,
     tournament_ctp_winners: ctpWinnerRows,
-    tournament_paradise_points: paradiseRows
+    tournament_paradise_points: paradiseRows,
+    tournament_side_game_results: sideGameResultRows
   };
 
   const [insertResult] = await db.query(
@@ -1271,6 +1358,8 @@ router.post('/', requireAdmin, async (req, res) => {
       'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, league_id, season_id, playoff_stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [date, course_id, holeCount, side, teeTime, shotgunStart ? 1 : 0, standardQuotaGame, leagueId, season, stage]
     );
+    // Side games the league turns on by default (they can be changed per tournament).
+    await applyLeagueDefaults(pool, leagueId, result.insertId, holeCount);
     res.status(201).json({
       id: result.insertId,
       date,
@@ -2051,9 +2140,12 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
     // These endpoints are intentionally destructive and recompute season totals from the playoff ledger.
 
 
+    // Optional side games, worked out from the same scores and results.
+    await rebuildTournamentSideGames(connection, tournamentId);
+
     // Prize money for this tournament, from this tournament's league fees.
     await rebuildTournamentPayouts(connection, tournamentId);
-    
+
     await connection.commit();
     transactionStarted = false;
     console.log(`Tournament completion applied: tournamentId=${tournamentId}, backupId=${backupId}`);
@@ -2091,6 +2183,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
         quotaPrizePot,
         dashboardTotals,
         playoffData: await getPlayoffResultsEmailData(pool, tournamentId, Number(tournamentRows[0].season_id), tournamentRows[0].playoff_stage),
+        sideGames: await getTournamentSideGames(pool, tournamentId),
         customMessage: req.body?.customMessage || null
       });
       const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
@@ -2469,6 +2562,7 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       quotaPrizePot,
       dashboardTotals,
       playoffData: await getPlayoffResultsEmailData(pool, Number(tournamentId), Number(season_id), playoff_stage),
+      sideGames: await getTournamentSideGames(pool, Number(tournamentId)),
       customMessage: customMessage || null
     });
     const emailSubject = `NPGolf Tournament Results - ${tournamentDate}`;
@@ -2627,6 +2721,11 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
     const skinWinners = Array.isArray(backupData.tournament_skin_winners) ? backupData.tournament_skin_winners : [];
     const ctpWinners = Array.isArray(backupData.tournament_ctp_winners) ? backupData.tournament_ctp_winners : [];
     const paradisePoints = Array.isArray(backupData.tournament_paradise_points) ? backupData.tournament_paradise_points : [];
+    // Backups made before side games existed have no side-game key; restoring
+    // them clears any side-game results, matching the state they captured.
+    // The Blind Draw (tournament_side_game_teams) is left alone, so completing
+    // again after a fix keeps the same partners unless the entrants change.
+    const sideGameResults = Array.isArray(backupData.tournament_side_game_results) ? backupData.tournament_side_game_results : [];
     const tournamentBackup = backupData.tournament && typeof backupData.tournament === 'object'
       ? backupData.tournament
       : null;
@@ -2665,11 +2764,13 @@ router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
     await connection.query('DELETE FROM tournament_ctp_winners WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
     await connection.query('DELETE FROM tournament_playoff_points WHERE tournament_id = ?', [tournamentId]);
+    await connection.query('DELETE FROM tournament_side_game_results WHERE tournament_id = ?', [tournamentId]);
 
     await insertRows(connection, 'tournament_players', tournamentPlayers);
     await insertRows(connection, 'tournament_skin_winners', skinWinners);
     await insertRows(connection, 'tournament_ctp_winners', ctpWinners);
     await insertRows(connection, 'tournament_paradise_points', paradisePoints);
+    await insertRows(connection, 'tournament_side_game_results', sideGameResults);
 
     // Payouts follow the restored results (FedEx totals come from the view).
     await rebuildTournamentPayouts(connection, tournamentId);

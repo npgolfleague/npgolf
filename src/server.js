@@ -17,6 +17,7 @@ const emailsRouter = require('./routes/emails');
 const cartTagsRouter = require('./routes/cart-tags');
 const rulesRouter = require('./routes/rules');
 const billingEntitiesRouter = require('./routes/billing-entities');
+const sideGamesRouter = require('./routes/side-games');
 const { leagueAliasMiddleware } = require('./middleware/league');
 const { startEmailPoller } = require('./email-poller');
 const { getVersionInfo } = require('./version');
@@ -70,6 +71,7 @@ app.use('/api/emails', emailsRouter);
 app.use('/api/cart-tags', cartTagsRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/billing-entities', billingEntitiesRouter);
+app.use('/api', sideGamesRouter);
 
 // GET /api/version - which build is running (public: commit, branch, build time)
 app.get('/api/version', (req, res) => {

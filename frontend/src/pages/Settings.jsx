@@ -1,7 +1,8 @@
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
-import { leaguesAPI } from '../api'
+import { leaguesAPI, sideGamesAPI } from '../api'
+import { SIDE_GAME_DESCRIPTIONS } from '../utils/sideGames'
 import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_SETTINGS = {
@@ -57,6 +58,7 @@ export const Settings = () => {
   const [leagues, setLeagues] = useState([])
   const [selectedLeagueId, setSelectedLeagueId] = useState(null)
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS })
+  const [sideGameDefaults, setSideGameDefaults] = useState([])
   const [loadingLeagues, setLoadingLeagues] = useState(true)
   const [loadingSettings, setLoadingSettings] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -97,8 +99,12 @@ export const Settings = () => {
       try {
         setLoadingSettings(true)
         setError('')
-        const response = await leaguesAPI.getSettings(selectedLeagueId)
+        const [response, sideGamesResponse] = await Promise.all([
+          leaguesAPI.getSettings(selectedLeagueId),
+          sideGamesAPI.getLeagueDefaults(selectedLeagueId)
+        ])
         setSettings(settingsFromResponse(response.data))
+        setSideGameDefaults(sideGamesResponse.data || [])
       } catch (err) {
         console.error('Error fetching settings:', err)
         setError('Failed to load settings')
@@ -146,6 +152,8 @@ export const Settings = () => {
 
       const response = await leaguesAPI.updateSettings(selectedLeagueId, settings)
       setSettings(settingsFromResponse(response.data))
+      const sideGamesResponse = await sideGamesAPI.saveLeagueDefaults(selectedLeagueId, sideGameDefaults)
+      setSideGameDefaults(sideGamesResponse.data || [])
       const leagueName = leagues.find(l => l.id === selectedLeagueId)?.name || 'League'
       setSuccess(`${leagueName} settings saved!`)
       setTimeout(() => setSuccess(''), 3000)
@@ -419,6 +427,53 @@ export const Settings = () => {
                 <p className="text-sm text-gray-500">When enabled, a posted card must be signed by a player from the other pair in the foursome before it is final. The marker can flag a problem for an admin instead.</p>
               </div>
             </label>
+          </div>
+
+          {/* Side games */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Side Games</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Optional bets worked out from the scores players already enter. Everyone still plays their own ball, so the quota game, skins and pins are not affected.
+              Games turned on here are switched on for each new tournament; you can change them per tournament.
+            </p>
+            <div className="space-y-4">
+              {sideGameDefaults.map((game) => {
+                const update = (field, value) => setSideGameDefaults(prev => prev.map(g => (
+                  g.game_type === game.game_type ? { ...g, [field]: value } : g
+                )))
+                return (
+                  <div key={game.game_type} className="border border-gray-200 rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!game.enabled}
+                        onChange={e => update('enabled', e.target.checked)}
+                        className="w-5 h-5 mt-0.5 shrink-0 accent-blue-600"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{game.label}</span>
+                        <p className="text-sm text-gray-500">{SIDE_GAME_DESCRIPTIONS[game.game_type]}</p>
+                      </div>
+                    </label>
+                    <div className="grid grid-cols-2 gap-4 mt-3 pl-8">
+                      {[['fee_9', '9 Hole Fee ($)'], ['fee_18', '18 Hole Fee ($)']].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                          <input
+                            type="number"
+                            value={game[field]}
+                            onChange={e => update(field, parseFloat(e.target.value) || 0)}
+                            step="0.01"
+                            min="0"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div className="mt-6 flex gap-3">

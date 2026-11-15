@@ -1,4 +1,4 @@
--- npgolf schema snapshot (structure only), as of migration 063. Regenerate with scripts/export-schema.sh.
+-- npgolf schema snapshot (structure only), as of migration 064. Regenerate with scripts/export-schema.sh.
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -275,6 +275,20 @@ CREATE TABLE `league_settings` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_league` (`league_id`),
   CONSTRAINT `league_settings_ibfk_1` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `league_side_game_defaults` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `league_id` int unsigned NOT NULL,
+  `game_type` enum('blind_draw','quota_nassau','birdie_pot') NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `fee_9` decimal(10,2) NOT NULL DEFAULT '2.00',
+  `fee_18` decimal(10,2) NOT NULL DEFAULT '5.00',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_league_side_game` (`league_id`,`game_type`),
+  CONSTRAINT `fk_lsgd_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -594,7 +608,7 @@ CREATE TABLE `tournament_payouts` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `tournament_id` int unsigned NOT NULL,
   `player_id` int unsigned NOT NULL,
-  `category` enum('quota','skins','ctp') NOT NULL,
+  `category` enum('quota','skins','ctp','side_games') NOT NULL,
   `amount` decimal(10,2) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -666,6 +680,68 @@ CREATE TABLE `tournament_results_email` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_tournament` (`tournament_id`),
   CONSTRAINT `fk_tre_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tournament_side_game_entries` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tournament_id` int unsigned NOT NULL,
+  `game_type` enum('blind_draw','quota_nassau','birdie_pot') NOT NULL,
+  `player_id` int unsigned NOT NULL,
+  `paid` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_side_game_entry` (`tournament_id`,`game_type`,`player_id`),
+  KEY `idx_sge_player` (`player_id`),
+  CONSTRAINT `fk_sge_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sge_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tournament_side_game_results` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tournament_id` int unsigned NOT NULL,
+  `game_type` enum('blind_draw','quota_nassau','birdie_pot') NOT NULL,
+  `segment` varchar(20) NOT NULL DEFAULT 'overall',
+  `player_id` int unsigned NOT NULL,
+  `team_no` smallint unsigned DEFAULT NULL,
+  `score` decimal(8,2) DEFAULT NULL,
+  `shares` smallint unsigned DEFAULT NULL,
+  `is_winner` tinyint(1) NOT NULL DEFAULT '0',
+  `prize_money` decimal(10,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_side_game_result` (`tournament_id`,`game_type`,`segment`,`player_id`),
+  KEY `idx_sgr_player` (`player_id`),
+  CONSTRAINT `fk_sgr_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sgr_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tournament_side_game_teams` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tournament_id` int unsigned NOT NULL,
+  `team_no` smallint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_side_game_team_player` (`tournament_id`,`player_id`),
+  KEY `idx_sgt_player` (`player_id`),
+  CONSTRAINT `fk_sgt_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sgt_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tournament_side_games` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tournament_id` int unsigned NOT NULL,
+  `game_type` enum('blind_draw','quota_nassau','birdie_pot') NOT NULL,
+  `fee` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `collected` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_tournament_side_game` (`tournament_id`,`game_type`),
+  CONSTRAINT `fk_tsg_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
