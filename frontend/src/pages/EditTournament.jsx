@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { tournamentsAPI, coursesAPI, leaguesAPI } from '../api'
+import { tournamentsAPI, coursesAPI, leaguesAPI, sideGamesAPI } from '../api'
+import { SideGamesFields, buildSideGameRows } from '../components/SideGamesFields'
 
 export const EditTournament = () => {
   const { id } = useParams()
@@ -18,6 +19,7 @@ export const EditTournament = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [sideGames, setSideGames] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -44,6 +46,12 @@ export const EditTournament = () => {
       setSeasonYear(Number(tournament.season_year) || Number(currentLeague?.season_year) || new Date().getFullYear())
       setPlayoffStage(tournament.playoff_stage || 'regular')
       setCourses(coursesRes.data)
+
+      const [sideGamesRes, defaultsRes] = await Promise.all([
+        sideGamesAPI.getForTournament(id),
+        sideGamesAPI.getLeagueDefaults(tournament.league_id || currentLeague?.id)
+      ])
+      setSideGames(buildSideGameRows(defaultsRes.data || [], sideGamesRes.data?.games || [], tournament.number_of_holes))
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Failed to load tournament')
@@ -64,6 +72,9 @@ export const EditTournament = () => {
     setLoading(true)
     try {
       await tournamentsAPI.update(id, date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame, seasonYear, playoffStage)
+      if (sideGames.length > 0) {
+        await sideGamesAPI.saveForTournament(id, sideGames)
+      }
       navigate('/tournaments')
     } catch (err) {
       console.error('Error updating tournament:', err)
@@ -245,6 +256,8 @@ export const EditTournament = () => {
                 </div>
               )}
             </div>
+
+            <SideGamesFields games={sideGames} onChange={setSideGames} showCollected />
 
             <div className="flex gap-3 mt-6">
               <button

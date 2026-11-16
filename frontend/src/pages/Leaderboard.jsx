@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { leaderboardAPI, tournamentsAPI, scoresAPI } from '../api';
+import { leaderboardAPI, tournamentsAPI, scoresAPI, sideGamesAPI } from '../api';
+import { SideGamesResults } from '../components/SideGamesResults';
 import { AuthContext } from '../context/AuthContext';
 import { isAdminCapable } from '../utils/roles';
 import { formatDateOnly } from '../utils/date';
@@ -18,6 +19,7 @@ export function Leaderboard() {
   const [playoffData, setPlayoffData] = useState(null);
   const [activeView, setActiveView] = useState('regular');
   const [ctpWinners, setCtpWinners] = useState([]);
+  const [sideGames, setSideGames] = useState(null);
   const [ctpAdminOptions, setCtpAdminOptions] = useState({ holes: [], players: [] });
   const [ctpDraftRows, setCtpDraftRows] = useState([]);
   const [savingCtp, setSavingCtp] = useState(false);
@@ -122,6 +124,10 @@ export function Leaderboard() {
 
       setTournament(tournamentRes.data);
       setTournamentPlayers(playersRes.data || []);
+      // Side games are extra; a failure here must not break the leaderboard.
+      sideGamesAPI.getForTournament(tournamentId)
+        .then((res) => setSideGames(res.data || null))
+        .catch((sideErr) => console.error('Failed to load side games:', sideErr));
       
       // Handle new response format
       if (leaderboardRes.data.leaderboard) {
@@ -1033,6 +1039,8 @@ export function Leaderboard() {
         )}
         </>
       )}
+
+      <SideGamesResults sideGames={sideGames} />
 
       {/* CTP Winners */}
       {ctpWinners.length > 0 && (

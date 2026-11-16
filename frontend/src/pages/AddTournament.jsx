@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI, coursesAPI, leaguesAPI } from '../api'
+import { tournamentsAPI, coursesAPI, leaguesAPI, sideGamesAPI } from '../api'
+import { SideGamesFields, buildSideGameRows } from '../components/SideGamesFields'
 
 export const AddTournament = () => {
   const navigate = useNavigate()
@@ -17,10 +18,21 @@ export const AddTournament = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const [sideGameDefaults, setSideGameDefaults] = useState([])
+  const [sideGames, setSideGames] = useState([])
+
   useEffect(() => {
     fetchCourses()
     fetchLeague()
   }, [])
+
+  // Fees follow the hole count; keep which games are switched on.
+  useEffect(() => {
+    setSideGames(prev => buildSideGameRows(sideGameDefaults, null, numberOfHoles).map(row => {
+      const before = prev.find(g => g.game_type === row.game_type)
+      return before ? { ...row, enabled: before.enabled } : row
+    }))
+  }, [sideGameDefaults, numberOfHoles])
 
   const fetchLeague = async () => {
     try {
@@ -28,6 +40,10 @@ export const AddTournament = () => {
       const currentSeasonYear = Number(response.data?.season_year)
       if (Number.isFinite(currentSeasonYear) && currentSeasonYear > 0) {
         setSeasonYear(currentSeasonYear)
+      }
+      if (response.data?.id) {
+        const defaultsRes = await sideGamesAPI.getLeagueDefaults(response.data.id)
+        setSideGameDefaults(defaultsRes.data || [])
       }
     } catch (err) {
       console.error('Error fetching current league:', err)
@@ -55,7 +71,10 @@ export const AddTournament = () => {
 
     setLoading(true)
     try {
-      await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame, seasonYear, playoffStage)
+      const created = await tournamentsAPI.create(date, courseId, numberOfHoles, nineHoleSide, firstTeeTime, shotgunStart, standardQuotaGame, seasonYear, playoffStage)
+      if (created.data?.id && sideGames.length > 0) {
+        await sideGamesAPI.saveForTournament(created.data.id, sideGames)
+      }
       navigate('/tournaments')
     } catch (err) {
       console.error('Error creating tournament:', err)
@@ -234,6 +253,8 @@ export const AddTournament = () => {
                 </div>
               )}
             </div>
+
+            <SideGamesFields games={sideGames} onChange={setSideGames} />
 
             <div className="flex gap-3 mt-6">
               <button

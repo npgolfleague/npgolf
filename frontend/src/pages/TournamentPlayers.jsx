@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tournamentsAPI, settingsAPI, coursesAPI } from '../api';
+import { tournamentsAPI, settingsAPI, coursesAPI, sideGamesAPI } from '../api';
+import { SIDE_GAME_SHORT_LABELS, formatMoney } from '../utils/sideGames';
 import { AuthContext } from '../context/AuthContext';
 import { formatDateOnly } from '../utils/date';
 import { isAdminCapable } from '../utils/roles';
@@ -29,7 +30,8 @@ export function TournamentPlayers() {
   const [reconciling, setReconciling] = useState(false);
   const [reconcileInput, setReconcileInput] = useState({ quota_collected: '', skins_collected: '' });
   const [reconcileSaved, setReconcileSaved] = useState(false);
-  
+  const [sideGames, setSideGames] = useState({ games: [], entries: [] });
+
   const isAdmin = isAdminCapable(user);
 
   useEffect(() => {
@@ -59,6 +61,12 @@ export function TournamentPlayers() {
       setPlayers(playersRes.data);
       setAvailablePlayers(availableRes.data);
       setSettings(settingsRes.data);
+      try {
+        const sideGamesRes = await sideGamesAPI.getForTournament(tournamentId);
+        setSideGames(sideGamesRes.data || { games: [], entries: [] });
+      } catch (sideErr) {
+        console.error('Failed to load side games:', sideErr);
+      }
       // Sync reconcile inputs with saved values
       setReconcileInput({
         quota_collected: tournamentRes.data.quota_collected != null ? String(tournamentRes.data.quota_collected) : '',
@@ -177,6 +185,45 @@ export function TournamentPlayers() {
       console.error('Failed to update skins/CTP paid status:', err);
       setError(err.response?.data?.error || 'Failed to update skins/CTP paid status');
       setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, skins_ctp_paid: currentStatus } : p));
+    }
+  };
+
+  const isSideGamePaid = (gameType, playerId) =>
+    sideGames.entries.some(e => e.game_type === gameType && e.player_id === playerId && e.paid);
+
+  const setSideGamePaidLocal = (gameType, playerIds, paid) => {
+    const ids = new Set(playerIds);
+    setSideGames(prev => {
+      const others = prev.entries.filter(e => !(e.game_type === gameType && ids.has(e.player_id)));
+      return { ...prev, entries: [...others, ...playerIds.map(id => ({ game_type: gameType, player_id: id, paid }))] };
+    });
+  };
+
+  const handleToggleSideGamePaid = async (gameType, playerId) => {
+    const current = isSideGamePaid(gameType, playerId);
+    setSideGamePaidLocal(gameType, [playerId], !current);
+    try {
+      await sideGamesAPI.setPaid(tournamentId, gameType, playerId, !current);
+    } catch (err) {
+      console.error('Failed to update side game paid status:', err);
+      setError(err.response?.data?.error || 'Failed to update side game paid status');
+      setSideGamePaidLocal(gameType, [playerId], current);
+    }
+  };
+
+  // One at a time: on a completed tournament each change re-works the results.
+  const handleMarkAllSideGamePaid = async (gameType) => {
+    const unpaid = confirmedPlayers.filter(p => !isSideGamePaid(gameType, p.id)).map(p => p.id);
+    if (unpaid.length === 0) return;
+    setSideGamePaidLocal(gameType, unpaid, true);
+    try {
+      for (const playerId of unpaid) {
+        await sideGamesAPI.setPaid(tournamentId, gameType, playerId, true);
+      }
+    } catch (err) {
+      console.error('Failed to mark all side game paid:', err);
+      setError(err.response?.data?.error || 'Failed to mark all side game paid');
+      await loadData();
     }
   };
 
@@ -371,6 +418,16 @@ export function TournamentPlayers() {
               Mark All Pins/Skins Paid
             </button>
           )}
+          {isAdmin && sideGames.games.map(game => (
+            <button
+              key={game.game_type}
+              onClick={() => handleMarkAllSideGamePaid(game.game_type)}
+              disabled={confirmedPlayers.every(p => isSideGamePaid(game.game_type, p.id))}
+              className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 disabled:bg-gray-400"
+            >
+              Mark All {SIDE_GAME_SHORT_LABELS[game.game_type]} Paid
+            </button>
+          ))}
           <button
             onClick={() => setShowAddModal(true)}
             disabled={actionLoading || availablePlayers.length === 0}
@@ -456,6 +513,26 @@ export function TournamentPlayers() {
               Enter actual amounts collected. If different from calculated, the entered amount is used for all prize payouts on the leaderboard.
               {!isSaved && <span className="ml-1 font-semibold text-red-700">Dollar amounts will be hidden on the leaderboard until you save collected amounts below.</span>}
             </p>
+            {sideGames.games.length > 0 && (
+              <div className="bg-white rounded-lg border border-amber-200 p-4 mb-4">
+                <div className="font-semibold text-gray-800 mb-2">🎲 Side Games</div>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {sideGames.games.map(game => {
+                    const paidCount = confirmedPlayers.filter(p => isSideGamePaid(game.game_type, p.id)).length;
+                    const pot = game.collected != null ? game.collected : paidCount * game.fee;
+                    return (
+                      <li key={game.game_type}>
+                        {game.label}: <span className="font-semibold text-gray-900">{paidCount} players</span> × {formatMoney(game.fee)} ={' '}
+                        <span className="font-semibold">{formatMoney(paidCount * game.fee)}</span>
+                        {game.collected != null && <span> (collected {formatMoney(game.collected)})</span>}
+                        {' '}&bull; pot {formatMoney(pot)}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">Change fees or the collected amount on Edit Tournament.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
               {/* Quota Game */}
               <div className="bg-white rounded-lg border border-amber-200 p-4">
@@ -535,6 +612,11 @@ export function TournamentPlayers() {
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Paid - Pins/Skins Game
               </th>
+              {sideGames.games.length > 0 && (
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Paid - Side Games
+                </th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Foursome
               </th>
@@ -627,6 +709,30 @@ export function TournamentPlayers() {
                       </span>
                     )}
                   </td>
+                  {sideGames.games.length > 0 && (
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="flex flex-wrap justify-center gap-1">
+                        {sideGames.games.map(game => {
+                          const paid = isSideGamePaid(game.game_type, player.id);
+                          const label = `${paid ? '✓' : '✗'} ${SIDE_GAME_SHORT_LABELS[game.game_type]}`;
+                          const tone = paid ? 'bg-teal-100 text-teal-800' : 'bg-gray-100 text-gray-700';
+                          return isAdmin ? (
+                            <button
+                              key={game.game_type}
+                              onClick={() => handleToggleSideGamePaid(game.game_type, player.id)}
+                              disabled={actionLoading}
+                              aria-pressed={paid}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${tone} ${paid ? 'hover:bg-teal-200' : 'hover:bg-gray-200'} disabled:opacity-50`}
+                            >
+                              {label}
+                            </button>
+                          ) : (
+                            <span key={game.game_type} className={`px-3 py-1 rounded-full text-xs font-semibold ${tone}`}>{label}</span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {isAdmin ? (
                       <input

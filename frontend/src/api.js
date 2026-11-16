@@ -252,4 +252,13 @@ export const rulesAPI = {
   publishDraft: (id) => apiClient.post(`/rules/${id}/publish`)
 }
 
+export const sideGamesAPI = {
+  getForTournament: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/side-games`),
+  saveForTournament: (tournamentId, games) => apiClient.put(`/tournaments/${tournamentId}/side-games`, { games }),
+  setPaid: (tournamentId, gameType, playerId, paid) =>
+    apiClient.put(`/tournaments/${tournamentId}/side-games/${gameType}/players/${playerId}/paid`, { paid }),
+  getLeagueDefaults: (leagueId) => apiClient.get(`/leagues/${leagueId}/side-game-defaults`),
+  saveLeagueDefaults: (leagueId, defaults) => apiClient.put(`/leagues/${leagueId}/side-game-defaults`, { defaults })
+}
+
 export default apiClient
