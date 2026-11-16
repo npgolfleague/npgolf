@@ -85,7 +85,7 @@ export const LeagueSelect = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fairway-50 to-fairway-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-ink-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-fairway-100 rounded-full mb-4">

@@ -48,7 +48,7 @@ export const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+    <div className="min-h-screen bg-tour-900 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
         <div className="mb-6 flex justify-center">
           <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-12 w-auto" />

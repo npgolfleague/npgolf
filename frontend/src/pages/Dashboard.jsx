@@ -129,34 +129,34 @@ export const Dashboard = () => {
       {/* Top Navigation Menu */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <img src="/npgolf-logo.svg" alt="NPGOLF" className="h-14 w-auto" />
+          <div className="flex justify-between items-center py-3">
+            <img src="/npgolf-logo.svg" alt="NPGOLF" className="hidden md:block h-12 w-auto" />
             <div className="flex gap-2 items-center">
               {!user && (
                 <>
                   <button
                     onClick={() => navigate('/register')}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition font-medium"
+                    className="btn-accent"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Join</span>
                   </button>
                   <button
                     onClick={() => navigate('/login')}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition font-medium"
+                    className="btn-secondary"
                   >
                     <Lock className="w-4 h-4" />
                     <span>Sign In</span>
                   </button>
                 </>
               )}
-              {user && menuItems.map(item => {
+              {user && menuItems.map((item, idx) => {
                 const Icon = item.icon
                 return (
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-${item.color}-500 hover:bg-${item.color}-600 text-white transition font-medium`}
+                    className={idx === 0 ? 'btn-accent' : 'btn-secondary'}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="hidden sm:inline">{item.label}</span>
@@ -171,19 +171,16 @@ export const Dashboard = () => {
       {/* Main Content */}
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">{cupName} — {currentLeague?.season_year || new Date().getFullYear()} Season</p>
+          <h1 className="text-4xl font-bold text-ink-900">Dashboard</h1>
+          <p className="font-display text-base uppercase tracking-wider text-ink-500 mt-1">{cupName} — {currentLeague?.season_year || new Date().getFullYear()} Season</p>
         </div>
         {/* Priority 5: Dashboard Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* Card 1: Next Event */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-              <CalendarDays className="w-6 h-6" />
-            </div>
+          <div className="bg-white rounded-lg border border-ink-200 border-t-4 border-t-tour-800 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Next Event</p>
-              <p className="text-lg font-bold text-slate-900 truncate">
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-500">Next Event</p>
+              <p className="font-display text-2xl font-bold uppercase text-ink-900 truncate">
                 {tournaments.length > 0 ? formatDate(tournaments[0].date) : 'TBD'}
               </p>
               <p className="text-xs text-slate-500 truncate">
@@ -193,25 +190,19 @@ export const Dashboard = () => {
           </div>
 
           {/* Card 2: Field Strength */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-fairway-50 flex items-center justify-center text-fairway-600 shrink-0">
-              <Users className="w-6 h-6" />
-            </div>
+          <div className="bg-white rounded-lg border border-ink-200 border-t-4 border-t-tour-800 px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Active Field</p>
-              <p className="text-2xl font-bold text-slate-900">{players.length}</p>
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-500">Active Field</p>
+              <p className="num text-4xl font-bold leading-none text-ink-900">{players.length}</p>
               <p className="text-xs text-slate-500">Registered Players</p>
             </div>
           </div>
 
           {/* Card 3: League Leader */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
-              <Trophy className="w-6 h-6" />
-            </div>
+          <div className="bg-white rounded-lg border border-ink-200 border-t-4 border-t-tour-800 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Points Leader</p>
-              <p className="text-lg font-bold text-slate-900 truncate">
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-500">Points Leader</p>
+              <p className="font-display text-2xl font-bold uppercase text-ink-900 truncate">
                 {players.length > 0 ? players[0].name : '---'}
               </p>
               <p className="text-xs text-slate-500">
@@ -221,13 +212,10 @@ export const Dashboard = () => {
           </div>
 
           {/* Card 4: Prize Pool Estimate */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
-              <Activity className="w-6 h-6" />
-            </div>
+          <div className="bg-white rounded-lg border border-ink-200 border-t-4 border-t-tour-800 px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Season Status</p>
-              <p className="text-lg font-bold text-slate-900">Active</p>
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-500">Season Status</p>
+              <p className="font-display text-2xl font-bold uppercase text-ink-900">Active</p>
               <p className="text-xs text-slate-500">Tournament Mode</p>
             </div>
           </div>
@@ -388,80 +376,61 @@ export const Dashboard = () => {
               ) : (
                 <div className="overflow-x-auto -mx-4 sm:mx-0">
                   <table className="w-full min-w-[920px]">
-                    <thead className="bg-slate-50 border-y border-slate-200">
+                    <thead className="bg-tour-800 text-white">
                       <tr>
-                        <th scope="col" aria-label="Rank" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Rank" className="px-6 py-4 text-left text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Rank
                         </th>
-                        <th scope="col" aria-label="Player" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Player" className="px-6 py-4 text-left text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Player
                         </th>
-                        <th scope="col" aria-label={`${cupName} Points`} className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label={`${cupName} Points`} className="px-6 py-4 text-center text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           {cupName} Pts
                         </th>
-                        <th scope="col" aria-label="18-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="18-Hole Quota" className="px-6 py-4 text-center text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Quota 18H
                         </th>
-                        <th scope="col" aria-label="9-Hole Quota" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="9-Hole Quota" className="px-6 py-4 text-center text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Quota 9H
                         </th>
-                        <th scope="col" aria-label="Tournaments Played" className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Tournaments Played" className="px-6 py-4 text-center text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Tournaments
                         </th>
-                        <th scope="col" aria-label="Prize Money Year to Date" className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th scope="col" aria-label="Prize Money Year to Date" className="px-6 py-4 text-right text-sm font-semibold text-tour-100 uppercase tracking-wider">
                           Prize Money YTD
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {players.map((player, index) => (
-                        <tr key={player.id} className="hover:bg-gray-50 transition">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {index < 3 ? (
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                                  index === 0 ? 'bg-amber-100 text-amber-600' :
-                                  index === 1 ? 'bg-slate-200 text-slate-600' :
-                                  'bg-orange-100 text-orange-500'
-                                }`}>
-                                  {index + 1}
-                                </div>
-                              ) : (
-                                <span className="text-sm font-medium text-gray-900">
-                                  #{index + 1}
-                                </span>
-                              )}
+                        <tr key={player.id} className={`hover:bg-ink-50 transition ${index === 0 ? 'bg-flag-50 shadow-[inset_4px_0_0_theme(colors.flag.400)]' : ''}`}>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <span className={`num text-2xl font-bold ${index === 0 ? 'text-tour-800' : 'text-ink-900'}`}>
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-base font-semibold uppercase tracking-wide text-ink-900">
+                              {player.name}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                {player.name?.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-semibold text-gray-900">
-                                  {player.name}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="text-lg font-bold text-blue-600">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
+                            <span className="num text-2xl font-bold text-tour-700">
                               {(player.fedex_points || 0).toLocaleString()}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <span className="text-sm font-semibold text-gray-900">{player.quota_18 ?? '-'}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <span className="text-sm font-semibold text-gray-900">{player.quota_9 ?? '-'}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <span className="text-sm text-gray-900">
                               {player.tournaments_played || 0}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-6 py-3 whitespace-nowrap text-right">
                             <span className="text-sm font-semibold text-green-600">
                               ${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>

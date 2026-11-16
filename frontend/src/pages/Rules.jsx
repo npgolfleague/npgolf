@@ -188,7 +188,7 @@ export const Rules = () => {
             The Quota Point system awards points based on your scores for each hole. Once you hit double bogey, 
             you pick up and move to the next hole to keep pace of play.
           </p>
-          <div className="bg-gradient-to-r from-yellow-50 to-green-50 rounded-lg p-6 mb-4">
+          <div className="bg-flag-50 rounded-lg p-6 mb-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-3xl font-bold text-yellow-600">10</div>
@@ -268,7 +268,7 @@ export const Rules = () => {
           <p className="text-gray-700 mb-4">
             Once you have a quota, you can start earning {cupName} points. Points are earned weekly as follows:
           </p>
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-4">
+          <div className="bg-ink-50 rounded-lg p-6 mb-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="text-center bg-white rounded p-2">
                 <div className="text-2xl font-bold text-purple-600">100</div>

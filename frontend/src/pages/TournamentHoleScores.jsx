@@ -102,7 +102,7 @@ export const TournamentHoleScores = () => {
         ← Back to Tournaments
       </button>
 
-      <h1 className="text-3xl font-bold text-gray-900">⛳ Hole-by-Hole Scores</h1>
+      <h1 className="text-3xl font-bold text-gray-900">Hole-by-Hole Scores</h1>
 
       {tournament && (
         <p className="mt-2 text-gray-600">

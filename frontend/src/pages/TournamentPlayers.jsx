@@ -451,7 +451,7 @@ export function TournamentPlayers() {
         const isSaved = tournament.quota_collected != null || tournament.skins_collected != null;
         return (
           <div className="mb-6 bg-amber-50 border border-amber-300 rounded-lg p-5">
-            <h3 className="text-lg font-bold text-amber-900 mb-1">💰 Prize Money Reconciliation</h3>
+            <h3 className="text-lg font-bold text-amber-900 mb-1">Prize Money Reconciliation</h3>
             <p className="text-xs text-amber-700 mb-4">
               Enter actual amounts collected. If different from calculated, the entered amount is used for all prize payouts on the leaderboard.
               {!isSaved && <span className="ml-1 font-semibold text-red-700">Dollar amounts will be hidden on the leaderboard until you save collected amounts below.</span>}
