@@ -886,93 +886,94 @@ export const ScoreEntry = () => {
   }
 
   const getFoursomeGameSummary = () => {
-    if (!selectedTournament || !foursomeGameEnabled || selectedPlayers.length !== 4 || playableHoles.length === 0) {
-      return null
+    if (!selectedTournament || !foursomeGameEnabled || selectedPlayers.length !== 4 || playableHoles.length === 0) return null
+    const matchAmt = Number(foursomeGameMatchAmount) || 0
+    const ctpAmt = Number(foursomeGameCtpAmount) || 0
+    const segSize = selectedTournament.number_of_holes === 9 ? 3 : 6
+    const numSegs = 3
+    const [A, B, C, D] = selectedPlayers.map(id => players.find(p => p.id === id))
+    const segPairs = [[[A, B], [C, D]], [[A, C], [B, D]], [[A, D], [B, C]]]
+    const getPairSegQuotaPoints = (pair, start, end) =>
+      playableHoles.slice(start, end).reduce((sum, h) =>
+        sum + pair.reduce((ps, p) => {
+          const raw = scores[`${h.hole_number}-${p?.id}-quota`]
+          if (raw === '' || raw === null || raw === undefined) return ps
+          const parsed = Number(raw)
+          return ps + (Number.isNaN(parsed) ? 0 : parsed)
+        }, 0), 0)
+    const getPairSegGoal = (pair) => {
+      const pairQuotaTotal = pair.reduce((sum, p) => sum + (getPlayerCurrentQuota(p) || 0), 0)
+      return Math.round(pairQuotaTotal / 3)
     }
-
-    const segmentLength = playableHoles.length / 3
-    if (!Number.isInteger(segmentLength) || segmentLength <= 0) {
-      return null
+    const segments = []
+    for (let s = 0; s < numSegs; s++) {
+      const start = s * segSize
+      const end = start + segSize
+      const [p0, p1] = segPairs[s]
+      const goal0 = getPairSegGoal(p0)
+      const goal1 = getPairSegGoal(p1)
+      const actual0 = getPairSegQuotaPoints(p0, start, end)
+      const actual1 = getPairSegQuotaPoints(p1, start, end)
+      const seg0 = actual0 - goal0
+      const seg1 = actual1 - goal1
+      const pot = matchAmt
+      let result
+      if (seg0 > seg1) { result = { winner: 0, amount: matchAmt } }
+      else if (seg1 > seg0) { result = { winner: 1, amount: matchAmt } }
+      else { result = { winner: -1, amount: 0 } }
+      segments.push({
+        seg: s + 1,
+        holes: `${playableHoles[start]?.hole_number}–${playableHoles[end - 1]?.hole_number}`,
+        pair0: p0,
+        pair1: p1,
+        pair0score: seg0,
+        pair1score: seg1,
+        pair0goal: goal0,
+        pair1goal: goal1,
+        pair0actual: actual0,
+        pair1actual: actual1,
+        result,
+        pot
+      })
     }
+    const playerTotals = {}
+    selectedPlayers.forEach(id => { playerTotals[id] = 0 })
+    segments.forEach(seg => {
+      const winners = seg.result.winner === 0 ? seg.pair0 : seg.result.winner === 1 ? seg.pair1 : []
+      const losers = seg.result.winner === 0 ? seg.pair1 : seg.result.winner === 1 ? seg.pair0 : []
+      winners.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) + seg.result.amount })
+      losers.forEach(p => { if (p?.id) playerTotals[p.id] = (playerTotals[p.id] || 0) - seg.result.amount })
+    })
+    const ctpPar3Holes = playableHoles.filter(h => h.mens_par === 3)
+    let ctpCarryoverPerPlayer = ctpAmt
+    const ctpRows = ctpPar3Holes.map((h, idx) => {
+      const record = foursomeGameCtpData[h.hole_number]
+      const winner = record?.playerId ? players.find(p => p.id === record.playerId) : null
+      // CTP setup amount is per player; winner receives from the other players.
+      const amount = winner ? ctpCarryoverPerPlayer * (selectedPlayers.length - 1) : 0
+      const isLast = idx === ctpPar3Holes.length - 1
 
-    const matchAmount = Number(foursomeGameMatchAmount) || 0
-    const ctpBaseAmount = Number(foursomeGameCtpAmount) || 0
-    const slots = ['A', 'B', 'C', 'D']
-    const lineup = selectedPlayers.map((playerId, index) => {
-      const player = players.find(entry => entry.id === playerId) || null
-      return {
-        slot: slots[index],
-        playerId,
-        player,
-        quotaTarget: Math.floor((getPlayerCurrentQuota(player) || 0) / 3)
+      if (winner) {
+        ctpCarryoverPerPlayer = ctpAmt
+      } else if (!isLast) {
+        ctpCarryoverPerPlayer += ctpAmt
+      }
+
+      return { hole: h.hole_number, winner: winner?.name || '—', winnerId: winner?.id || null, amount }
+    })
+    // Apply CTP payouts to playerTotals
+    ctpRows.forEach(row => {
+      if (row.winnerId && row.amount > 0) {
+        selectedPlayers.forEach(id => {
+          if (id === row.winnerId) {
+            playerTotals[id] = (playerTotals[id] || 0) + row.amount
+          } else {
+            playerTotals[id] = (playerTotals[id] || 0) - (row.amount / (selectedPlayers.length - 1))
+          }
+        })
       }
     })
-
-    const pairings = [
-      [[0, 1], [2, 3]],
-      [[0, 2], [1, 3]],
-      [[0, 3], [1, 2]]
-    ]
-
-    const segments = pairings.map((pairing, index) => {
-      const holes = playableHoles.slice(index * segmentLength, (index + 1) * segmentLength)
-      const [teamAIndexes, teamBIndexes] = pairing
-      const teamAPlayers = teamAIndexes.map(playerIndex => lineup[playerIndex])
-      const teamBPlayers = teamBIndexes.map(playerIndex => lineup[playerIndex])
-
-      const getPlayerSegmentPoints = (playerId) => holes.reduce((sum, hole) => {
-        const quotaValue = scores[`${hole.hole_number}-${playerId}-quota`]
-        return sum + (parseInt(quotaValue) || 0)
-      }, 0)
-
-      const teamAActual = teamAPlayers.reduce((sum, entry) => sum + getPlayerSegmentPoints(entry.playerId), 0)
-      const teamBActual = teamBPlayers.reduce((sum, entry) => sum + getPlayerSegmentPoints(entry.playerId), 0)
-      const teamATarget = teamAPlayers.reduce((sum, entry) => sum + entry.quotaTarget, 0)
-      const teamBTarget = teamBPlayers.reduce((sum, entry) => sum + entry.quotaTarget, 0)
-      const winner = teamAActual > teamBActual ? 'A' : teamBActual > teamAActual ? 'B' : 'Tie'
-
-      return {
-        label: `${teamAPlayers.map(entry => entry.slot).join('+')} vs ${teamBPlayers.map(entry => entry.slot).join('+')}`,
-        holes,
-        teamAPlayers,
-        teamBPlayers,
-        teamAActual,
-        teamBActual,
-        teamATarget,
-        teamBTarget,
-        winner,
-        payoutPerPlayer: winner === 'Tie' ? matchAmount / 2 : matchAmount
-      }
-    })
-
-    const ctpHoles = playableHoles.filter(hole => hole.mens_par === 3)
-    let carryover = ctpBaseAmount
-    const ctpRows = ctpHoles.map((hole, index) => {
-      const record = foursomeGameCtpData[hole.hole_number]
-      const payout = record ? carryover : 0
-      const isLastHole = index === ctpHoles.length - 1
-
-      if (record) {
-        carryover = ctpBaseAmount
-      } else if (!isLastHole) {
-        carryover += ctpBaseAmount
-      }
-
-      return {
-        hole,
-        record,
-        payout,
-        carryover
-      }
-    })
-
-    return {
-      modeLabel: selectedTournament.number_of_holes === 9 ? '333' : '666',
-      lineup,
-      segments,
-      ctpRows,
-      ctpBaseAmount
-    }
+    return { modeLabel: selectedTournament.number_of_holes === 9 ? '333' : '666', players: [A, B, C, D], segments, playerTotals, ctpRows, matchAmt, ctpAmt }
   }
 
   const foursomeGameSummary = getFoursomeGameSummary()
@@ -1359,6 +1360,72 @@ export const ScoreEntry = () => {
               : 'Select a tournament to determine whether this side game runs as 333 (9 holes) or 666 (18 holes).'}
           </p>
         </div>
+
+        {/* Side Game Results */}
+        {foursomeGameEnabled && foursomeGameSummary && (
+          <div className="bg-white rounded-lg shadow p-4 mb-4 border border-emerald-300">
+            <div className="text-sm font-semibold text-emerald-900 mb-3">{foursomeGameSummary.modeLabel} Side Game – Live Results</div>
+            <div className="space-y-2 mb-3">
+              {foursomeGameSummary.segments.map(seg => (
+                <div key={seg.seg} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1">
+                    <span>Segment {seg.seg} (holes {seg.holes})</span>
+                    <span className="text-emerald-700">Pot: ${seg.pot.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>
+                      {seg.pair0.map(p => p?.name).join(' & ')}: <b>{seg.pair0score > 0 ? '+' : ''}{seg.pair0score}</b>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair0actual}, goal {seg.pair0goal})</span>
+                    </span>
+                    <span className={seg.result.winner === 0 ? 'text-emerald-700 font-bold' : seg.result.winner === 1 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
+                      {seg.result.winner === 0 ? '✓ WIN' : seg.result.winner === 1 ? 'loss' : 'PUSH'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>
+                      {seg.pair1.map(p => p?.name).join(' & ')}: <b>{seg.pair1score > 0 ? '+' : ''}{seg.pair1score}</b>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(actual {seg.pair1actual}, goal {seg.pair1goal})</span>
+                    </span>
+                    <span className={seg.result.winner === 1 ? 'text-emerald-700 font-bold' : seg.result.winner === 0 ? 'text-red-500 font-bold' : 'text-gray-500 font-semibold'}>
+                      {seg.result.winner === 1 ? '✓ WIN' : seg.result.winner === 0 ? 'loss' : 'PUSH'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <div className="text-xs font-semibold text-gray-600 mb-1">Running totals</div>
+              <div className="grid grid-cols-2 gap-1">
+                {foursomeGameSummary.players.map(p => p && (
+                  <div key={p.id} className="flex justify-between text-sm font-semibold">
+                    <span>{p.name}</span>
+                    <span className={`text-sm font-semibold ${
+                      (foursomeGameSummary.playerTotals[p.id] || 0) > 0 ? 'text-emerald-700' :
+                      (foursomeGameSummary.playerTotals[p.id] || 0) < 0 ? 'text-red-600' : 'text-gray-400'
+                    }`}>
+                      {(foursomeGameSummary.playerTotals[p.id] || 0) > 0
+                        ? `wins $${(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
+                        : (foursomeGameSummary.playerTotals[p.id] || 0) < 0
+                          ? `owes $${Math.abs(foursomeGameSummary.playerTotals[p.id]).toFixed(2)}`
+                          : 'even'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {foursomeGameSummary.ctpRows.length > 0 && foursomeGameSummary.ctpAmt > 0 && (
+              <div className="mt-3 border-t pt-2">
+                <div className="text-xs font-semibold text-gray-600 mb-1">Side CTP (par 3s)</div>
+                {foursomeGameSummary.ctpRows.map(r => (
+                  <div key={r.hole} className="flex justify-between text-xs text-gray-700">
+                    <span>Hole {r.hole}: {r.winner}</span>
+                    <span>${r.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Score Entry for Current Hole */}
         {selectedPlayers.length > 0 && holeData && (
