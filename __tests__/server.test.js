@@ -40,6 +40,14 @@ jest.mock('../src/db', () => {
         return [[{ tournament_fee_18_holes: 100, tournament_fee_9_holes: 50 }], []];
       }
 
+      // Current season lookup (src/seasons.js getCurrentSeason).
+      if (normalized.includes('select season_year from leagues')) {
+        return [[{ season_year: 2026 }], []];
+      }
+      if (normalized.includes('from league_seasons where league_id = ? and season_year = ?')) {
+        return [[{ id: 1, league_id: 1, season_year: 2026, status: 'open' }], []];
+      }
+
       if (normalized.includes('select id, number_of_holes from tournament')) {
         return [[], []];
       }

@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
+const seasons = require('../seasons');
 const router = express.Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -441,6 +442,127 @@ router.get('/:id/playoff-overview', async (req, res) => {
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch playoff overview' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Seasons: history, archive and rollover (logic in src/seasons.js)
+// ---------------------------------------------------------------------------
+
+function sendSeasonsError(res, err, label) {
+  if (err instanceof seasons.SeasonError) {
+    return res.status(err.status).json({ error: err.message, ...(err.details || {}) });
+  }
+  console.error(`${label}:`, err);
+  return res.status(500).json({ error: label });
+}
+
+function parseSeasonId(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// GET /api/leagues/:id/seasons - every season, newest first
+router.get('/:id/seasons', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  try {
+    res.json(await seasons.listSeasons(pool, Number(id)));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to fetch seasons');
+  }
+});
+
+// GET /api/leagues/:id/seasons/rollover-preview - checks before Start New Season
+router.get('/:id/seasons/rollover-preview', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  try {
+    res.json(await seasons.getRolloverPreview(pool, Number(id)));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to check the season');
+  }
+});
+
+// POST /api/leagues/:id/seasons/rollover - close the current season and start the next
+// Body: { new_season_year?, quota_mode: 'keep'|'set', quota_18?, quota_9?, carry_pots?, move_unplayed? }
+router.post('/:id/seasons/rollover', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  try {
+    const result = await seasons.rolloverSeason(pool, Number(id), req.body || {}, req.user?.id);
+    console.log(`Season rollover: league=${id} ${result.closed_season_year} -> ${result.new_season_year} by player ${req.user?.id}`);
+    res.json(result);
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to start the new season');
+  }
+});
+
+// GET /api/leagues/:id/seasons/:seasonId - standings (frozen when closed) and tournaments
+router.get('/:id/seasons/:seasonId', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  const seasonId = parseSeasonId(req.params.seasonId);
+  if (!seasonId) return res.status(400).json({ error: 'Invalid season id' });
+  try {
+    res.json(await seasons.getSeasonDetail(pool, Number(id), seasonId));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to fetch season');
+  }
+});
+
+// GET /api/leagues/:id/seasons/:seasonId/standings.csv - download standings
+router.get('/:id/seasons/:seasonId/standings.csv', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  const seasonId = parseSeasonId(req.params.seasonId);
+  if (!seasonId) return res.status(400).json({ error: 'Invalid season id' });
+  try {
+    const detail = await seasons.getSeasonDetail(pool, Number(id), seasonId);
+    const cols = [
+      ['final_rank', 'Rank'], ['player_name', 'Player'], ['fedex_points', 'FedEx Points'],
+      ['regular_points', 'Regular Points'], ['playoff_points', 'Playoff Points'],
+      ['tournaments_played', 'Played'], ['prize_quota', 'Quota $'], ['prize_skins', 'Skins $'],
+      ['prize_ctp', 'CTP $'], ['prize_side_games', 'Side Games $'], ['prize_money', 'Total $'],
+      ['end_quota_18', 'Quota 18'], ['end_quota_9', 'Quota 9']
+    ];
+    const esc = (v) => {
+      const str = v == null ? '' : String(v);
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const lines = [cols.map(([, h]) => h).join(',')];
+    detail.standings.forEach((row) => lines.push(cols.map(([k]) => esc(row[k])).join(',')));
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="season-${detail.season.season_year}-standings.csv"`);
+    res.send(lines.join('\n'));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to export season');
+  }
+});
+
+// POST /api/leagues/:id/seasons/:seasonId/reopen - allow corrections to a closed season
+router.post('/:id/seasons/:seasonId/reopen', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  const seasonId = parseSeasonId(req.params.seasonId);
+  if (!seasonId) return res.status(400).json({ error: 'Invalid season id' });
+  try {
+    res.json(await seasons.reopenSeason(pool, Number(id), seasonId));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to reopen season');
+  }
+});
+
+// POST /api/leagues/:id/seasons/:seasonId/close - close a reopened past season again
+router.post('/:id/seasons/:seasonId/close', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!ensureLeagueScope(req, res, id)) return;
+  const seasonId = parseSeasonId(req.params.seasonId);
+  if (!seasonId) return res.status(400).json({ error: 'Invalid season id' });
+  try {
+    res.json(await seasons.recloseSeason(pool, Number(id), seasonId, req.user?.id));
+  } catch (err) {
+    sendSeasonsError(res, err, 'Failed to close season');
   }
 });
 

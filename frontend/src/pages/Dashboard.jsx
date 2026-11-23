@@ -203,10 +203,10 @@ export const Dashboard = () => {
             <div className="min-w-0">
               <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-500">Points Leader</p>
               <p className="font-display text-2xl font-bold uppercase text-ink-900 truncate">
-                {players.length > 0 ? players[0].name : '---'}
+                {players.length > 0 && Number(players[0].fedex_points) > 0 ? players[0].name : '---'}
               </p>
               <p className="text-xs text-slate-500">
-                {players.length > 0 ? `${Math.round(players[0].fedex_points || 0)} Points` : 'No results yet'}
+                {players.length > 0 && Number(players[0].fedex_points) > 0 ? `${Math.round(players[0].fedex_points)} Points` : 'No results yet'}
               </p>
             </div>
           </div>

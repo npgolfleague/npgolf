@@ -123,7 +123,13 @@ const rebuildTournamentPayouts = async (db, tournamentId) => {
 // Recalculate payouts for every tournament in a league. Returns how many
 // players in the league have any payout.
 const rebuildLeaguePayouts = async (db, leagueId) => {
-  const [tournaments] = await db.query('SELECT id FROM tournament WHERE league_id = ?', [leagueId]);
+  // Closed seasons are frozen (see src/seasons.js), so only open seasons are rebuilt.
+  const [tournaments] = await db.query(
+    `SELECT t.id FROM tournament t
+     LEFT JOIN league_seasons ls ON ls.id = t.season_id
+     WHERE t.league_id = ? AND (ls.status IS NULL OR ls.status = 'open')`,
+    [leagueId]
+  );
   for (const t of tournaments) {
     await rebuildTournamentPayouts(db, t.id);
   }
