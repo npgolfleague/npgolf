@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
 const { rebuildLeaguePayouts } = require('../payouts');
+const { getCurrentSeason } = require('../seasons');
 const { requireAdmin, requireAuth, isSuperAdminRole } = require('../middleware/admin');
 const router = express.Router();
 
@@ -33,15 +34,21 @@ router.get('/', requireAuth, async (req, res) => {
     // Keep this league's payouts current (paid flags and winners can change
     // after completion), then read this league's totals.
     await rebuildLeaguePayouts(pool, leagueId);
-    let query = `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, lpt.fedex_points,
-                 lpt.tournaments_played, lpt.prize_money, p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at
+    // Totals are for the current season only, so a new season starts at 0.
+    const season = await getCurrentSeason(pool, leagueId);
+    let query = `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9,
+                 COALESCE(lpt.fedex_points, 0) AS fedex_points,
+                 COALESCE(lpt.tournaments_played, 0) AS tournaments_played,
+                 COALESCE(lpt.prize_money, 0) AS prize_money,
+                 p.role, p.active, p.sms_allowed, p.email_allowed, p.created_at
                  FROM players p
                  INNER JOIN league_players lp ON p.id = lp.player_id
-                 INNER JOIN league_player_totals lpt ON lpt.league_id = lp.league_id AND lpt.player_id = p.id
+                 LEFT JOIN league_player_season_totals lpt
+                   ON lpt.league_id = lp.league_id AND lpt.player_id = p.id AND lpt.season_id = ?
                  WHERE lp.league_id = ?`;
-    let params = [leagueId];
+    let params = [season.id, leagueId];
 
-    query += ' ORDER BY lpt.fedex_points DESC, p.name ASC';
+    query += ' ORDER BY fedex_points DESC, p.name ASC';
     
     const [rows] = await pool.query(query, params);
     res.json(rows);
@@ -344,14 +351,19 @@ router.put('/:id', requireAdmin, async (req, res) => {
         quotaValues
       );
     }
+    const season = await getCurrentSeason(pool, leagueId);
     const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9, lpt.fedex_points, lpt.tournaments_played, lpt.prize_money,
+      `SELECT p.id, p.name, p.email, p.phone, p.sex, lp.quota_18, lp.quota_9,
+              COALESCE(lpt.fedex_points, 0) AS fedex_points,
+              COALESCE(lpt.tournaments_played, 0) AS tournaments_played,
+              COALESCE(lpt.prize_money, 0) AS prize_money,
               p.role, p.active, p.sms_allowed, p.email_allowed, p.default_tee_name, p.created_at
        FROM players p
        LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
-       LEFT JOIN league_player_totals lpt ON lpt.league_id = lp.league_id AND lpt.player_id = p.id
+       LEFT JOIN league_player_season_totals lpt
+         ON lpt.league_id = lp.league_id AND lpt.player_id = p.id AND lpt.season_id = ?
        WHERE p.id = ?`,
-      [leagueId, id]
+      [leagueId, season.id, id]
     );
     
     if (rows.length === 0) {

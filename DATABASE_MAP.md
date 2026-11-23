@@ -50,6 +50,7 @@ emails, schema_migrations  (standalone)
 | Tournaments | `tournament`, `tournament_players`, `scores`, `foursome_posts` |
 | Results | `tournament_paradise_points`, `tournament_skin_winners`, `tournament_ctp_winners`, `tournament_playoff_points`, `season_player_stats`, `tournament_results_email`, `tournament_completion_backups` |
 | Quota | `quota` (7 rolling slots), `skins_quota` (20 slots) |
+| Seasons (migration 065) | `league_seasons.status/closed_at/closed_by`, `season_archive_standings` (frozen final standings), `league_player_season_totals` (view) |
 | Side games (migration 064) | `league_side_game_defaults`, `tournament_side_games`, `tournament_side_game_entries` (opt-in), `tournament_side_game_teams` (saved Blind Draw), `tournament_side_game_results`; prize money goes to `tournament_payouts` as `side_games` |
 | Other | `emails`, `schema_migrations` |
 
@@ -194,6 +195,22 @@ The 2 stored CTP photos (base64 PNGs) take **7.0 MB in `scores` + 0.8 MB in `tou
 - Then drop `scores.ctp_image_url`, `scores.foursome_ctp_image_url` and `tournament_ctp_winners.ctp_image_url`.
 
 Backups shrink, and every `SELECT *` on `scores` gets lighter on the Pi.
+
+---
+
+## 3.6 Done: season rollover and archive (`065_season_rollover.sql` + `src/seasons.js`)
+
+- **Season totals are per season.** The Dashboard standings, the player list and the results emails read `league_player_season_totals` for the league's current season (`leagues.season_year`). A new season starts every player at 0 points and $0 without deleting anything. `league_player_totals` (all-time) is no longer read.
+- **Start New Season** (Seasons page, admins; `POST /api/leagues/:id/seasons/rollover`):
+  1. Refuses while any tournament in the season has scores but isn't completed.
+  2. Optionally moves tournaments with no scores into the new season (default on).
+  3. Rebuilds the season's payouts one last time, then freezes each player's final rank, points, tournaments played, prize money by category and end-of-season quota in `season_archive_standings`.
+  4. Marks the old season `closed`, creates the new `league_seasons` row (pots at $0 unless carried over) and sets `leagues.season_year`.
+  5. Quota: kept by default. "Reset" sets everyone's quota to a starting value and clears the league's `quota` / `skins_quota` history, since quota is the average of that history.
+  All in one transaction.
+- **Closed seasons are read-only.** Creating, editing, deleting, completing or restoring a tournament in a closed season returns 409, and `rebuildLeaguePayouts` skips closed seasons. An admin can reopen a past season for corrections and close it again, which re-freezes the standings.
+- **History:** `GET /api/leagues/:id/seasons`, `GET /api/leagues/:id/seasons/:seasonId` (frozen standings when closed, live otherwise) and `.../standings.csv`.
+- The migration also gives any tournament with no `season_id` the season for its league and year.
 
 ---
 

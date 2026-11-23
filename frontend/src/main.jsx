@@ -41,6 +41,7 @@ const TournamentPlayers = lazyPage(() => import('./pages/TournamentPlayers'), 'T
 const Leaderboard = lazyPage(() => import('./pages/Leaderboard'), 'Leaderboard')
 const Settings = lazyPage(() => import('./pages/Settings'), 'Settings')
 const League = lazyPage(() => import('./pages/League'), 'League')
+const Seasons = lazyPage(() => import('./pages/Seasons'), 'Seasons')
 const Tournaments = lazyPage(() => import('./pages/Tournaments'), 'Tournaments')
 const AddTournament = lazyPage(() => import('./pages/AddTournament'), 'AddTournament')
 const EditTournament = lazyPage(() => import('./pages/EditTournament'), 'EditTournament')
@@ -124,6 +125,7 @@ try {
               <Route path="/tournaments/:tournamentId/hole-scores" element={<TournamentHoleScores />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/league" element={<League />} />
+              <Route path="/seasons" element={<Seasons />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/manage" element={<RulesManager />} />
               <Route path="/rules/edit" element={<Navigate to="/rules/manage" replace />} />

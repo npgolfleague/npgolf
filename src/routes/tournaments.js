@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { rebuildTournamentPayouts } = require('../payouts');
+const { SeasonError, assertSeasonOpen } = require('../seasons');
 const { rebuildTournamentSideGames, getTournamentSideGames, applyLeagueDefaults } = require('../sideGames');
 const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../utils/sideGames');
 const {
@@ -1323,8 +1324,30 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Closed seasons are read-only (src/seasons.js). Blocks changes to a
+// tournament whose season has been closed.
+const requireOpenSeason = async (req, res, next) => {
+  try {
+    const [rows] = await pool.query('SELECT season_id FROM tournament WHERE id = ? LIMIT 1', [req.params.id]);
+    if (rows.length > 0) await assertSeasonOpen(pool, rows[0].season_id);
+    return next();
+  } catch (err) {
+    if (err instanceof SeasonError) return res.status(err.status).json({ error: err.message });
+    console.error('Error checking tournament season:', err);
+    return res.status(500).json({ error: 'Failed to check tournament season' });
+  }
+};
+
+const sendSeasonError = (res, err) => {
+  if (err instanceof SeasonError) {
+    res.status(err.status).json({ error: err.message });
+    return true;
+  }
+  return false;
+};
+
 // PUT /api/tournaments/:id/collected - Save actual collected amounts for reconciliation
-router.put('/:id/collected', requireAdmin, async (req, res) => {
+router.put('/:id/collected', requireAdmin, requireOpenSeason, async (req, res) => {
   try {
     const { quota_collected, skins_collected } = req.body;
     await pool.query(
@@ -1353,6 +1376,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const shotgunStart = Boolean(shotgun_start);
     const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     const season = season_id ? Number(season_id) : (season_year ? (await getOrCreateLeagueSeason(pool, leagueId, season_year)).id : (await getOrCreateLeagueSeason(pool, leagueId)).id);
+    await assertSeasonOpen(pool, season);
     const stage = normalizePlayoffStage(playoff_stage);
     const [result] = await pool.query(
       'INSERT INTO tournament (date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, league_id, season_id, playoff_stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1375,13 +1399,14 @@ router.post('/', requireAdmin, async (req, res) => {
       league_id: leagueId
     });
   } catch (err) {
+    if (sendSeasonError(res, err)) return;
     console.error('Error creating tournament:', err);
     res.status(500).json({ error: 'Failed to create tournament' });
   }
 });
 
 // PUT /api/tournaments/:id - Update tournament
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', requireAdmin, requireOpenSeason, async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const { date, course_id, number_of_holes, nine_hole_side, first_tee_time, shotgun_start, standard_quota_game, season_id, season_year, playoff_stage } = req.body;
@@ -1391,6 +1416,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     const shotgunStart = Boolean(shotgun_start);
     const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     const season = season_id ? Number(season_id) : (season_year ? (await getOrCreateLeagueSeason(pool, leagueId, season_year)).id : (await getOrCreateLeagueSeason(pool, leagueId)).id);
+    await assertSeasonOpen(pool, season);
     const stage = normalizePlayoffStage(playoff_stage);
     await pool.query(
       'UPDATE tournament SET date = ?, course_id = ?, number_of_holes = ?, nine_hole_side = ?, first_tee_time = ?, shotgun_start = ?, standard_quota_game = ?, season_id = ?, playoff_stage = ? WHERE id = ? AND league_id = ?',
@@ -1410,13 +1436,14 @@ router.put('/:id', requireAdmin, async (req, res) => {
       playoff_stage: stage
     });
   } catch (err) {
+    if (sendSeasonError(res, err)) return;
     console.error('Error updating tournament:', err);
     res.status(500).json({ error: 'Failed to update tournament' });
   }
 });
 
 // DELETE /api/tournaments/:id - Delete tournament
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, requireOpenSeason, async (req, res) => {
   try {
   const leagueId = getLeagueId(req);
   await pool.query('DELETE FROM tournament WHERE id = ? AND league_id = ?', [req.params.id, leagueId]);
@@ -1428,7 +1455,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 });
 
 // POST /api/tournaments/:id/complete - Complete tournament and update quota history
-router.post('/:id/complete', requireAdmin, async (req, res) => {
+router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) => {
   const connection = await pool.getConnection();
   let transactionStarted = false;
   try {
@@ -1680,7 +1707,7 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
     }
 
     // FedEx points and tournaments played are no longer stored on players:
-    // the league_player_totals view adds them up per league from
+    // the league_player_season_totals view adds them up per season from
     // tournament_paradise_points.
 
     const [skinScoreRows] = await connection.query(
@@ -2162,11 +2189,11 @@ router.post('/:id/complete', requireAdmin, async (req, res) => {
         const placeholders = rankedPlayerIds.map(() => '?').join(', ');
         const [dashboardRows] = await pool.query(
           `SELECT lpt.player_id, p.name, lpt.fedex_points, lpt.prize_money
-           FROM league_player_totals lpt
+           FROM league_player_season_totals lpt
            JOIN players p ON p.id = lpt.player_id
-           WHERE lpt.league_id = ? AND lpt.player_id IN (${placeholders})
+           WHERE lpt.league_id = ? AND lpt.season_id = ? AND lpt.player_id IN (${placeholders})
            ORDER BY lpt.fedex_points DESC, p.name ASC`,
-          [leagueId, ...rankedPlayerIds]
+          [leagueId, tournamentSeasonId, ...rankedPlayerIds]
         );
         dashboardTotals = dashboardRows;
       }
@@ -2257,7 +2284,7 @@ router.post('/:id/playoff/finals-participants', requireAdmin, async (req, res) =
 });
 
 // POST /api/tournaments/:id/playoff/points
-router.post('/:id/playoff/points', requireAdmin, async (req, res) => {
+router.post('/:id/playoff/points', requireAdmin, requireOpenSeason, async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const tournamentId = req.params.id;
@@ -2464,11 +2491,11 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
       const placeholders = rankedPlayerIds.map(() => '?').join(', ');
       const [dashboardRows] = await pool.query(
         `SELECT lpt.player_id, p.name, lpt.fedex_points, lpt.prize_money
-         FROM league_player_totals lpt
+         FROM league_player_season_totals lpt
          JOIN players p ON p.id = lpt.player_id
-         WHERE lpt.league_id = ? AND lpt.player_id IN (${placeholders})
+         WHERE lpt.league_id = ? AND lpt.season_id = ? AND lpt.player_id IN (${placeholders})
          ORDER BY lpt.fedex_points DESC, p.name ASC`,
-        [tournamentLeagueId, ...rankedPlayerIds]
+        [tournamentLeagueId, season_id, ...rankedPlayerIds]
       );
       dashboardTotals = dashboardRows;
     }
@@ -2684,7 +2711,7 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
 });
 
 // POST /api/tournaments/:id/restore-backup/:backupId - Restore tournament state from backup
-router.post('/:id/restore-backup/:backupId', requireAdmin, async (req, res) => {
+router.post('/:id/restore-backup/:backupId', requireAdmin, requireOpenSeason, async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const tournamentId = Number(req.params.id);

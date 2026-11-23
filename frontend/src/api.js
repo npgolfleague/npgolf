@@ -229,6 +229,13 @@ export const leaguesAPI = {
   getPlayers: (id) => apiClient.get(`/leagues/${id}/players`),
   getTournaments: (id) => apiClient.get(`/leagues/${id}/tournaments`),
   current: () => apiClient.get('/leagues/current'),
+  getSeasons: (id) => apiClient.get(`/leagues/${id}/seasons`),
+  getSeason: (id, seasonId) => apiClient.get(`/leagues/${id}/seasons/${seasonId}`),
+  getRolloverPreview: (id) => apiClient.get(`/leagues/${id}/seasons/rollover-preview`),
+  rolloverSeason: (id, data) => apiClient.post(`/leagues/${id}/seasons/rollover`, data),
+  reopenSeason: (id, seasonId) => apiClient.post(`/leagues/${id}/seasons/${seasonId}/reopen`),
+  closeSeason: (id, seasonId) => apiClient.post(`/leagues/${id}/seasons/${seasonId}/close`),
+  downloadSeasonCsv: (id, seasonId) => apiClient.get(`/leagues/${id}/seasons/${seasonId}/standings.csv`, { responseType: 'blob' }),
 }
 
 export const emailsAPI = {

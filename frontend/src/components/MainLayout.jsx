@@ -5,7 +5,7 @@ import { isAdminCapable } from '../utils/roles'
 import { useAppVersion, formatVersionShort, formatDateTime } from '../utils/version'
 import {
   LayoutDashboard, ClipboardList, Users, Trophy, Flag, BookOpen,
-  Info, Target, Inbox, Settings, Shield, LogOut, ChevronLeft, ChevronRight, Building2, Menu
+  Info, Target, Inbox, Settings, Shield, LogOut, ChevronLeft, ChevronRight, Building2, Menu, History
 } from 'lucide-react'
 
 export const MainLayout = () => {
@@ -33,6 +33,7 @@ export const MainLayout = () => {
     { path: '/tournaments', label: 'Tournaments', icon: Trophy },
     { path: '/courses', label: 'Courses', icon: Flag },
     { path: '/league', label: 'League Info', icon: Shield },
+    { path: '/seasons', label: 'Seasons', icon: History },
     { path: '/rules', label: 'Rules', icon: BookOpen },
     { path: '/app/about', label: 'About', icon: Info }
   ]
