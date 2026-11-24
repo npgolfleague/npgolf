@@ -1,5 +1,6 @@
 import { useEffect, useState, useContext } from 'react'
 import { playersAPI } from '../api'
+import { roundValue } from '../utils/quota'
 import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
 
@@ -195,7 +196,7 @@ export const Quota = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">Quota Management</h1>
-          <p className="text-slate-500 text-sm mt-1">Player quota history</p>
+          <p className="text-slate-500 text-sm mt-1">Every round counts toward both quotas: a 9-hole round is doubled for the 18-hole quota, and an 18-hole round is halved (rounded down) for the 9-hole quota.</p>
         </div>
         <div className="flex flex-col gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
@@ -236,6 +237,8 @@ export const Quota = () => {
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Points</th>
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Quota Diff</th>
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Holes</th>
+                    <th className="px-6 py-3 text-left text-gray-700 font-semibold">9-hole value</th>
+                    <th className="px-6 py-3 text-left text-gray-700 font-semibold">18-hole value</th>
                     <th className="px-6 py-3 text-left text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
@@ -278,6 +281,8 @@ export const Quota = () => {
                           <option value="18">18</option>
                         </select>
                       </td>
+                      <td className="px-6 py-4 text-gray-900">{roundValue(form[`points_${round}`], form[`holes_${round}`], 9) ?? '-'}</td>
+                      <td className="px-6 py-4 text-gray-900">{roundValue(form[`points_${round}`], form[`holes_${round}`], 18) ?? '-'}</td>
                       <td className="px-6 py-4">
                         <button
                           type="button"

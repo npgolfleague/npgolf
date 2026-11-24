@@ -1,4 +1,4 @@
-import { eighteenHoleQuota } from '../utils/quota'
+import { quotaForHoles } from '../utils/quota'
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tournamentsAPI, settingsAPI, coursesAPI, sideGamesAPI } from '../api';
@@ -803,7 +803,7 @@ export function TournamentPlayers() {
                   )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
-                      {tournament?.number_of_holes === 9 ? player.quota_9 || '-' : eighteenHoleQuota(player) ?? '-'}
+                      {quotaForHoles(player, tournament?.number_of_holes) ?? '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

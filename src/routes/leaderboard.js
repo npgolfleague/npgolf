@@ -2,36 +2,8 @@ const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
 const { getHoleReveal } = require('../utils/holeReveal');
-const { quotaSql } = require('../utils/leagueQuota');
+const { quotaSql, recentAverageQuota } = require('../utils/leagueQuota');
 const router = express.Router();
-
-function calculateRecentAverageQuota(playerRow, holeCount) {
-  const points = [];
-
-  for (let i = 1; i <= 7; i++) {
-    const pointsRaw = playerRow[`points_${i}`];
-    const holesRaw = playerRow[`holes_${i}`];
-
-    if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
-      continue;
-    }
-
-    const pointsValue = Number(pointsRaw);
-    const holesValue = Number(holesRaw);
-
-    if (Number.isNaN(pointsValue) || holesValue !== holeCount) {
-      continue;
-    }
-
-    points.push(pointsValue);
-  }
-
-  if (points.length === 0) {
-    return null;
-  }
-
-  return Math.floor(points.reduce((sum, value) => sum + value, 0) / points.length);
-}
 
 // GET /api/leaderboard/:tournamentId - Get leaderboard for a tournament
 // Calculates total quota points earned vs player's quota and skins
@@ -386,7 +358,7 @@ router.get('/:tournamentId', async (req, res) => {
       // For completed tournaments, freeze to finalized values so standings never drift.
       const playerQuota = isCompleted
         ? (hasFinalizedValues ? (parseFloat(player.finalized_player_quota) || 0) : fallbackQuota)
-        : (calculateRecentAverageQuota(player, holeCount) ?? fallbackQuota);
+        : (recentAverageQuota(player, holeCount) ?? fallbackQuota);
 
       const totalQuotaPoints = isCompleted && player.finalized_total_quota_points !== null
         ? (parseFloat(player.finalized_total_quota_points) || 0)
