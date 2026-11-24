@@ -25,6 +25,7 @@ const {
   awardFinalRoundPoints,
   pickChampion
 } = require('../utils/playoffs');
+const { quotaSql, keepsNineHoleHistory } = require('../utils/leagueQuota');
 
 const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
 
@@ -107,14 +108,14 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
     }));
   }
 
-  const quotaColumn = Number(tournamentHoleCount) === 9 ? 'quota_9' : 'quota_18';
+  const quotaColumn = quotaSql(tournamentHoleCount, 'lpq');
 
   const [rows] = await db.query(
     `SELECT
        p.id AS player_id,
        p.name,
        tp.tournament_quota,
-       lpq.${quotaColumn} AS default_player_quota,
+       ${quotaColumn} AS default_player_quota,
        q.points_1,
        q.points_2,
        q.points_3,
@@ -145,7 +146,7 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
       AND tpp.player_id = p.id
      LEFT JOIN scores s ON s.player_id = p.id AND s.tournament_id = ?
      WHERE tp.tournament_id = ? AND p.active = 1
-     GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
+     GROUP BY p.id, p.name, tp.tournament_quota, ${quotaColumn},
               q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
               tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points`,
@@ -539,7 +540,7 @@ const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
   const [rows] = await db.query(
     `SELECT CASE
               WHEN t.number_of_holes = 9 THEN lp.quota_9
-              ELSE lp.quota_18
+              ELSE ${quotaSql(18)}
             END AS tournament_quota
      FROM tournament t
      LEFT JOIN league_players lp ON lp.player_id = ? AND lp.league_id = t.league_id
@@ -1476,7 +1477,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     const tournamentPlayoffStage = normalizePlayoffStage(tournamentRows[0].playoff_stage);
     const isNineHoleTournament = tournamentHoleCount === 9;
     // Quota is per league: current quota lives on league_players (lp).
-    const quotaColumn = isNineHoleTournament ? 'lp.quota_9' : 'lp.quota_18';
+    const quotaColumn = quotaSql(tournamentHoleCount);
 
     if (!Number(tournamentRows[0].season_id)) {
       await connection.query('UPDATE tournament SET season_id = ? WHERE id = ?', [tournamentSeasonId, tournamentId]);
@@ -1622,13 +1623,10 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     await connection.query(
       `UPDATE tournament_players tp
        JOIN league_players lp ON lp.player_id = tp.player_id AND lp.league_id = ?
-       SET tp.tournament_quota = CASE
-         WHEN ? = 9 THEN lp.quota_9
-         ELSE lp.quota_18
-       END
+       SET tp.tournament_quota = ${quotaColumn}
        WHERE tp.tournament_id = ?
          AND tp.tournament_quota IS NULL`,
-      [leagueId, tournamentHoleCount, tournamentId]
+      [leagueId, tournamentId]
     );
 
     const [scoresRowsWithSnapshot] = await connection.query(
@@ -1664,10 +1662,13 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
 
     // Tied players share place and points (e.g. two tied for 1st get 95 each).
+    // Playoff rounds keep their results here but add no weekly points: the
+    // regular-season totals stop at the last regular round.
+    const isPlayoffRound = tournamentPlayoffStage !== PLAYOFF_STAGE.REGULAR;
     for (const award of awardRegularSeasonPoints(rankedPlayers)) {
       const player = award;
       const place = award.rank_position;
-      const pointsAwarded = award.points_awarded;
+      const pointsAwarded = isPlayoffRound ? 0 : award.points_awarded;
 
       await connection.query(
         `INSERT INTO tournament_paradise_points
@@ -1797,8 +1798,24 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
       );
     }
 
+    // An 18-hole round leaves nine-hole players' history and quota alone.
+    const scoredIds = scoresRowsWithSnapshot.map((row) => row.player_id);
+    const [memberRows] = await connection.query(
+      'SELECT player_id, quota_9, quota_18 FROM league_players WHERE league_id = ? AND player_id IN (?)',
+      [leagueId, scoredIds]
+    );
+    const [historyRows] = await connection.query(
+      'SELECT * FROM quota WHERE league_id = ? AND player_id IN (?)',
+      [leagueId, scoredIds]
+    );
+    const memberById = new Map(memberRows.map((row) => [Number(row.player_id), row]));
+    const historyById = new Map(historyRows.map((row) => [Number(row.player_id), row]));
+    const quotaHistoryPlayers = scoresRowsWithSnapshot.filter((row) => !keepsNineHoleHistory(
+      memberById.get(Number(row.player_id)), historyById.get(Number(row.player_id)), tournamentHoleCount
+    ));
+
     // For each player, shift quota history and add new result, then recalculate quota as floor average
-    for (const player of scoresRowsWithSnapshot) {
+    for (const player of quotaHistoryPlayers) {
       const playerId = player.player_id;
       const totalPoints = player.total_points;
       const currentQuota = Number(player.current_quota);
@@ -1864,7 +1881,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     }
     
     // Now do the same for skins_quota (20 slots instead of 7)
-    for (const player of scoresRowsWithSnapshot) {
+    for (const player of quotaHistoryPlayers) {
       const playerId = player.player_id;
       const totalPoints = player.total_points;
       const currentQuota = Number(player.current_quota);

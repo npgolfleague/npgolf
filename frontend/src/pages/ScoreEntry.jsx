@@ -1,3 +1,4 @@
+import { eighteenHoleQuota } from '../utils/quota'
 import { useState, useEffect, useRef, useContext } from 'react'
 import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI, settingsAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
@@ -512,7 +513,7 @@ export const ScoreEntry = () => {
 
     const quotaValue = selectedTournament.number_of_holes === 9
       ? player.quota_9
-      : player.quota_18
+      : eighteenHoleQuota(player)
 
     if (quotaValue === null || quotaValue === undefined || quotaValue === '') {
       return null

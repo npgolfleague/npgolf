@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
 const { getHoleReveal } = require('../utils/holeReveal');
+const { quotaSql } = require('../utils/leagueQuota');
 const router = express.Router();
 
 function calculateRecentAverageQuota(playerRow, holeCount) {
@@ -96,13 +97,8 @@ router.get('/:tournamentId', async (req, res) => {
     const skinPrizePot = skinsCTPTotalPot * SKINS_PCT;
     const ctpPrizePot = skinsCTPTotalPot * CTP_PCT;
     
-    // Determine which quota to use based on tournament holes (validated whitelist)
-    const quotaColumn = holeCount === 9 ? 'quota_9' : 'quota_18';
-    
-    // Validate quota column to prevent SQL injection
-    if (quotaColumn !== 'quota_9' && quotaColumn !== 'quota_18') {
-      return res.status(400).json({ error: 'Invalid quota column' });
-    }
+    // Which quota applies to this round (fixed SQL, no user input)
+    const quotaColumn = quotaSql(holeCount, 'lpq');
     
     // Only holes that every player has finished count toward what anyone sees
     // (enforced here, not just hidden on screen). With live scoring off, nothing
@@ -132,7 +128,7 @@ router.get('/:tournamentId', async (req, res) => {
         p.id,
         p.name,
         tp.tournament_quota,
-        lpq.${quotaColumn} as default_player_quota,
+        ${quotaColumn} as default_player_quota,
         q.points_1,
         q.points_2,
         q.points_3,
@@ -164,7 +160,7 @@ router.get('/:tournamentId', async (req, res) => {
        AND tpp.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
-      GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
+      GROUP BY p.id, p.name, tp.tournament_quota, ${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
                q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
                tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points

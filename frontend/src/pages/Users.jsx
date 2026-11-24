@@ -1,3 +1,4 @@
+import { eighteenHoleQuota } from '../utils/quota'
 import { useState, useEffect, useContext } from 'react'
 import { playersAPI, tournamentsAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
@@ -368,7 +369,7 @@ export const Users = () => {
                           onMouseLeave={handleQuotaLeave}
                           className="cursor-help inline-block"
                         >
-                          {player.quota_18 || '-'}
+                          {eighteenHoleQuota(player) ?? '-'}
                           {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
                             <div className="absolute z-10 left-0 top-full mt-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
                               <div className="font-bold mb-2">Last 7 Rounds</div>
