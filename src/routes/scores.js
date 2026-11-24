@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
+const { requireOpenSeason, requireOpenSeasonForScores, requireOpenSeasonForScore } = require('../middleware/season');
 const { getHoleReveal, isScoreVisibleToPlayer, getUserFoursomes } = require('../utils/holeReveal');
 
 // True when the signed-in user is a league admin (admins see and fix everything).
@@ -191,7 +192,7 @@ router.get('/tournament/:tournamentId/foursome/:group', requireAuth, async (req,
 });
 
 // POST /api/scores - Create score(s)
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireOpenSeasonForScores, async (req, res) => {
   try {
     const { scores } = req.body; // Array of score objects
     
@@ -411,7 +412,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PUT /api/scores/:id - Update score
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', requireAdmin, requireOpenSeasonForScore, async (req, res) => {
   try {
     const { score, quota } = req.body;
     // Accept either name for foursome field
@@ -428,7 +429,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/scores/:id - Delete score
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, requireOpenSeasonForScore, async (req, res) => {
   try {
     await pool.query('DELETE FROM scores WHERE id = ?', [req.params.id]);
     res.json({ message: 'Score deleted' });
@@ -519,7 +520,7 @@ router.get('/tournament/:tournamentId/ctp-admin-options', requireAdmin, async (r
 });
 
 // PUT /api/scores/tournament/:tournamentId/ctp-winners - Upsert/remove CTP winners (admin only)
-router.put('/tournament/:tournamentId/ctp-winners', requireAdmin, async (req, res) => {
+router.put('/tournament/:tournamentId/ctp-winners', requireAdmin, requireOpenSeason, async (req, res) => {
   const { tournamentId } = req.params;
   const { winners } = req.body || {};
 
@@ -810,7 +811,7 @@ router.get('/tournament/:tournamentId/foursome/:group/post-status', requireAuth,
 
 // POST /api/scores/tournament/:tournamentId/foursome/:group/post - Post the card
 // (or submit it for the marker to sign, when the league requires that)
-router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, async (req, res) => {
+router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, requireOpenSeason, async (req, res) => {
   const { tournamentId, group } = req.params;
   const userId = req.user.id;
 
@@ -836,7 +837,7 @@ router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, async
 // Body: { decision: 'sign' | 'flag', note?: string }
 // The marker signs the card (it becomes final) or flags a problem for an admin.
 // Admins can also sign, including a flagged card once it's been fixed.
-router.post('/tournament/:tournamentId/foursome/:group/attest', requireAuth, async (req, res) => {
+router.post('/tournament/:tournamentId/foursome/:group/attest', requireAuth, requireOpenSeason, async (req, res) => {
   const { tournamentId, group } = req.params;
   const decision = req.body?.decision;
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
@@ -879,7 +880,7 @@ router.post('/tournament/:tournamentId/foursome/:group/attest', requireAuth, asy
 
 // POST /api/scores/tournament/:tournamentId/foursome/:group/reopen - Admin unlocks a card
 // so the foursome can correct it and post again.
-router.post('/tournament/:tournamentId/foursome/:group/reopen', requireAdmin, async (req, res) => {
+router.post('/tournament/:tournamentId/foursome/:group/reopen', requireAdmin, requireOpenSeason, async (req, res) => {
   const { tournamentId, group } = req.params;
   try {
     await pool.query('DELETE FROM foursome_posts WHERE tournament_id = ? AND foursome_group = ?', [tournamentId, group]);

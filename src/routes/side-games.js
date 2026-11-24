@@ -2,6 +2,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
+const { requireOpenSeason } = require('../middleware/season');
 const { rebuildTournamentPayouts } = require('../payouts');
 const {
   isGameType,
@@ -63,7 +64,7 @@ router.get('/tournaments/:id/side-games', requireAuth, async (req, res) => {
 
 // PUT /api/tournaments/:id/side-games
 // body: { games: [{ game_type, enabled, fee, collected }] }
-router.put('/tournaments/:id/side-games', requireAdmin, async (req, res) => {
+router.put('/tournaments/:id/side-games', requireAdmin, requireOpenSeason, async (req, res) => {
   const tournamentId = parseId(req.params.id);
   if (!tournamentId) return res.status(400).json({ error: 'Invalid tournament id' });
   const games = Array.isArray(req.body?.games) ? req.body.games : null;
@@ -101,7 +102,7 @@ router.put('/tournaments/:id/side-games', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/tournaments/:id/side-games/:type/players/:playerId/paid  body: { paid }
-router.put('/tournaments/:id/side-games/:type/players/:playerId/paid', requireAdmin, async (req, res) => {
+router.put('/tournaments/:id/side-games/:type/players/:playerId/paid', requireAdmin, requireOpenSeason, async (req, res) => {
   const tournamentId = parseId(req.params.id);
   const playerId = parseId(req.params.playerId);
   const gameType = req.params.type;
