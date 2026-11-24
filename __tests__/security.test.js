@@ -1,6 +1,9 @@
 // Regression tests for the security review (November 2026).
 const request = require('supertest');
 
+process.env.JWT_SECRET = 'test-secret';
+const { optInLink, rsvpLink, confirmLink } = require('../src/utils/signedLinks');
+
 let mockActor = { id: 2, role: 'league_admin' };
 jest.mock('../src/middleware/admin', () => {
   const actual = jest.requireActual('../src/middleware/admin');
@@ -55,11 +58,13 @@ describe('inbound email webhook', () => {
   });
 });
 
-test.each(['/api/players/9/sms-opt-in', '/api/players/9/email-opt-in',
-  '/api/tournaments/3/rsvp?playerId=9', '/api/tournaments/3/confirm?playerId=9&response=yes',
-  '/api/tournaments/3/confirm?playerId=9&response=no'])('%s escapes names', async (url) => {
+const pathOf = (link) => { const u = new URL(link); return u.pathname + u.search; };
+
+test.each([optInLink('sms', 9), optInLink('email', 9), rsvpLink(3, 9),
+  confirmLink(3, 9, 'yes'), confirmLink(3, 9, 'no')].map(pathOf))('%s escapes names', async (url) => {
   pool.execute.mockResolvedValue([{}]);
   pool.query.mockImplementation(async (sql) => {
+    if (sql.startsWith('SELECT ls.status')) return [[{ status: 'open', is_completed: 0 }]];
     if (sql.includes('FROM tournament t')) return [[{ id: 3, date: '2027-03-17', course_name: EVIL }]];
     if (sql.includes('FROM players')) return [[{ id: 9, name: EVIL, sms_allowed: 0, email_allowed: 0 }]];
     return [[]];

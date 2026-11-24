@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { escapeHtml } = require('../utils/html');
+const { optInLink } = require('../utils/signedLinks');
 const { signAccessToken } = require('../utils/authTokens');
 const { Limiter, clientIp, limitByIp, tooMany } = require('../middleware/rateLimit');
 
@@ -208,9 +209,7 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
 
     // Send SMS opt-in message (only if SMS is enabled and user opted in)
     if (sms_allowed) {
-      const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-      const optInLink = `${appBaseUrl}/api/players/${userId}/sms-opt-in`;
-      const smsMessage = `Welcome to NP Golf League! Click this link to confirm SMS notifications: ${optInLink}`;
+      const smsMessage = `Welcome to NP Golf League! Click this link to confirm SMS notifications: ${optInLink('sms', userId)}`;
       
       try {
         await sendSMS(phone, smsMessage);

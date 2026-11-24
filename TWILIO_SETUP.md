@@ -73,16 +73,9 @@ Send SMS invites to all eligible players for a tournament.
 }
 ```
 
-### GET `/api/tournaments/join?playerId={id}&tournamentId={id}`
+### GET `/api/tournaments/{id}/rsvp?playerId={id}&sig={signature}`
 
-Add a player to a tournament via SMS link.
-
-**Response:**
-```json
-{
-  "message": "Joined tournament successfully"
-}
-```
+Sign a player up from a link in a text. The signature is made by the server; the response is a web page.
 
 ## Frontend Integration
 
@@ -173,3 +166,7 @@ All errors are logged and returned in the API response for troubleshooting.
 - Use international format: +[country code][number]
 - Remove spaces, dashes, and parentheses
 - Example: +12025551234 (not 202-555-1234)
+
+## STOP webhook
+
+`POST /api/players/sms-webhook` is off unless `TWILIO_AUTH_TOKEN` is set. It accepts only requests signed by Twilio, and the URL configured in Twilio must start with `APP_BASE_URL`.

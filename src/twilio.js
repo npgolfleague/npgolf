@@ -16,7 +16,7 @@ async function sendSMS(to, body) {
   const smsEnabled = process.env.SMS_ENABLED === 'true';
   
   if (!smsEnabled) {
-    console.log(`SMS disabled - would have sent to ${to}: ${body}`);
+    console.log(`SMS disabled - message of ${body.length} characters not sent`);
     return { 
       sid: 'SMS_DISABLED', 
       status: 'skipped',

@@ -103,8 +103,8 @@ export const Users = () => {
           month: 'long',
           day: 'numeric'
         })
-        const baseUrl = window.location.origin
-        const rsvpLink = `${baseUrl}/api/tournaments/${tournament.id}/rsvp?playerId=${player.id}`
+        // Links are signed by the server, so they can't be built here.
+        const rsvpLink = (await tournamentsAPI.rsvpLink(tournament.id, player.id)).data.link
         const defaultMessage = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${rsvpLink}`
         setSmsMessage(defaultMessage)
       } else {
