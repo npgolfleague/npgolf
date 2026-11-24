@@ -88,6 +88,16 @@ describe('league settings', () => {
     expect(update()).toEqual(['UPDATE league_settings SET live_scoring = ? WHERE league_id = ?', [0, 1].map((v, i) => (i ? '1' : v))]);
   });
 
+  test('the standard quota method is saved', async () => {
+    await put({ quota_method: 'last_7' }).expect(200);
+    expect(update()[1][0]).toBe('last_7');
+  });
+
+  test.each(['best_8_of_20', 'other', '', null, 'constructor'])('quota method %p is refused', async (quota_method) => {
+    await put({ quota_method }).expect(400);
+    expect(update()).toBeUndefined();
+  });
+
   test('points, including zero, are saved as sent', async () => {
     await put({ quota_points_par: 2, quota_points_double_bogey: 0 }).expect(200);
     expect(update()[1].slice(0, 2)).toEqual([2, 0]);

@@ -6,7 +6,15 @@
 //                  (rounded down)
 //   18-hole value: the points of an 18-hole round, or double a 9-hole round
 // Each quota is the average of its 7 values, rounded down. Both are stored on
-// league_players whenever a round is completed.
+// league_players whenever a round is completed. Only rounds in the same league
+// count.
+//
+// This is the "last_7" method. A league picks its method in League Settings;
+// to add another, build its calculation and mark it available here.
+const QUOTA_METHODS = Object.freeze({
+  last_7: { label: 'Use standard 7 round quota logic', available: true },
+  best_8_of_20: { label: 'Use best 8 of last 20 quota logic', available: false }
+});
 
 const SLOTS = [1, 2, 3, 4, 5, 6, 7];
 const isSet = (value) => value !== null && value !== undefined && value !== '' && !Number.isNaN(Number(value));
@@ -58,4 +66,4 @@ const quotaSql = (holes, alias = 'lp') => (
     : `COALESCE(${alias}.quota_18, ${alias}.quota_9 * 2)`
 );
 
-module.exports = { historyRounds, quotasFromHistory, recentAverageQuota, quotaForHoles, quotaSql };
+module.exports = { QUOTA_METHODS, historyRounds, quotasFromHistory, recentAverageQuota, quotaForHoles, quotaSql };
