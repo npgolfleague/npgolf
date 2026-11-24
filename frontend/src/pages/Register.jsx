@@ -71,8 +71,8 @@ export const Register = () => {
   }, [])
 
   const validatePassword = (pwd) => {
-    if (pwd.length < 8) {
-      setPasswordError('Password must be at least 8 characters')
+    if (pwd.length < 10) {
+      setPasswordError('Password must be at least 10 characters')
       return false
     }
     if (!/[a-zA-Z]/.test(pwd)) {
@@ -236,7 +236,7 @@ export const Register = () => {
               required
             />
             {passwordError && <p className="text-red-600 text-sm mt-1" role="alert">{passwordError}</p>}
-            <p className="text-sm text-gray-600 mt-2">Min 8 chars, letters + numbers</p>
+            <p className="text-sm text-gray-600 mt-2">At least 10 characters with a letter and a number. Avoid common words and your name.</p>
           </div>
 
           <div className="mb-6">

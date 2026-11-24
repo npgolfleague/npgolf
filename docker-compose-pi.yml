@@ -35,7 +35,7 @@ services:
       DB_NAME: npgolf
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env on the Pi}
       JWT_EXPIRES_IN: 8h
-      BCRYPT_ROUNDS: 10
+      BCRYPT_ROUNDS: 12
       SMS_ENABLED: ${SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
