@@ -5,6 +5,8 @@ import { SIDE_GAME_SHORT_LABELS, formatMoney } from '../utils/sideGames';
 import { AuthContext } from '../context/AuthContext';
 import { formatDateOnly } from '../utils/date';
 import { isAdminCapable } from '../utils/roles';
+import { isArchivedRound } from '../utils/season';
+import { ArchivedNotice } from '../components/ArchivedNotice';
 
 export function TournamentPlayers() {
   const { tournamentId } = useParams();
@@ -33,6 +35,8 @@ export function TournamentPlayers() {
   const [sideGames, setSideGames] = useState({ games: [], entries: [] });
 
   const isAdmin = isAdminCapable(user);
+  const archived = isArchivedRound(tournament);
+  const canEdit = isAdmin && !archived;
 
   useEffect(() => {
     loadData();
@@ -391,7 +395,7 @@ export function TournamentPlayers() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={() => setShowInviteModal(true)}
               disabled={sendingSMS || actionLoading}
@@ -400,7 +404,7 @@ export function TournamentPlayers() {
               {sendingSMS ? 'Sending...' : '📧 Send Invitations'}
             </button>
           )}
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={handleMarkAllPaid}
               disabled={confirmedPlayers.every(p => p.paid)}
@@ -409,7 +413,7 @@ export function TournamentPlayers() {
               Mark All Quota Paid
             </button>
           )}
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={handleMarkAllSkinsCtpPaid}
               disabled={confirmedPlayers.every(p => p.skins_ctp_paid)}
@@ -418,7 +422,7 @@ export function TournamentPlayers() {
               Mark All Pins/Skins Paid
             </button>
           )}
-          {isAdmin && sideGames.games.map(game => (
+          {canEdit && sideGames.games.map(game => (
             <button
               key={game.game_type}
               onClick={() => handleMarkAllSideGamePaid(game.game_type)}
@@ -428,6 +432,7 @@ export function TournamentPlayers() {
               Mark All {SIDE_GAME_SHORT_LABELS[game.game_type]} Paid
             </button>
           ))}
+          {!archived && (
           <button
             onClick={() => setShowAddModal(true)}
             disabled={actionLoading || availablePlayers.length === 0}
@@ -435,6 +440,7 @@ export function TournamentPlayers() {
           >
             Add Player
           </button>
+          )}
         </div>
       </div>
 
@@ -490,6 +496,8 @@ export function TournamentPlayers() {
       )}
 
       {/* Prize Money Reconciliation Panel - Admin Only */}
+      {archived && <ArchivedNotice tournament={tournament} />}
+
       {isAdmin && tournament && settings && (() => {
         const holeCount = Number(tournament.number_of_holes);
         const quotaFee = Number(holeCount === 9 ? settings.tournament_fee_9_holes : settings.tournament_fee_18_holes) || 0;
@@ -548,6 +556,7 @@ export function TournamentPlayers() {
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                   placeholder={`${calcQuota.toFixed(2)}`}
                   value={reconcileInput.quota_collected}
+                  readOnly={archived}
                   onChange={e => { setReconcileInput(prev => ({ ...prev, quota_collected: e.target.value })); setReconcileSaved(false); }}
                 />
                 {quotaDiff != null && (
@@ -571,6 +580,7 @@ export function TournamentPlayers() {
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                   placeholder={`${calcSkins.toFixed(2)}`}
                   value={reconcileInput.skins_collected}
+                  readOnly={archived}
                   onChange={e => { setReconcileInput(prev => ({ ...prev, skins_collected: e.target.value })); setReconcileSaved(false); }}
                 />
                 {skinsDiff != null && (
@@ -585,6 +595,7 @@ export function TournamentPlayers() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {!archived && (
               <button
                 onClick={handleSaveCollected}
                 disabled={reconciling}
@@ -592,8 +603,9 @@ export function TournamentPlayers() {
               >
                 {reconciling ? 'Saving...' : '💾 Save Collected Amounts'}
               </button>
+              )}
               {reconcileSaved && <span className="text-green-700 text-sm font-semibold">✓ Saved! Leaderboard will now show prize amounts.</span>}
-              {isSaved && !reconcileSaved && <span className="text-blue-700 text-sm">Saved amounts loaded. Edit and save to update.</span>}
+              {isSaved && !reconcileSaved && !archived && <span className="text-blue-700 text-sm">Saved amounts loaded. Edit and save to update.</span>}
             </div>
           </div>
         );
@@ -664,7 +676,7 @@ export function TournamentPlayers() {
                     <div className="text-sm font-medium text-gray-900">{player.name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {isAdmin ? (
+                    {canEdit ? (
                       <button
                         onClick={() => handleTogglePaid(player.id, player.paid)}
                         disabled={actionLoading}
@@ -687,7 +699,7 @@ export function TournamentPlayers() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    {isAdmin ? (
+                    {canEdit ? (
                       <button
                         onClick={() => handleToggleSkinsCtpPaid(player.id, player.skins_ctp_paid)}
                         disabled={actionLoading}
@@ -716,7 +728,7 @@ export function TournamentPlayers() {
                           const paid = isSideGamePaid(game.game_type, player.id);
                           const label = `${paid ? '✓' : '✗'} ${SIDE_GAME_SHORT_LABELS[game.game_type]}`;
                           const tone = paid ? 'bg-teal-100 text-teal-800' : 'bg-gray-100 text-gray-700';
-                          return isAdmin ? (
+                          return canEdit ? (
                             <button
                               key={game.game_type}
                               onClick={() => handleToggleSideGamePaid(game.game_type, player.id)}
@@ -734,7 +746,7 @@ export function TournamentPlayers() {
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {isAdmin ? (
+                    {canEdit ? (
                       <input
                         value={(editValues[player.id] && editValues[player.id].foursome) || ''}
                         onChange={(e) => handleEditChange(player.id, 'foursome', e.target.value)}
@@ -750,7 +762,7 @@ export function TournamentPlayers() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {isAdmin ? (
+                    {canEdit ? (
                       <input
                         value={(editValues[player.id] && editValues[player.id].pair) || ''}
                         onChange={(e) => handleEditChange(player.id, 'pair', e.target.value)}
@@ -812,7 +824,7 @@ export function TournamentPlayers() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {isAdmin && (
+                    {canEdit && (
                       <button
                         onClick={() => handleRemovePlayer(player.id)}
                         disabled={actionLoading}

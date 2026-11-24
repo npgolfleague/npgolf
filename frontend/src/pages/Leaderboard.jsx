@@ -4,6 +4,7 @@ import { leaderboardAPI, tournamentsAPI, scoresAPI, sideGamesAPI } from '../api'
 import { SideGamesResults } from '../components/SideGamesResults';
 import { AuthContext } from '../context/AuthContext';
 import { isAdminCapable } from '../utils/roles';
+import { isArchivedRound } from '../utils/season';
 import { formatDateOnly } from '../utils/date';
 
 export function Leaderboard() {
@@ -918,7 +919,7 @@ export function Leaderboard() {
               )}
             </div>
 
-            {canManagePlayoffs && tournamentPlayers.length > 0 && (
+            {canManagePlayoffs && !isArchivedRound(tournament) && tournamentPlayers.length > 0 && (
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="font-semibold text-slate-900 mb-1">Playoff Admin Overrides</h3>
@@ -1077,7 +1078,7 @@ export function Leaderboard() {
         </div>
       )}
 
-      {canManageCtp && ctpAdminOptions.holes.length > 0 && (
+      {canManageCtp && !isArchivedRound(tournament) && ctpAdminOptions.holes.length > 0 && (
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-6">
           <h2 className="text-2xl font-bold text-amber-900 mb-1">Manage Closest to the Pin</h2>
           <p className="text-sm text-amber-800 mb-4">League admins and super admins can assign or update winners by CTP hole.</p>
