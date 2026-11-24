@@ -4,7 +4,8 @@ services:
     container_name: npgolf-mysql-pi
     restart: always
     ports:
-      - "3308:3306"
+      # Only from the Pi itself; use an SSH tunnel from another computer.
+      - "127.0.0.1:3308:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
       MYSQL_DATABASE: npgolf
@@ -25,8 +26,9 @@ services:
     environment:
       DB_HOST: npgolf-mysql-pi
       DB_PORT: 3306
-      DB_USER: root
-      DB_PASS: ${DB_PASS}
+      # Limited account: reads and changes data, can't alter tables. DB_PASS is root's.
+      DB_USER: ${APP_DB_USER:?Set APP_DB_USER in .env on the Pi}
+      DB_PASS: ${APP_DB_PASS:?Set APP_DB_PASS in .env on the Pi}
       DB_NAME: npgolf
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env on the Pi}
       JWT_EXPIRES_IN: 8h

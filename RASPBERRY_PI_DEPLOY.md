@@ -86,3 +86,10 @@ Stop containers:
 ```bash
 docker compose -f docker-compose-pi.yml down
 ```
+
+## Database accounts
+
+- The app connects as `APP_DB_USER` / `APP_DB_PASS` (in `.env`), which has only SELECT, INSERT, UPDATE and DELETE on `npgolf`.
+- `DB_PASS` is the MySQL root password, used for migrations, backups and monitoring. Run migrations as root:
+  `docker exec -e DB_USER=root -e DB_PASS="$DB_PASS" npgolf-app-pi npm run migrate`
+- MySQL listens on the Pi only. From another computer: `ssh -L 3308:127.0.0.1:3308 dalin@raspberrypi`, then connect to `127.0.0.1:3308`.
