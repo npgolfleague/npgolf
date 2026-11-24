@@ -19,9 +19,14 @@ const rulesRouter = require('./routes/rules');
 const billingEntitiesRouter = require('./routes/billing-entities');
 const sideGamesRouter = require('./routes/side-games');
 const { leagueAliasMiddleware } = require('./middleware/league');
+const { requireAuth } = require('./middleware/admin');
+const { securityHeaders } = require('./middleware/securityHeaders');
 const { startEmailPoller } = require('./email-poller');
 const { getVersionInfo } = require('./version');
 const app = express();
+
+app.disable('x-powered-by');
+app.use(securityHeaders);
 
 const PORT = process.env.PORT || 3000;
 
@@ -31,28 +36,33 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
   }
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
 // Log all incoming requests
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  // Path only: query strings can hold reset tokens and link signatures.
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
 // League alias middleware - extracts league from URL path
 // Supports: /paradise/api/tournaments, /paradise/tournaments, etc.
 app.use(leagueAliasMiddleware);
+
+// Scores can carry closest-to-pin photos, so a signed-in player may send a large
+// request there. Everything else is small.
+app.post('/api/scores', requireAuth, express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '100kb', extended: true }));
 
 // Register API routes FIRST before static files
 app.use('/:alias/api/cart-tags', cartTagsRouter); // League-prefixed cart tags (enables req.league)
@@ -130,6 +140,19 @@ if (fs.existsSync(frontendDist)) {
   });
 }
 
+// Errors that reach Express (oversized or malformed requests, failed uploads).
+// Answers never include internal details.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const tooLarge = err.type === 'entity.too.large' || err.code === 'LIMIT_FILE_SIZE';
+  const badRequest = err.name === 'MulterError' || err.message === 'Unexpected end of form';
+  let status = Number(err.status || err.statusCode) || (tooLarge ? 413 : badRequest ? 400 : 500);
+  if (tooLarge) status = 413;
+  if (status >= 500) console.error('Unhandled request error:', err);
+  const message = status === 413 ? 'That is too large to send' : status < 500 ? 'Invalid request' : 'Something went wrong';
+  return res.status(status).json({ error: message });
+});
+
 // If this file is run directly, start the server. This makes it safe to require
 // the app in tests without starting a listener.
 if (require.main === module) {
@@ -145,8 +168,8 @@ if (require.main === module) {
   });
   
   process.on('unhandledRejection', (reason, promise) => {
+    // One failed request shouldn't take the site down for everyone.
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    process.exit(1);
   });
 }
 
