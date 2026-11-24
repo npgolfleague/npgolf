@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../api'
 
-const isStrongPassword = (value) => /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(value)
+const isStrongPassword = (value) => /^(?=.*[A-Za-z])(?=.*\d).{10,}$/.test(value)
 
 export const ResetPassword = () => {
   const [searchParams] = useSearchParams()
@@ -31,7 +31,7 @@ export const ResetPassword = () => {
     }
 
     if (!isStrongPassword(password)) {
-      setError('Password must be at least 8 characters and include letters and numbers')
+      setError('Password must be at least 10 characters and include a letter and a number')
       return
     }
 
@@ -67,7 +67,7 @@ export const ResetPassword = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">At least 8 characters with letters and numbers</p>
+            <p className="text-xs text-gray-500 mt-1">At least 10 characters with a letter and a number. Avoid common words and your name. It must differ from your current password.</p>
           </div>
 
           <div className="mb-4">

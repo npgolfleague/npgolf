@@ -6,6 +6,7 @@ const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { escapeHtml } = require('../utils/html');
 const { optInLink } = require('../utils/signedLinks');
+const { passwordProblem, hashPassword, needsRehash } = require('../utils/passwords');
 const { signAccessToken } = require('../utils/authTokens');
 const { Limiter, clientIp, limitByIp, tooMany } = require('../middleware/rateLimit');
 
@@ -43,14 +44,6 @@ function isPlausibleName(name) {
   if (value.length < 2 || value.length > 60) return false;
   if (/[<>\u0000-\u001f]|:\/\/|www\./i.test(value)) return false;
   return !/\w\.[a-z]{2,}\//i.test(value);
-}
-
-function isStrongPassword(password) {
-  const minLen = 8;
-  const hasMin = typeof password === 'string' && password.length >= minLen;
-  const hasLetter = /[A-Za-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  return hasMin && hasLetter && hasNumber;
 }
 
 // POST /api/auth/login { email, password }
@@ -107,6 +100,13 @@ router.post('/login', async (req, res) => {
     }
     loginLimits.account.clear(accountKey);
 
+    // Strengthen an older, cheaper hash now that the password is known.
+    if (needsRehash(user.password)) {
+      const stronger = await hashPassword(password);
+      const [result] = await pool.query('UPDATE players SET password = ? WHERE id = ? AND password = ?', [stronger, user.id, user.password]);
+      if (result.affectedRows === 1) user.password = stronger;
+    }
+
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       console.error('JWT_SECRET not set');
@@ -145,9 +145,8 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid phone number' });
   }
 
-  if (!isStrongPassword(password)) {
-    return res.status(400).json({ error: 'password must be at least 8 characters and include letters and numbers' });
-  }
+  const problem = passwordProblem(password, { name, email });
+  if (problem) return res.status(400).json({ error: problem });
 
   try {
     const parsedLeagueId = league_id === undefined || league_id === null || league_id === ''
@@ -196,8 +195,7 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
     }
 
     // Hash password
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS || '10');
-    const hashedPassword = await bcrypt.hash(password, rounds);
+    const hashedPassword = await hashPassword(password);
 
     // Insert new player
     const [result] = await pool.query(
@@ -384,14 +382,10 @@ router.post('/forgot-password', limitByIp(forgotIpLimit), async (req, res) => {
 router.post('/reset-password', limitByIp(resetLimit), async (req, res) => {
   const { token, password } = req.body || {};
   if (!token || typeof token !== 'string' || !password) return res.status(400).json({ error: 'token and password are required' });
-  if (!isStrongPassword(password)) {
-    return res.status(400).json({ error: 'password must be at least 8 characters and include letters and numbers' });
-  }
-
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const [rows] = await pool.query(
-      'SELECT id FROM players WHERE reset_password_token_hash = ? AND reset_password_expires > NOW() AND COALESCE(active, 1) <> 0 LIMIT 1',
+      'SELECT id, name, email, password FROM players WHERE reset_password_token_hash = ? AND reset_password_expires > NOW() AND COALESCE(active, 1) <> 0 LIMIT 1',
       [tokenHash]
     );
 
@@ -400,8 +394,14 @@ router.post('/reset-password', limitByIp(resetLimit), async (req, res) => {
       return res.status(400).json({ error: 'invalid or expired reset token' });
     }
 
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS || '10');
-    const hashedPassword = await bcrypt.hash(password, rounds);
+    // The link stays usable after these, so another password can be tried.
+    const problem = passwordProblem(password, user);
+    if (problem) return res.status(400).json({ error: problem });
+    if (user.password && await bcrypt.compare(password, user.password)) {
+      return res.status(400).json({ error: 'Choose a password different from your current one' });
+    }
+
+    const hashedPassword = await hashPassword(password);
 
     // Clearing the refresh token (and the new password fingerprint) ends every open session.
     await pool.query(

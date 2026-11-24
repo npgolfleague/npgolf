@@ -74,7 +74,7 @@ describe('deactivated accounts', () => {
 
 describe('sign-up checks', () => {
   const signUp = (over = {}) => request(app).post('/api/auth/register')
-    .send({ name: 'Pat Smith', email: 'new@example.test', password: 'Passw0rd1', phone: '(813) 555-0100', league_id: 1, ...over });
+    .send({ name: 'Pat Smith', email: 'new@example.test', password: 'teal7Walnut', phone: '(813) 555-0100', league_id: 1, ...over });
   const inserted = () => pool.query.mock.calls.some(([sql]) => sql.includes('INSERT INTO players'));
 
   test('accepts a normal player', async () => {

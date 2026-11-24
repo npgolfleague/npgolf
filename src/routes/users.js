@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const bcrypt = require('bcryptjs');
+const { passwordProblem, hashPassword } = require('../utils/passwords');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
 const { rebuildLeaguePayouts } = require('../payouts');
@@ -84,17 +84,9 @@ router.post('/', requireAdmin, async (req, res) => {
   try {
     let hashed = null;
     if (password) {
-      // Basic password validation: minimum 8 chars, includes letters and numbers
-      const minLen = 8;
-      const hasMin = typeof password === 'string' && password.length >= minLen;
-      const hasLetter = /[A-Za-z]/.test(password);
-      const hasNumber = /\d/.test(password);
-      if (!hasMin || !hasLetter || !hasNumber) {
-        return res.status(400).json({ error: `password must be at least ${minLen} characters and include letters and numbers` });
-      }
-
-      const rounds = process.env.BCRYPT_ROUNDS ? Number(process.env.BCRYPT_ROUNDS) : 10;
-      hashed = await bcrypt.hash(password, rounds);
+      const problem = passwordProblem(password, { name, email });
+      if (problem) return res.status(400).json({ error: problem });
+      hashed = await hashPassword(password);
     }
 
     const activeValue = active !== undefined ? active : 1;

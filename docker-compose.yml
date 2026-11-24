@@ -41,7 +41,7 @@ services:
       # Local development only. Set LOCAL_JWT_SECRET to use your own.
       JWT_SECRET: ${LOCAL_JWT_SECRET:-local-development-only}
       JWT_EXPIRES_IN: 8h
-      BCRYPT_ROUNDS: 10
+      BCRYPT_ROUNDS: 12
       SMS_ENABLED: ${SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_API_KEY: ${TWILIO_API_KEY}

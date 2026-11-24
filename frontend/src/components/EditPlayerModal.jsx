@@ -238,7 +238,7 @@ export const EditPlayerModal = ({ player, onClose, onSave }) => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Min 8 chars, letters & numbers"
+                  placeholder="Min 10 chars, letters & numbers"
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Optional - leave blank for passwordless account</p>
