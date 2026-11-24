@@ -334,13 +334,14 @@ export const Seasons = () => {
                   <th className="hidden px-3 py-2 text-right md:table-cell">Skins $</th>
                   <th className="hidden px-3 py-2 text-right md:table-cell">CTP $</th>
                   <th className="hidden px-3 py-2 text-right md:table-cell">Side $</th>
+                  {showPlayoffCols && <th className="hidden px-3 py-2 text-right md:table-cell">Playoff $</th>}
                   <th className="px-3 py-2 text-right">Total $</th>
                   {detail.frozen && <th className="hidden px-3 py-2 text-right sm:table-cell">End quota</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {detail.standings.length === 0 && (
-                  <tr><td colSpan="11" className="px-3 py-6 text-center text-slate-500">No results yet this season.</td></tr>
+                  <tr><td colSpan="12" className="px-3 py-6 text-center text-slate-500">No results yet this season.</td></tr>
                 )}
                 {detail.standings.map((r) => (
                   <tr key={r.player_id}>
@@ -353,6 +354,7 @@ export const Seasons = () => {
                     <td className="hidden px-3 py-2 text-right md:table-cell">{money(r.prize_skins)}</td>
                     <td className="hidden px-3 py-2 text-right md:table-cell">{money(r.prize_ctp)}</td>
                     <td className="hidden px-3 py-2 text-right md:table-cell">{money(r.prize_side_games)}</td>
+                    {showPlayoffCols && <td className="hidden px-3 py-2 text-right md:table-cell">{money(r.prize_playoffs)}</td>}
                     <td className="px-3 py-2 text-right font-semibold">{money(r.prize_money)}</td>
                     {detail.frozen && <td className="hidden px-3 py-2 text-right sm:table-cell">{r.end_quota_18 ?? '—'}</td>}
                   </tr>

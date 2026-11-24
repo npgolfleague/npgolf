@@ -523,7 +523,7 @@ router.get('/:id/seasons/:seasonId/standings.csv', requireAuth, async (req, res)
       ['final_rank', 'Rank'], ['player_name', 'Player'], ['fedex_points', 'FedEx Points'],
       ['regular_points', 'Regular Points'], ['playoff_points', 'Playoff Points'],
       ['tournaments_played', 'Played'], ['prize_quota', 'Quota $'], ['prize_skins', 'Skins $'],
-      ['prize_ctp', 'CTP $'], ['prize_side_games', 'Side Games $'], ['prize_money', 'Total $'],
+      ['prize_ctp', 'CTP $'], ['prize_side_games', 'Side Games $'], ['prize_playoffs', 'Playoff $'], ['prize_money', 'Total $'],
       ['end_quota_18', 'Quota 18'], ['end_quota_9', 'Quota 9']
     ];
     const esc = (v) => {
