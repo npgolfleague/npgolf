@@ -37,6 +37,9 @@ ENV GIT_COMMIT=$GIT_COMMIT \
     GIT_BRANCH=$GIT_BRANCH \
     BUILD_TIME=$BUILD_TIME
 
+# The app writes nothing to the image, so it doesn't need root.
+USER node
+
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "src/server.js"]
