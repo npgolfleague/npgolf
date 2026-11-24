@@ -40,6 +40,7 @@ beforeEach(() => {
     }
     if (sql.startsWith('SELECT 1 FROM league_players')) return [(MEMBERS[params[0]] || []).includes(Number(params[1])) ? [{ 1: 1 }] : []];
     if (sql.startsWith('SELECT league_id FROM tournament')) return [LEAGUE_OF[params[0]] ? [{ league_id: LEAGUE_OF[params[0]] }] : []];
+    if (sql.startsWith('SELECT ht.par')) return [[{ par: 4 }]];
     if (sql.startsWith('SELECT season_id FROM tournament')) return [[{ season_id: null }]];
     if (sql.startsWith('SELECT 1 FROM tournament_paradise_points')) return [completed ? [{ 1: 1 }] : []];
     if (sql.startsWith('SELECT player_id, foursome FROM tournament_players')) return [roster];

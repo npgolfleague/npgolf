@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
 const { hideContacts } = require('../utils/privacy');
+const { DEFAULT_TABLE } = require('../utils/quotaPoints');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
@@ -1529,15 +1530,11 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     );
     const qp = settingsRows.length > 0 ? settingsRows[0] : {};
     const playoffFormat = String(qp.playoff_format || 'none').toLowerCase();
-    const pts = {
-      albatross: Number.isInteger(qp.quota_points_albatross) ? qp.quota_points_albatross : 8,
-      eagle: Number.isInteger(qp.quota_points_eagle) ? qp.quota_points_eagle : 8,
-      birdie: Number.isInteger(qp.quota_points_birdie) ? qp.quota_points_birdie : 6,
-      par: Number.isInteger(qp.quota_points_par) ? qp.quota_points_par : 4,
-      bogey: Number.isInteger(qp.quota_points_bogey) ? qp.quota_points_bogey : 2,
-      double_bogey: Number.isInteger(qp.quota_points_double_bogey) ? qp.quota_points_double_bogey : 1,
-      worse: Number.isInteger(qp.quota_points_worse) ? qp.quota_points_worse : 0
-    };
+    const pts = {};
+    Object.entries(DEFAULT_TABLE).forEach(([name, value]) => {
+      const own = qp[`quota_points_${name}`];
+      pts[name] = Number.isInteger(own) ? own : value;
+    });
 
     const [scoreCountRows] = await connection.query(
       'SELECT COUNT(*) AS score_count FROM scores WHERE tournament_id = ?',
