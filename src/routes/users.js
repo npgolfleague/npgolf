@@ -7,6 +7,8 @@ const { rebuildLeaguePayouts } = require('../payouts');
 const { getCurrentSeason } = require('../seasons');
 const { requireAdmin, requireAuth, isSuperAdminRole, isAdminCapableRole } = require('../middleware/admin');
 const { escapeHtml, htmlPageHeaders } = require('../utils/html');
+const { optInLink, requireSignedLink } = require('../utils/signedLinks');
+const { requireTwilioSignature } = require('../middleware/twilio');
 const router = express.Router();
 
 const ALLOWED_PLAYER_ROLES = new Set(['player', 'league_admin', 'admin', 'super_admin']);
@@ -169,10 +171,8 @@ router.post('/', requireAdmin, async (req, res) => {
     // Send SMS opt-in message if phone number is provided
     if (phone) {
       try {
-        const baseUrl = process.env.APP_BASE_URL || 'http://192.168.4.111:3000';
-        const optInLink = `${baseUrl}/api/players/${insertedId}/sms-opt-in`;
-        const message = `Click on this link ${optInLink} to authorize receiving text messages - opt out anytime by replying with 'STOP' to any text message`;
-        console.log(`Sending SMS opt-in to new player ${name} (${phone}): ${message}`);
+        const message = `Click on this link ${optInLink('sms', insertedId)} to authorize receiving text messages - opt out anytime by replying with 'STOP' to any text message`;
+        console.log(`Sending SMS opt-in to new player ${insertedId}`);
         await sendSMS(phone, message);
         console.log(`✓ SMS opt-in sent successfully to ${name}`);
       } catch (smsErr) {
@@ -387,7 +387,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 });
 
 // GET /api/users/:id/sms-opt-in - Opt in to SMS notifications
-router.get('/:id/sms-opt-in', htmlPageHeaders, async (req, res) => {
+router.get('/:id/sms-opt-in', htmlPageHeaders, requireSignedLink((req) => ['sms-opt-in', req.params.id]), async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -439,7 +439,7 @@ router.get('/:id/sms-opt-in', htmlPageHeaders, async (req, res) => {
 });
 
 // GET /api/users/:id/email-opt-in - Opt in to email notifications
-router.get('/:id/email-opt-in', htmlPageHeaders, async (req, res) => {
+router.get('/:id/email-opt-in', htmlPageHeaders, requireSignedLink((req) => ['email-opt-in', req.params.id]), async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -608,16 +608,16 @@ router.post('/:id/send-sms', requireAdmin, async (req, res) => {
 });
 
 // POST /api/users/sms-webhook - Handle Twilio SMS status updates (opt-outs)
-router.post('/sms-webhook', async (req, res) => {
+router.post('/sms-webhook', requireTwilioSignature, async (req, res) => {
   const { From, Body, MessageStatus } = req.body;
   
   try {
     // Log the webhook for debugging
-    console.log('Twilio SMS webhook received:', { From, Body, MessageStatus });
+    console.log('Twilio SMS webhook received:', { MessageStatus });
     
     // Check if user opted out (STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT)
     const optOutKeywords = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
-    if (Body && optOutKeywords.includes(Body.toUpperCase().trim())) {
+    if (typeof Body === 'string' && optOutKeywords.includes(Body.toUpperCase().trim())) {
       // Find player by phone number and disable SMS
       const [players] = await pool.query('SELECT id, name FROM players WHERE phone = ?', [From]);
       if (players.length > 0) {

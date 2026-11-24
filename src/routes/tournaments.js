@@ -9,6 +9,7 @@ const { rebuildTournamentPayouts } = require('../payouts');
 const { SeasonError, assertSeasonOpen } = require('../seasons');
 const { requireOpenSeason } = require('../middleware/season');
 const { escapeHtml, htmlPageHeaders } = require('../utils/html');
+const { confirmLink, rsvpLink, requireSignedLink, page } = require('../utils/signedLinks');
 const { rebuildTournamentSideGames, getTournamentSideGames, applyLeagueDefaults } = require('../sideGames');
 const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../utils/sideGames');
 const {
@@ -2861,8 +2862,7 @@ router.post('/:id/invite-sms', requireAdmin, async (req, res) => {
     let sent = 0, failed = [];
     for (const player of players) {
       // Generate unique link for each player
-      const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-      const joinUrl = `${baseUrl}/api/tournaments/join?playerId=${player.id}&tournamentId=${tournamentId}`;
+      const joinUrl = rsvpLink(tournamentId, player.id);
       const msg = `Hi ${player.name}, are you playing in the next tournament? Tap to join: ${joinUrl}`;
       try {
         await sendSMS(player.phone, msg);
@@ -2925,9 +2925,8 @@ router.post('/:id/send-sms', requireAdmin, async (req, res) => {
     
     for (const player of players) {
       try {
-        const rsvpLink = `${baseUrl}/api/tournaments/${tournamentId}/rsvp?playerId=${player.id}`;
-        const message = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${rsvpLink}`;
-        console.log(`Sending SMS to ${player.name} (${player.phone}): ${message}`);
+        const message = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${rsvpLink(tournamentId, player.id)}`;
+        console.log(`Sending SMS to player ${player.id}`);
         await sendSMS(player.phone, message);
         console.log(`✓ SMS sent successfully to ${player.name}`);
         sent++;
@@ -2937,7 +2936,7 @@ router.post('/:id/send-sms', requireAdmin, async (req, res) => {
       }
     }
     
-    const sampleMessage = `If you are playing ${tournament.course_name} ${tournamentDate} click this link ${baseUrl}/api/tournaments/${tournamentId}/rsvp?playerId={playerId}`;
+    const sampleMessage = `If you are playing ${tournament.course_name} ${tournamentDate} click this link (personal link)`;
     res.json({ sent, failed, message: sampleMessage });
   } catch (err) {
     console.error('Error sending SMS announcement:', err);
@@ -3027,8 +3026,8 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
     );
     
     for (const player of players) {
-      const yesUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=yes`;
-      const noUrl = `${baseUrl}/api/tournaments/${tournamentId}/confirm?playerId=${player.id}&response=no`;
+      const yesUrl = confirmLink(tournamentId, player.id, 'yes');
+      const noUrl = confirmLink(tournamentId, player.id, 'no');
       
       // Send SMS if applicable
       if ((method === 'sms' || method === 'both') && player.sms_allowed === 1 && player.phone) {
@@ -3148,8 +3147,45 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
   }
 });
 
+// Links stop working once the round is completed or its season is closed.
+const requireOpenRound = async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT ls.status, EXISTS (SELECT 1 FROM tournament_paradise_points x WHERE x.tournament_id = t.id) AS is_completed
+       FROM tournament t LEFT JOIN league_seasons ls ON ls.id = t.season_id WHERE t.id = ?`,
+      [req.params.id]
+    );
+    if (rows[0] && (rows[0].status === 'closed' || Number(rows[0].is_completed) === 1)) {
+      return res.status(409).send(page('This round is over', 'Its sign-up can no longer be changed.'));
+    }
+    return next();
+  } catch (err) {
+    console.error('Error checking round:', err);
+    return res.status(500).send(page('Something went wrong', 'Please try again later.'));
+  }
+};
+
+// GET /api/tournaments/:id/rsvp-link/:playerId - A player's personal sign-up link,
+// for an admin to put in a text
+router.get('/:id/rsvp-link/:playerId', requireAdmin, async (req, res) => {
+  const playerId = Number(req.params.playerId);
+  if (!Number.isInteger(playerId) || playerId <= 0) return res.status(400).json({ error: 'Invalid player id' });
+  try {
+    const [rows] = await pool.query(
+      `SELECT 1 FROM tournament t JOIN league_players lp ON lp.league_id = t.league_id AND lp.player_id = ?
+       WHERE t.id = ? LIMIT 1`,
+      [playerId, req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Player or tournament not found in this league' });
+    return res.json({ link: rsvpLink(Number(req.params.id), playerId) });
+  } catch (err) {
+    console.error('Error creating sign-up link:', err);
+    return res.status(500).json({ error: 'Failed to create the link' });
+  }
+});
+
 // GET /api/tournaments/:id/confirm - Confirm attendance (yes/no) via link
-router.get('/:id/confirm', htmlPageHeaders, async (req, res) => {
+router.get('/:id/confirm', htmlPageHeaders, requireSignedLink((req) => ['confirm', req.params.id, req.query.playerId, req.query.response]), requireOpenRound, async (req, res) => {
   const tournamentId = req.params.id;
   const { playerId, response } = req.query;
   
@@ -3288,7 +3324,7 @@ router.get('/:id/confirm', htmlPageHeaders, async (req, res) => {
 });
 
 // GET /api/tournaments/:id/rsvp - RSVP to a tournament via SMS link
-router.get('/:id/rsvp', htmlPageHeaders, async (req, res) => {
+router.get('/:id/rsvp', htmlPageHeaders, requireSignedLink((req) => ['rsvp', req.params.id, req.query.playerId]), requireOpenRound, async (req, res) => {
   const tournamentId = req.params.id;
   const { playerId } = req.query;
   
@@ -3448,30 +3484,6 @@ router.get('/:id/attendance', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching attendance:', err);
     res.status(500).json({ error: 'Failed to fetch attendance data' });
-  }
-});
-
-// GET /api/tournaments/join - Add player to tournament via link
-router.get('/join', async (req, res) => {
-  const { playerId, tournamentId } = req.query;
-  try {
-    if (!playerId || !tournamentId) {
-      return res.status(400).json({ error: 'Missing playerId or tournamentId' });
-    }
-    
-    // Check if already joined
-    const [exists] = await pool.query('SELECT * FROM tournament_players WHERE player_id = ? AND tournament_id = ?', [playerId, tournamentId]);
-    if (exists.length > 0) {
-      return res.json({ message: 'Already joined' });
-    }
-    
-    // Add to tournament_players
-    await pool.query('INSERT INTO tournament_players (player_id, tournament_id) VALUES (?, ?)', [playerId, tournamentId]);
-    await saveTournamentQuotaSnapshot(pool, tournamentId, playerId);
-    res.json({ message: 'Joined tournament successfully' });
-  } catch (err) {
-    console.error('Error joining tournament:', err);
-    res.status(500).json({ error: 'Failed to join tournament' });
   }
 });
 

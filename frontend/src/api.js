@@ -173,6 +173,7 @@ export const tournamentsAPI = {
   complete: (id) => apiClient.post(`/tournaments/${id}/complete`),
   getPlayers: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/players`),
   getFoursome: (tournamentId, foursome) => apiClient.get(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}`),
+  rsvpLink: (tournamentId, playerId) => apiClient.get(`/tournaments/${tournamentId}/rsvp-link/${playerId}`),
   saveFoursomeRoster: (tournamentId, foursome, playerIds, pairs) => apiClient.put(`/tournaments/${tournamentId}/foursomes/${encodeURIComponent(foursome)}/roster`, { playerIds, pairs }),
   addPlayer: (tournamentId, playerId, teeId) => apiClient.post(`/tournaments/${tournamentId}/players`, { playerId, teeId }),
   removePlayer: (tournamentId, playerId) => apiClient.delete(`/tournaments/${tournamentId}/players/${playerId}`),
