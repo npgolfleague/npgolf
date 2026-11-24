@@ -21,6 +21,8 @@ chmod +x monitor-pi.sh
 ./monitor-pi.sh
 cat logs/performance-$(date +%Y%m%d).log
 ```
+The script reads `DB_PASS` from `~/npgolf/.env`. Keep that file out of Git and
+restrict its permissions with `chmod 600 ~/npgolf/.env`.
 
 ### 4. Set up automated logging (every 5 minutes)
 ```bash
@@ -67,7 +69,10 @@ docker stats
 
 ### Database Size
 ```bash
-docker exec npgolf-mysql-pi mysql -u root -p'A6qpNm8hKA&y#8' -e "
+set -a
+source ~/npgolf/.env
+set +a
+docker exec -e MYSQL_PWD="$DB_PASS" npgolf-mysql-pi mysql -u root -e "
 SELECT 
     table_schema AS 'Database',
     ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)',
@@ -80,7 +85,7 @@ GROUP BY table_schema;
 
 ### MySQL Connection Count
 ```bash
-docker exec npgolf-mysql-pi mysql -u root -p'A6qpNm8hKA&y#8' -e "
+docker exec -e MYSQL_PWD="$DB_PASS" npgolf-mysql-pi mysql -u root -e "
 SHOW STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running');
 "
 ```
