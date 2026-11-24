@@ -116,7 +116,7 @@ export const systemAPI = {
 
 export const authAPI = {
   login: (email, password) => apiClient.post('/auth/login', { email, password }),
-  register: (name, email, password, phone, sex, smsAllowed, leagueId) => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed, league_id: leagueId }),
+  register: (name, email, password, phone, sex, smsAllowed, leagueId, website = '') => apiClient.post('/auth/register', { name, email, password, phone, sex, sms_allowed: smsAllowed, league_id: leagueId, website }),
   forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
   refresh: (refreshToken) => apiClient.post('/auth/refresh', { refreshToken }),

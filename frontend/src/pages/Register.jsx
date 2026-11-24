@@ -23,6 +23,7 @@ export const Register = () => {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [sex, setSex] = useState('M')
+  const [website, setWebsite] = useState('') // hidden trap: only bots fill it in
   const [leagues, setLeagues] = useState([])
   const [leagueId, setLeagueId] = useState('')
   const [leaguesLoading, setLeaguesLoading] = useState(true)
@@ -125,7 +126,7 @@ export const Register = () => {
     setLoading(true)
 
     try {
-      await authAPI.register(name, email, password, phone, sex, smsAllowed, Number(leagueId))
+      await authAPI.register(name, email, password, phone, sex, smsAllowed, Number(leagueId), website)
       navigate('/login', { state: { message: 'Registration successful! Check your email for further instructions.' } })
     } catch (err) {
       console.error('Registration error:', err)
@@ -141,6 +142,17 @@ export const Register = () => {
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
         <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">NPGOLF Sign Up</h1>
         <form onSubmit={handleSubmit}>
+          <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px' }}>
+            <label htmlFor="reg-website">Leave this empty</label>
+            <input
+              id="reg-website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
           <div className="mb-4">
             <label htmlFor="reg-name" className="block text-gray-700 font-semibold mb-2">Name</label>
             <input

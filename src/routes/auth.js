@@ -1,16 +1,46 @@
 const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { escapeHtml } = require('../utils/html');
+const { signAccessToken } = require('../utils/authTokens');
+const { Limiter, clientIp, limitByIp, tooMany } = require('../middleware/rateLimit');
 
 const router = express.Router();
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL_DELAY_MS || process.env.INVITATION_EMAIL_DELAY_MS || 3000), 0);
+
+const MINUTE = 60 * 1000;
+// Failed logins only, so players sharing a clubhouse network aren't blocked by
+// each other's successful logins.
+const loginLimits = {
+  account: new Limiter({ max: 8, windowMs: 15 * MINUTE }), // one address guessing one account
+  ip: new Limiter({ max: 40, windowMs: 15 * MINUTE }),     // one address guessing many accounts
+  email: new Limiter({ max: 60, windowMs: 60 * MINUTE })   // many addresses guessing one account
+};
+const registerLimit = new Limiter({ max: 15, windowMs: 60 * MINUTE });
+const forgotIpLimit = new Limiter({ max: 15, windowMs: 60 * MINUTE });
+const forgotEmailLimit = new Limiter({ max: 3, windowMs: 60 * MINUTE });
+const resetLimit = new Limiter({ max: 20, windowMs: 60 * MINUTE });
+
+// For tests.
+const resetAuthLimits = () => {
+  [...Object.values(loginLimits), registerLimit, forgotIpLimit, forgotEmailLimit, resetLimit].forEach((l) => l.clear());
+};
+
+const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+// A person's name: no links, markup or control characters.
+function isPlausibleName(name) {
+  if (typeof name !== 'string') return false;
+  const value = name.trim();
+  if (value.length < 2 || value.length > 60) return false;
+  if (/[<>\u0000-\u001f]|:\/\/|www\./i.test(value)) return false;
+  return !/\w\.[a-z]{2,}\//i.test(value);
+}
 
 function isStrongPassword(password) {
   const minLen = 8;
@@ -24,7 +54,24 @@ function isStrongPassword(password) {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
-  const normalizedEmail = String(email).trim();
+  if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'email and password are required' });
+  const normalizedEmail = email.trim();
+
+  const ip = clientIp(req);
+  const emailKey = normalizedEmail.toLowerCase().slice(0, 255);
+  const accountKey = `${ip}|${emailKey}`;
+  const wait = Math.max(
+    loginLimits.account.blockedFor(accountKey),
+    loginLimits.ip.blockedFor(ip),
+    loginLimits.email.blockedFor(emailKey)
+  );
+  if (wait) return tooMany(res, wait);
+  const loginFailed = () => {
+    loginLimits.account.hit(accountKey);
+    loginLimits.ip.hit(ip);
+    loginLimits.email.hit(emailKey);
+    return res.status(401).json({ error: 'invalid credentials' });
+  };
 
   try {
     const leagueBillingEntityId = req.league?.billing_entity_id ?? null;
@@ -44,10 +91,14 @@ router.post('/login', async (req, res) => {
       [req.league?.id ?? null, normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
     );
     const user = rows && rows[0];
-    if (!user || !user.password) return res.status(401).json({ error: 'invalid credentials' });
+    if (!user || !user.password) return loginFailed();
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ error: 'invalid credentials' });
+    if (!match) return loginFailed();
+    if (Number(user.active) === 0) {
+      return res.status(403).json({ error: 'This account is deactivated. Contact your league admin.' });
+    }
+    loginLimits.account.clear(accountKey);
 
     const secret = process.env.JWT_SECRET;
     if (!secret) {
@@ -55,8 +106,7 @@ router.post('/login', async (req, res) => {
       return res.status(500).json({ error: 'server misconfigured' });
     }
 
-    const payload = { sub: user.id, email: user.email };
-    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn });
+    const token = signAccessToken(user, secret, jwtExpiresIn);
     // create refresh token (30 days)
     const refreshToken = crypto.randomBytes(48).toString('hex')
     const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
@@ -71,10 +121,21 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9?, sms_allowed?, league_id? }
-router.post('/register', async (req, res) => {
-  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed, league_id } = req.body || {};
+router.post('/register', limitByIp(registerLimit), async (req, res) => {
+  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed, league_id, website } = req.body || {};
+  // Hidden on the form, so only a bot fills it in.
+  if (website) return res.status(400).json({ error: 'Registration failed' });
   if (!email || !password || !name || !phone) {
     return res.status(400).json({ error: 'email, password, name, and phone are required' });
+  }
+  if (!isPlausibleName(name)) {
+    return res.status(400).json({ error: 'Please enter your name, without links or symbols' });
+  }
+  if (typeof email !== 'string' || email.length > 255 || !EMAIL_PATTERN.test(email.trim())) {
+    return res.status(400).json({ error: 'Please enter a valid email address' });
+  }
+  if (typeof phone !== 'string' || !/^[0-9+().\-\s]{7,25}$/.test(phone)) {
+    return res.status(400).json({ error: 'Please enter a valid phone number' });
   }
 
   if (!isStrongPassword(password)) {
@@ -174,8 +235,7 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ error: 'server misconfigured' });
     }
 
-    const payload = { sub: userId, email };
-    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn });
+    const token = signAccessToken({ id: userId, email, password: hashedPassword }, secret, jwtExpiresIn);
     // create refresh token (30 days)
     const refreshToken = crypto.randomBytes(48).toString('hex')
     const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
@@ -205,12 +265,12 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/refresh { refreshToken }
 router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body || {}
-  if (!refreshToken) return res.status(400).json({ error: 'refreshToken is required' })
+  if (!refreshToken || typeof refreshToken !== 'string') return res.status(400).json({ error: 'refreshToken is required' })
 
   try {
     const hash = crypto.createHash('sha256').update(refreshToken).digest('hex')
     const [rows] = await pool.query(
-      `SELECT p.id, p.name, p.email, p.sex, p.active, lp.quota_18, lp.quota_9, p.role
+      `SELECT p.id, p.name, p.email, p.sex, p.active, lp.quota_18, lp.quota_9, p.role, p.password
        FROM players p
        LEFT JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
        WHERE p.refresh_token_hash = ? AND p.refresh_token_expires > NOW()
@@ -218,13 +278,12 @@ router.post('/refresh', async (req, res) => {
       [req.league?.id ?? null, hash]
     )
     const user = rows && rows[0]
-    if (!user) return res.status(401).json({ error: 'invalid or expired refresh token' })
+    if (!user || Number(user.active) === 0) return res.status(401).json({ error: 'invalid or expired refresh token' })
 
     const secret = process.env.JWT_SECRET
     if (!secret) return res.status(500).json({ error: 'server misconfigured' })
 
-    const payload = { sub: user.id, email: user.email }
-    const token = jwt.sign(payload, secret, { expiresIn: jwtExpiresIn })
+    const token = signAccessToken(user, secret, jwtExpiresIn)
 
     // rotate refresh token
     const newRefreshToken = crypto.randomBytes(48).toString('hex')
@@ -255,12 +314,18 @@ router.post('/logout', async (req, res) => {
 })
 
 // POST /api/auth/forgot-password { email }
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', limitByIp(forgotIpLimit), async (req, res) => {
   const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'email is required' });
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'email is required' });
+
+  // Same answer whether or not an email goes out, so this doesn't reveal accounts.
+  const sentMessage = { message: 'If an account exists for that email, a reset link has been sent.' };
+  const emailKey = email.trim().toLowerCase().slice(0, 255);
+  if (forgotEmailLimit.blockedFor(emailKey)) return res.json(sentMessage);
+  forgotEmailLimit.hit(emailKey);
 
   try {
-    const [rows] = await pool.query('SELECT id, name, email FROM players WHERE email = ? LIMIT 1', [email]);
+    const [rows] = await pool.query('SELECT id, name, email FROM players WHERE LOWER(email) = LOWER(?) AND COALESCE(active, 1) <> 0 LIMIT 1', [email.trim()]);
     const user = rows && rows[0];
 
     if (user) {
@@ -296,7 +361,7 @@ router.post('/forgot-password', async (req, res) => {
       }
     }
 
-    return res.json({ message: 'If an account exists for that email, a reset link has been sent.' });
+    return res.json(sentMessage);
   } catch (err) {
     console.error('Forgot password error', err);
     return res.status(500).json({ error: 'Failed to process forgot password request' });
@@ -304,9 +369,9 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password { token, password }
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', limitByIp(resetLimit), async (req, res) => {
   const { token, password } = req.body || {};
-  if (!token || !password) return res.status(400).json({ error: 'token and password are required' });
+  if (!token || typeof token !== 'string' || !password) return res.status(400).json({ error: 'token and password are required' });
   if (!isStrongPassword(password)) {
     return res.status(400).json({ error: 'password must be at least 8 characters and include letters and numbers' });
   }
@@ -314,7 +379,7 @@ router.post('/reset-password', async (req, res) => {
   try {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const [rows] = await pool.query(
-      'SELECT id FROM players WHERE reset_password_token_hash = ? AND reset_password_expires > NOW() LIMIT 1',
+      'SELECT id FROM players WHERE reset_password_token_hash = ? AND reset_password_expires > NOW() AND COALESCE(active, 1) <> 0 LIMIT 1',
       [tokenHash]
     );
 
@@ -326,8 +391,9 @@ router.post('/reset-password', async (req, res) => {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS || '10');
     const hashedPassword = await bcrypt.hash(password, rounds);
 
+    // Clearing the refresh token (and the new password fingerprint) ends every open session.
     await pool.query(
-      'UPDATE players SET password = ?, reset_password_token_hash = NULL, reset_password_expires = NULL WHERE id = ?',
+      'UPDATE players SET password = ?, reset_password_token_hash = NULL, reset_password_expires = NULL, refresh_token_hash = NULL, refresh_token_expires = NULL WHERE id = ?',
       [hashedPassword, user.id]
     );
 
@@ -339,3 +405,5 @@ router.post('/reset-password', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.resetAuthLimits = resetAuthLimits;
+module.exports.isPlausibleName = isPlausibleName;
