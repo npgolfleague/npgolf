@@ -6,7 +6,7 @@ services:
     container_name: npgolf-mysql
     restart: always
     ports:
-      - "3308:3306"
+      - "127.0.0.1:3308:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: npgolf
@@ -38,7 +38,8 @@ services:
       DB_USER: root
       DB_PASS: root
       DB_NAME: npgolf
-      JWT_SECRET: your-secret-key-change-in-production
+      # Local development only. Set LOCAL_JWT_SECRET to use your own.
+      JWT_SECRET: ${LOCAL_JWT_SECRET:-local-development-only}
       JWT_EXPIRES_IN: 8h
       BCRYPT_ROUNDS: 10
       SMS_ENABLED: ${SMS_ENABLED:-false}

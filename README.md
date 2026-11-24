@@ -21,7 +21,7 @@ Node backend + MySQL scaffold for the npgolf project.
 
 	If you prefer to run as the dedicated app user (recommended), update `.env` after running migrations (see below):
 
-	- DB_PASS=app_password
+	- DB_PASS=<app-password>
 
 2. Install node deps (PowerShell):
 
@@ -93,7 +93,7 @@ Quick commands to stop dev servers, Docker containers, and clean up images/tarba
 	```powershell
 	docker run -d --name npgolf --network npgolf_default -p 3000:3000 \
 		-e DB_HOST=npgolf-mysql -e DB_PORT=3306 -e DB_NAME=npgolf \
-		-e DB_USER=root -e DB_PASS=root -e JWT_SECRET=devsecret \
+		-e DB_USER=root -e DB_PASS=root -e JWT_SECRET=<your-secret> \
 		npgolf-multi:latest
 	```
 
@@ -110,7 +110,7 @@ Quick commands to stop dev servers, Docker containers, and clean up images/tarba
 	```powershell
 	docker run -d --name npgolf --network npgolf_default -p 3000:3000 \
 		-e DB_HOST=npgolf-mysql -e DB_PORT=3306 -e DB_NAME=npgolf \
-		-e DB_USER=npgolf_app -e DB_PASS=app_password -e JWT_SECRET=devsecret \
+		-e DB_USER=npgolf_app -e DB_PASS=<app-password> -e JWT_SECRET=<your-secret> \
 		npgolf-multi:latest
 	```
 
@@ -121,7 +121,7 @@ Quick commands to stop dev servers, Docker containers, and clean up images/tarba
 	If the password you supplied does not match the one stored in MySQL, reset it (inside the MySQL container):
 
 	```powershell
-	docker exec npgolf-mysql mysql -uroot -proot -e "ALTER USER 'npgolf_app'@'%' IDENTIFIED BY 'app_password'; FLUSH PRIVILEGES;"
+	docker exec npgolf-mysql mysql -uroot -proot -e "ALTER USER 'npgolf_app'@'%' IDENTIFIED BY '<app-password>'; FLUSH PRIVILEGES;"
 	```
 
 	Then restart the app container (or recreate it with the correct env var):
@@ -224,7 +224,7 @@ Notes
 
 Notes on credentials and security
 
-- The migration creates a local user `npgolf_app` with password `app_password` for convenience. In production you should:
+- The migration creates a local user `npgolf_app` with password `<app-password>` for convenience. In production you should:
   - Create a dedicated DB user with a strong password and limited privileges.
   - Do not store secrets in the repository — keep `.env` out of version control.
 

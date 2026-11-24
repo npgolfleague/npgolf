@@ -49,6 +49,9 @@ async function generatePDF(html, options = {}) {
 
   try {
     const page = await browser.newPage();
+    // Pages are built by the app and self-contained: no scripts, no network.
+    await page.setJavaScriptEnabled(false);
+    await page.setOfflineMode(true);
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     const pdfOptions = {
