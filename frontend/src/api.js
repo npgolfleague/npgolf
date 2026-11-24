@@ -66,6 +66,12 @@ const addRefreshOn401 = (client) => client.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // A 401 from a sign-in request means a wrong password or token, not an
+    // expired session: renewing and resending would count it as two attempts.
+    if (String(originalRequest.url || '').startsWith('/auth/')) {
+      return Promise.reject(error)
+    }
+
     const refreshToken = localStorage.getItem('refreshToken')
     if (!refreshToken) {
       return Promise.reject(error)
