@@ -1,5 +1,5 @@
 ### Build the frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 WORKDIR /usr/src/app/frontend
 # Copy frontend sources
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm ci && npm run build
 
 ### Build the backend and copy frontend assets
-FROM node:20-alpine AS backend
+FROM node:24-alpine AS backend
 WORKDIR /usr/src/app
 RUN apk add --no-cache tini chromium nss freetype harfbuzz ca-certificates ttf-freefont
 
@@ -17,7 +17,7 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 # Copy backend package manifests and install production deps
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production || npm install --only=production
+RUN npm ci --omit=dev
 
 # Copy backend source
 COPY src ./src
