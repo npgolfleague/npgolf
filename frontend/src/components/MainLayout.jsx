@@ -80,12 +80,13 @@ export const MainLayout = () => {
       )}
 
       {/* ── Sidebar ── */}
-      {/* On md+: inline collapsible. On <md: off-canvas drawer. */}
+      {/* On md+: inline collapsible. On <md: off-canvas drawer.
+          Either way it's as tall as the screen and the menu scrolls inside it. */}
       <aside
         className={`
           bg-tour-900 text-slate-100 flex flex-col shrink-0
           fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300
-          md:relative md:translate-x-0 md:z-auto
+          md:sticky md:top-0 md:bottom-auto md:h-screen md:translate-x-0 md:z-auto
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           md:transition-all md:duration-300
           ${sidebarOpen ? 'md:w-64' : 'md:w-16'}
@@ -136,7 +137,7 @@ export const MainLayout = () => {
         )}
 
         {/* Navigation Menu */}
-        <nav className="flex-1 p-3">
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain [color-scheme:dark] p-3">
           <ul className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon
@@ -193,24 +194,26 @@ export const MainLayout = () => {
                 </li>
               )
             })}
+            <li className="mt-3 pt-3 border-t border-tour-800">
+              <button
+                  onClick={handleLogout}
+                  aria-label="Log out"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-tour-200 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+                >
+                  <LogOut className="w-5 h-5 shrink-0" />
+                  <span className={`font-semibold text-[15px] tracking-wide ${!sidebarOpen ? 'md:hidden' : ''}`}>
+                    Logout
+                  </span>
+                </button>
+            </li>
           </ul>
         </nav>
 
-        {/* Logout Button */}
-        <div className="p-3 border-t border-tour-800">
-          <button
-            onClick={handleLogout}
-            aria-label="Log out"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-tour-200 hover:bg-red-900/40 hover:text-red-300 transition-colors"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            <span className={`font-semibold text-[15px] tracking-wide ${!sidebarOpen ? 'md:hidden' : ''}`}>
-              Logout
-            </span>
-          </button>
-          {appVersion && (
+        {/* Version */}
+        {appVersion && (
+          <div className={`p-3 border-t border-tour-800 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${!sidebarOpen ? 'md:hidden' : ''}`}>
             <p
-              className={`mt-2 px-3 text-[11px] text-tour-300 truncate ${!sidebarOpen ? 'md:hidden' : ''}`}
+              className={`px-3 text-[11px] text-tour-300 truncate ${!sidebarOpen ? 'md:hidden' : ''}`}
               title={[
                 appVersion.branch && `Branch: ${appVersion.branch}`,
                 formatDateTime(appVersion.buildTime) && `Built: ${formatDateTime(appVersion.buildTime)}`
@@ -218,8 +221,8 @@ export const MainLayout = () => {
             >
               {formatVersionShort(appVersion)}
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
 
       {/* ── Main Content ── */}
