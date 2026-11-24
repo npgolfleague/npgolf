@@ -94,7 +94,8 @@ export function Leaderboard() {
   };
 
   const buildPlayoffPointsDraftRows = (rows) => {
-    return (rows || []).map((row) => ({
+    // Seed points come from the regular season and aren't edited here.
+    return (rows || []).filter((row) => row.result_type !== 'seed').map((row) => ({
       player_id: String(row.player_id ?? row.id ?? ''),
       name: row.name || '',
       rank_position: row.rank_position ?? '',
@@ -990,13 +991,15 @@ export function Leaderboard() {
                           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         >
                           <option value="">-- Select winner --</option>
-                          {(playoffData.standings || []).slice(0, 4).map((row) => (
+                          {(playoffData.finalists || []).map((row) => (
                             <option key={`tie-${row.playerId}`} value={row.playerId}>
                               {row.name}
                             </option>
                           ))}
                         </select>
-                        <p className="mt-2 text-xs text-slate-500">Use this when the championship is decided by regular-season tiebreak rules or a manual putt-off result.</p>
+                        <p className="mt-2 text-xs text-slate-500">{(playoffData.finalists || []).length > 0
+                            ? 'Choose the putt-off winner. Only players still tied can win.'
+                            : 'The finalists appear here once the final is completed.'}</p>
                       </div>
                       <div className="flex flex-col justify-end gap-3">
                         <button

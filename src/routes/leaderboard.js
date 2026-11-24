@@ -632,6 +632,11 @@ router.get('/:tournamentId', async (req, res) => {
           losersBracketPoints: Number(row.losers_bracket_points) || 0,
           totalPoints: Number(row.total_points) || 0
         })),
+        // Who played this round of the championship bracket
+        finalists: tournament.playoff_stage === 'final'
+          ? playoffResults.filter((row) => row.result_type === 'performance')
+            .map((row) => ({ playerId: Number(row.player_id), name: row.name }))
+          : [],
         playoffResults,
         losersResults,
         losersStandings,
