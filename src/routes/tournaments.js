@@ -1326,6 +1326,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+const assertLeagueSeason = async (seasonId, leagueId) => {
+  const [rows] = await pool.query('SELECT 1 FROM league_seasons WHERE id = ? AND league_id = ? LIMIT 1', [seasonId, leagueId]);
+  if (rows.length === 0) throw new SeasonError(400, 'That season is not in this league');
+};
+
 const sendSeasonError = (res, err) => {
   if (err instanceof SeasonError) {
     res.status(err.status).json({ error: err.message });
@@ -1364,6 +1369,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const shotgunStart = Boolean(shotgun_start);
     const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     const season = season_id ? Number(season_id) : (season_year ? (await getOrCreateLeagueSeason(pool, leagueId, season_year)).id : (await getOrCreateLeagueSeason(pool, leagueId)).id);
+    await assertLeagueSeason(season, leagueId);
     await assertSeasonOpen(pool, season);
     const stage = normalizePlayoffStage(playoff_stage);
     const [result] = await pool.query(
@@ -1404,6 +1410,7 @@ router.put('/:id', requireAdmin, requireOpenSeason, async (req, res) => {
     const shotgunStart = Boolean(shotgun_start);
     const standardQuotaGame = standard_quota_game === undefined ? 1 : (standard_quota_game ? 1 : 0);
     const season = season_id ? Number(season_id) : (season_year ? (await getOrCreateLeagueSeason(pool, leagueId, season_year)).id : (await getOrCreateLeagueSeason(pool, leagueId)).id);
+    await assertLeagueSeason(season, leagueId);
     await assertSeasonOpen(pool, season);
     const stage = normalizePlayoffStage(playoff_stage);
     await pool.query(

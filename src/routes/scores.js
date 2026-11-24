@@ -16,6 +16,36 @@ const isLeagueAdmin = async (req) => {
   }
 };
 
+// Why this player may not save these scores, or null when they may. "Their
+// foursome" is the one set in the round's line-up (players can rearrange it).
+async function findForeignScore(scores, userId) {
+  const tournamentIds = [...new Set(scores.map((s) => Number(s?.tournament_id)))];
+  for (const tournamentId of tournamentIds) {
+    const [done] = await pool.query(
+      'SELECT 1 FROM tournament_paradise_points WHERE tournament_id = ? LIMIT 1',
+      [tournamentId]
+    );
+    if (done.length > 0) return 'This round is completed. Ask an admin to make changes.';
+
+    const [roster] = await pool.query(
+      `SELECT player_id, foursome FROM tournament_players
+       WHERE tournament_id = ? AND foursome IS NOT NULL AND foursome <> ''`,
+      [tournamentId]
+    );
+    const foursomeOf = new Map(roster.map((r) => [Number(r.player_id), String(r.foursome)]));
+    const mine = foursomeOf.get(Number(userId));
+    if (!mine) return 'Add yourself to a foursome before entering scores.';
+
+    for (const score of scores.filter((s) => Number(s?.tournament_id) === tournamentId)) {
+      const group = score.foursome || score.foursome_group;
+      if (foursomeOf.get(Number(score.player_id)) !== mine || String(group ?? '') !== mine) {
+        return 'You can only enter scores for your own foursome.';
+      }
+    }
+  }
+  return null;
+}
+
 async function getPar3HolesForCourse(courseId) {
   try {
     const [holeRows] = await pool.query(
@@ -225,6 +255,13 @@ router.post('/', requireAuth, requireOpenSeasonForScores, async (req, res) => {
           throw authErr;
         }
       }
+    }
+
+    // Players enter scores for their own foursome only, and not once the round
+    // is completed. Admins can change anything in their league.
+    if (!(await isLeagueAdmin(req))) {
+      const problem = await findForeignScore(scores, req.user.id);
+      if (problem) return res.status(403).json({ error: problem });
     }
 
     // Saved holes lock: once a player has a score saved on a later hole, a
@@ -817,6 +854,12 @@ router.post('/tournament/:tournamentId/foursome/:group/post', requireAuth, requi
 
   try {
     const ctx = await getCardContext(tournamentId, group);
+    if (!(await isLeagueAdmin(req))) {
+      if (!ctx.members.some((m) => m.id === Number(userId))) {
+        return res.status(403).json({ error: 'Only players in this foursome can post its card.' });
+      }
+      if (ctx.post) return res.status(409).json({ error: 'This card has already been posted. Ask an admin to make changes.' });
+    }
     const status = ctx.requireAttest ? 'awaiting_marker' : 'posted';
     await pool.query(
       `INSERT INTO foursome_posts (tournament_id, foursome_group, posted_by, status)

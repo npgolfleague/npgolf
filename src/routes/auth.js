@@ -120,9 +120,9 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register { email, password, name, phone, sex?, quota_18?, quota_9?, sms_allowed?, league_id? }
+// POST /api/auth/register { email, password, name, phone, sex?, sms_allowed?, league_id? }
 router.post('/register', limitByIp(registerLimit), async (req, res) => {
-  const { email, password, name, phone, sex, quota_18, quota_9, sms_allowed, league_id, website } = req.body || {};
+  const { email, password, name, phone, sex, sms_allowed, league_id, website } = req.body || {};
   // Hidden on the form, so only a bot fills it in.
   if (website) return res.status(400).json({ error: 'Registration failed' });
   if (!email || !password || !name || !phone) {
@@ -192,13 +192,6 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS || '10');
     const hashedPassword = await bcrypt.hash(password, rounds);
 
-    const normalizedQuota18 = quota_18 === undefined || quota_18 === null || quota_18 === ''
-      ? null
-      : Number(quota_18);
-    const normalizedQuota9 = quota_9 === undefined || quota_9 === null || quota_9 === ''
-      ? null
-      : Number(quota_9);
-
     // Insert new player
     const [result] = await pool.query(
       'INSERT INTO players (billing_entity_id, name, email, password, phone, sex, role, email_allowed, sms_allowed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -207,10 +200,10 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
 
     const userId = result.insertId;
 
-    // Quota is stored per league on the membership row.
+    // Quotas are earned or set by an admin, never chosen at sign-up.
     await pool.query(
-      'INSERT IGNORE INTO league_players (league_id, player_id, quota_18, quota_9) VALUES (?, ?, ?, ?)',
-      [targetLeague.id, userId, normalizedQuota18, normalizedQuota9]
+      'INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)',
+      [targetLeague.id, userId]
     );
 
     // Send SMS opt-in message (only if SMS is enabled and user opted in)
@@ -245,7 +238,7 @@ router.post('/register', limitByIp(registerLimit), async (req, res) => {
     res.status(201).json({
       token,
       refreshToken,
-      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: normalizedQuota18, quota_9: normalizedQuota9, role: 'player', league_id: targetLeague.id }
+      user: { id: userId, name, email, phone, sex: sex || 'M', quota_18: null, quota_9: null, role: 'player', league_id: targetLeague.id }
     });
   } catch (err) {
     console.error('Registration error', err);

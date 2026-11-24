@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin, requireAuth } = require('../middleware/admin');
+const { requireAdmin, requireAuth, requireSuperAdmin } = require('../middleware/admin');
 const seasons = require('../seasons');
 const router = express.Router();
 
@@ -612,7 +612,7 @@ router.get('/:id/tournaments', async (req, res) => {
 });
 
 // POST /api/leagues - Create new league (admin only)
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireSuperAdmin, async (req, res) => {
   const {
     billing_entity_id,
     name,
