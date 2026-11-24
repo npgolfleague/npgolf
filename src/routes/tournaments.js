@@ -1298,7 +1298,7 @@ router.get('/:id', async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.first_tee_time, t.shotgun_start, t.season_id, ls.season_year, ls.champion_tiebreak_player_id, t.playoff_stage, t.playoff_override_semifinal_player_ids, t.playoff_override_final_player_ids, t.created_at,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.first_tee_time, t.shotgun_start, t.season_id, ls.season_year, ls.status AS season_status, ls.champion_tiebreak_player_id, t.playoff_stage, t.playoff_override_semifinal_player_ids, t.playoff_override_final_player_ids, t.created_at,
               t.quota_collected, t.skins_collected,
               c.id as course_id, c.name as course_name, c.address as course_address, c.phone as course_phone,
               CASE

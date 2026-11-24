@@ -3,6 +3,7 @@ import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
 import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
+import { isArchivedRound } from '../utils/season'
 import { ConfirmModal } from '../components/ConfirmModal'
 
 // How long to wait after the last score on a hole before saving it automatically.
@@ -102,6 +103,8 @@ export const ScoreEntry = () => {
     const loadFoursome = async () => {
       try {
         const tResp = await tournamentsAPI.get(tid)
+        // Scores in a closed season can't be changed, so don't open it for entry.
+        if (isArchivedRound(tResp.data)) return
         setSelectedTournament(tResp.data)
         await fetchTournamentPlayers(tid)
         if (fq) {
@@ -1156,7 +1159,7 @@ export const ScoreEntry = () => {
             }}
           >
             <option value="">Choose a tournament...</option>
-            {tournaments.filter(t => !t.completed && !t.is_completed).map(t => (
+            {tournaments.filter(t => !t.completed && !t.is_completed && !isArchivedRound(t)).map(t => (
               <option key={t.id} value={t.id}>
                 {formatDateOnly(t.date)} - {t.course_name}{t.number_of_holes === 9 ? ` (${t.nine_hole_side === 'back' ? 'back' : 'front'})` : ''}
               </option>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { tournamentsAPI, coursesAPI, leaguesAPI, sideGamesAPI } from '../api'
+import { isArchivedRound } from '../utils/season'
+import { ArchivedNotice } from '../components/ArchivedNotice'
 import { SideGamesFields, buildSideGameRows } from '../components/SideGamesFields'
 
 export const EditTournament = () => {
@@ -20,6 +22,7 @@ export const EditTournament = () => {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [sideGames, setSideGames] = useState([])
+  const [archivedRound, setArchivedRound] = useState(null) // set when the season is closed
 
   useEffect(() => {
     fetchData()
@@ -36,6 +39,10 @@ export const EditTournament = () => {
       
       const tournament = tournamentRes.data
       const currentLeague = leagueRes.data
+      if (isArchivedRound(tournament)) {
+        setArchivedRound(tournament)
+        return
+      }
       setDate(tournament.date.split('T')[0]) // Convert to YYYY-MM-DD format
       setFirstTeeTime(tournament.first_tee_time ? String(tournament.first_tee_time).slice(0, 5) : '')
       setShotgunStart(Boolean(tournament.shotgun_start))
@@ -88,6 +95,22 @@ export const EditTournament = () => {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  if (archivedRound) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <button
+            onClick={() => navigate('/tournaments')}
+            className="text-blue-600 hover:text-blue-800 mb-4"
+          >
+            ← Back to Tournaments
+          </button>
+          <ArchivedNotice tournament={archivedRound} />
+        </div>
       </div>
     )
   }
