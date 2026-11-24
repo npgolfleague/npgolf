@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
+const { escapeHtml } = require('../utils/html');
 
 const router = express.Router();
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
@@ -277,7 +278,7 @@ router.post('/forgot-password', async (req, res) => {
 
       const subject = 'NPGOLF Password Reset';
       const html = `
-        <p>Hello ${user.name || ''},</p>
+        <p>Hello ${escapeHtml(user.name)},</p>
         <p>We received a request to reset your NPGOLF password.</p>
         <p><a href="${resetLink}">Click here to reset your password</a></p>
         <p>This link expires in 1 hour. If you did not request this, you can safely ignore this email.</p>

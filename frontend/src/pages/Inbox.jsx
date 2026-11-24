@@ -193,7 +193,14 @@ export function Inbox() {
 
               <div className="prose max-w-none">
                 {selectedEmail.html ? (
-                  <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                  // Email HTML is untrusted: no scripts, and no access to this page.
+                  <iframe
+                    title="Email content"
+                    sandbox="allow-popups allow-popups-to-escape-sandbox"
+                    referrerPolicy="no-referrer"
+                    srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'"><base target="_blank">${selectedEmail.html}`}
+                    className="h-[60vh] w-full border-0"
+                  />
                 ) : (
                   <pre className="whitespace-pre-wrap font-sans text-gray-700">
                     {selectedEmail.text}
