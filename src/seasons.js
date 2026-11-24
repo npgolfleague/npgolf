@@ -56,12 +56,43 @@ const assertSeasonOpen = async (db, seasonId) => {
   }
 };
 
+// Final order: the champion, then the other finalists by playoff points
+// (regular points break ties), then everyone else by regular + playoff points.
+// Without playoffs it is simply by FedEx points.
+const rankSeasonStandings = (rows, championPlayerId) => {
+  const championId = Number(championPlayerId) || null;
+  const hasPlayoffs = rows.some((r) => Number(r.playoff_points) !== 0);
+  const isFinalist = (r) => Number(r.is_finalist) === 1;
+  const sortKey = (r) => (hasPlayoffs
+    ? Number(r.regular_points) + Number(r.playoff_points)
+    : Number(r.fedex_points));
+
+  return [...rows].sort((a, b) => {
+    if (championId) {
+      if (Number(a.player_id) === championId) return -1;
+      if (Number(b.player_id) === championId) return 1;
+    }
+    if (isFinalist(a) !== isFinalist(b)) return isFinalist(a) ? -1 : 1;
+    if (isFinalist(a)) {
+      const diff = Number(b.playoff_points) - Number(a.playoff_points)
+        || Number(b.regular_points) - Number(a.regular_points);
+      if (diff) return diff;
+    }
+    return sortKey(b) - sortKey(a)
+      || Number(b.prize_money) - Number(a.prize_money)
+      || String(a.player_name).localeCompare(String(b.player_name));
+  });
+};
+
 // Live (calculated) standings for a season, best first.
 const computeSeasonStandings = async (db, season) => {
   const [rows] = await db.query(
     `SELECT t.player_id, p.name AS player_name,
             t.fedex_points, t.tournaments_played,
-            t.prize_quota, t.prize_skins, t.prize_ctp, t.prize_side_games, t.prize_money,
+            t.prize_quota, t.prize_skins, t.prize_ctp, t.prize_side_games, t.prize_playoffs, t.prize_money,
+            EXISTS (SELECT 1 FROM tournament_playoff_points fp
+                    WHERE fp.season_id = t.season_id AND fp.player_id = t.player_id
+                      AND fp.bracket_type = 'playoff' AND fp.playoff_week = 2) AS is_finalist,
             COALESCE(sps.regular_points, 0) AS regular_points,
             COALESCE(sps.playoff_points, 0) AS playoff_points,
             COALESCE(sps.losers_bracket_points, 0) AS losers_bracket_points,
@@ -75,23 +106,9 @@ const computeSeasonStandings = async (db, season) => {
     [season.id]
   );
 
-  const championId = Number(season.champion_player_id) || null;
-  const hasPlayoffs = rows.some((r) => Number(r.playoff_points) !== 0);
-  const sortKey = (r) => (hasPlayoffs
-    ? Number(r.regular_points) + Number(r.playoff_points)
-    : Number(r.fedex_points));
+  const ranked = rankSeasonStandings(rows, season.champion_player_id);
 
-  rows.sort((a, b) => {
-    if (championId) {
-      if (Number(a.player_id) === championId) return -1;
-      if (Number(b.player_id) === championId) return 1;
-    }
-    return sortKey(b) - sortKey(a)
-      || Number(b.prize_money) - Number(a.prize_money)
-      || String(a.player_name).localeCompare(String(b.player_name));
-  });
-
-  return rows.map((r, i) => ({
+  return ranked.map((r, i) => ({
     final_rank: i + 1,
     player_id: Number(r.player_id),
     player_name: r.player_name,
@@ -104,6 +121,7 @@ const computeSeasonStandings = async (db, season) => {
     prize_skins: Number(r.prize_skins) || 0,
     prize_ctp: Number(r.prize_ctp) || 0,
     prize_side_games: Number(r.prize_side_games) || 0,
+    prize_playoffs: Number(r.prize_playoffs) || 0,
     prize_money: Number(r.prize_money) || 0,
     end_quota_18: r.quota_18 == null ? null : Number(r.quota_18),
     end_quota_9: r.quota_9 == null ? null : Number(r.quota_9)
@@ -128,6 +146,7 @@ const getArchivedStandings = async (db, seasonId) => {
     prize_skins: Number(r.prize_skins),
     prize_ctp: Number(r.prize_ctp),
     prize_side_games: Number(r.prize_side_games),
+    prize_playoffs: Number(r.prize_playoffs) || 0,
     prize_money: Number(r.prize_money),
     end_quota_18: r.end_quota_18 == null ? null : Number(r.end_quota_18),
     end_quota_9: r.end_quota_9 == null ? null : Number(r.end_quota_9)
@@ -278,12 +297,12 @@ const closeSeason = async (db, season, userId) => {
       `INSERT INTO season_archive_standings (
          season_id, player_id, player_name, final_rank, fedex_points, regular_points, playoff_points,
          losers_bracket_points, tournaments_played, prize_quota, prize_skins, prize_ctp,
-         prize_side_games, prize_money, end_quota_18, end_quota_9
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         prize_side_games, prize_playoffs, prize_money, end_quota_18, end_quota_9
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         season.id, s.player_id, s.player_name, s.final_rank, s.fedex_points, s.regular_points, s.playoff_points,
         s.losers_bracket_points, s.tournaments_played, s.prize_quota, s.prize_skins, s.prize_ctp,
-        s.prize_side_games, s.prize_money, s.end_quota_18, s.end_quota_9
+        s.prize_side_games, s.prize_playoffs, s.prize_money, s.end_quota_18, s.end_quota_9
       ]
     );
   }
@@ -456,6 +475,7 @@ module.exports = {
   SeasonError,
   getCurrentSeason,
   assertSeasonOpen,
+  rankSeasonStandings,
   computeSeasonStandings,
   listSeasons,
   getSeasonDetail,

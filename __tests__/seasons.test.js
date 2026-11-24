@@ -22,7 +22,7 @@ jest.mock('../src/middleware/league', () => ({
 jest.mock('../src/db', () => ({ query: jest.fn(), getConnection: jest.fn() }));
 
 const pool = require('../src/db');
-const { normalizeRolloverOptions, assertSeasonOpen, SeasonError } = require('../src/seasons');
+const { rankSeasonStandings, normalizeRolloverOptions, assertSeasonOpen, SeasonError } = require('../src/seasons');
 const app = require('../src/server');
 
 describe('rollover options', () => {
@@ -46,6 +46,25 @@ describe('rollover options', () => {
     expect(() => normalizeRolloverOptions({ quota_mode: 'wipe' }, 2027)).toThrow('Invalid quota option');
     expect(() => normalizeRolloverOptions({ new_season_year: 'abc' }, 2027)).toThrow('Invalid new season year');
     expect(() => normalizeRolloverOptions({ quota_mode: 'set', quota_18: 150 }, 2027)).toThrow(/whole number/);
+  });
+});
+
+describe('final ranking', () => {
+  const row = (player_id, regular_points, playoff_points, is_finalist) => (
+    { player_id, player_name: `P${player_id}`, regular_points, playoff_points, is_finalist, fedex_points: regular_points, prize_money: 0 });
+  const order = (rows, champion) => rankSeasonStandings(rows, champion).map((r) => r.player_id);
+
+  test('finalists rank by playoff points, ahead of non-finalists with more total points', () => {
+    const rows = [row(1, 853, 220, 1), row(2, 766, 250, 1), row(3, 606, 320, 1), row(4, 754, 200, 1), row(5, 686, 210, 1), row(6, 900, 150, 0)];
+    expect(order(rows, 3)).toEqual([3, 2, 1, 5, 4, 6]);
+  });
+
+  test('the champion is first even when tied on playoff points; regular points break other ties', () => {
+    expect(order([row(1, 800, 250, 1), row(2, 700, 250, 1), row(3, 750, 250, 1)], 2)).toEqual([2, 1, 3]);
+  });
+
+  test('without playoffs, ranks by FedEx points', () => {
+    expect(order([row(1, 100, 0, 0), row(2, 300, 0, 0)], null)).toEqual([2, 1]);
   });
 });
 

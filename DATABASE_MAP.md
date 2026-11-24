@@ -51,6 +51,7 @@ emails, schema_migrations  (standalone)
 | Results | `tournament_paradise_points`, `tournament_skin_winners`, `tournament_ctp_winners`, `tournament_playoff_points`, `season_player_stats`, `tournament_results_email`, `tournament_completion_backups` |
 | Quota | `quota` (7 rolling slots), `skins_quota` (20 slots) |
 | Seasons (migration 065) | `league_seasons.status/closed_at/closed_by`, `season_archive_standings` (frozen final standings), `league_player_season_totals` (view) |
+| Playoff prizes (migration 066) | `season_playoff_prizes` (championship and losers-bracket prizes, included in `league_player_season_totals.prize_money`) |
 | Side games (migration 064) | `league_side_game_defaults`, `tournament_side_games`, `tournament_side_game_entries` (opt-in), `tournament_side_game_teams` (saved Blind Draw), `tournament_side_game_results`; prize money goes to `tournament_payouts` as `side_games` |
 | Other | `emails`, `schema_migrations` |
 
