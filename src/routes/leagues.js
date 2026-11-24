@@ -205,11 +205,11 @@ router.get('/:id/settings', async (req, res) => {
         golf_course_email: null,
         outgoing_email_from: null,
         quota_points_albatross: 8,
-        quota_points_eagle: 8,
-        quota_points_birdie: 6,
-        quota_points_par: 4,
-        quota_points_bogey: 2,
-        quota_points_double_bogey: 1,
+        quota_points_eagle: 6,
+        quota_points_birdie: 4,
+        quota_points_par: 2,
+        quota_points_bogey: 1,
+        quota_points_double_bogey: 0,
         quota_points_worse: 0,
         live_scoring: 1,
         require_card_attest: 0,
@@ -278,50 +278,36 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'League not found' });
     }
 
-    await pool.query(
-      `INSERT INTO league_settings (
-        league_id,
-        tournament_fee_18_holes, tournament_fee_9_holes,
-        skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
-        golf_course_email,
-        outgoing_email_from,
-        playoff_format,
-        quota_points_albatross, quota_points_eagle, quota_points_birdie,
-        quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
-        live_scoring,
-        require_card_attest
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        tournament_fee_18_holes = VALUES(tournament_fee_18_holes),
-        tournament_fee_9_holes = VALUES(tournament_fee_9_holes),
-        skins_ctp_fee_18_holes = VALUES(skins_ctp_fee_18_holes),
-        skins_ctp_fee_9_holes = VALUES(skins_ctp_fee_9_holes),
-        golf_course_email = VALUES(golf_course_email),
-        outgoing_email_from = VALUES(outgoing_email_from),
-        playoff_format = VALUES(playoff_format),
-        quota_points_albatross = VALUES(quota_points_albatross),
-        quota_points_eagle = VALUES(quota_points_eagle),
-        quota_points_birdie = VALUES(quota_points_birdie),
-        quota_points_par = VALUES(quota_points_par),
-        quota_points_bogey = VALUES(quota_points_bogey),
-        quota_points_double_bogey = VALUES(quota_points_double_bogey),
-        quota_points_worse = VALUES(quota_points_worse),
-        live_scoring = VALUES(live_scoring),
-        require_card_attest = VALUES(require_card_attest)`,
-      [
-        id,
-        tournament_fee_18_holes ?? 20.00, tournament_fee_9_holes ?? 10.00,
-        skins_ctp_fee_18_holes ?? 10.00, skins_ctp_fee_9_holes ?? 5.00,
-        normalizedGolfCourseEmail,
-        normalizedOutgoingEmailFrom,
-        normalizedPlayoffFormat ?? 'none',
-        quota_points_albatross ?? 8, quota_points_eagle ?? 8, quota_points_birdie ?? 6,
-        quota_points_par ?? 4, quota_points_bogey ?? 2, quota_points_double_bogey ?? 1,
-        quota_points_worse ?? 0,
-        live_scoring != null ? (live_scoring ? 1 : 0) : 1,
-        require_card_attest ? 1 : 0
-      ]
-    );
+    // Only the settings sent are changed; anything left out keeps its value.
+    const changes = {
+      tournament_fee_18_holes, tournament_fee_9_holes, skins_ctp_fee_18_holes, skins_ctp_fee_9_holes,
+      quota_points_albatross, quota_points_eagle, quota_points_birdie, quota_points_par,
+      quota_points_bogey, quota_points_double_bogey, quota_points_worse,
+      playoff_format: normalizedPlayoffFormat,
+      golf_course_email: golf_course_email === undefined ? undefined : normalizedGolfCourseEmail,
+      outgoing_email_from: outgoing_email_from === undefined ? undefined : normalizedOutgoingEmailFrom,
+      live_scoring: live_scoring == null ? undefined : (live_scoring ? 1 : 0),
+      require_card_attest: require_card_attest === undefined ? undefined : (require_card_attest ? 1 : 0)
+    };
+    for (const name of Object.keys(changes).filter((k) => /^(quota_points_|.*_fee_)/.test(k))) {
+      if (changes[name] === null || changes[name] === '') delete changes[name];
+      else if (changes[name] !== undefined) {
+        const value = Number(changes[name]);
+        const whole = name.startsWith('quota_points_');
+        if (!Number.isFinite(value) || value < 0 || (whole && (!Number.isInteger(value) || value > 50))) {
+          return res.status(400).json({ error: `Invalid value for ${name}` });
+        }
+        changes[name] = value;
+      }
+    }
+    const names = Object.keys(changes).filter((k) => changes[k] !== undefined);
+    await pool.query('INSERT IGNORE INTO league_settings (league_id) VALUES (?)', [id]);
+    if (names.length > 0) {
+      await pool.query(
+        `UPDATE league_settings SET ${names.map((k) => `${k} = ?`).join(', ')} WHERE league_id = ?`,
+        [...names.map((k) => changes[k]), id]
+      );
+    }
 
     if (championship_pot !== undefined || losers_bracket_pot !== undefined) {
       const currentSeasonRow = await getCurrentLeagueSeasonRow(id);

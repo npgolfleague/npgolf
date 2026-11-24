@@ -12,7 +12,7 @@ jest.mock('../src/middleware/admin', () => {
   return { ...actual, requireAdmin: pass, requireSuperAdmin: pass, requireAnyAdmin: pass, requireAuth: pass, assertTournamentAccess: async () => {} };
 });
 jest.mock('../src/middleware/league', () => ({ leagueAliasMiddleware: (_req, _res, next) => next() }));
-jest.mock('../src/db', () => ({ query: jest.fn(async () => [[]]), execute: jest.fn(), getConnection: jest.fn() }));
+jest.mock('../src/db', () => ({ query: jest.fn(async (sql) => [sql.startsWith('SELECT ht.par') ? [{ par: 4 }] : []]), execute: jest.fn(), getConnection: jest.fn() }));
 
 const pool = require('../src/db');
 const app = require('../src/server');
@@ -40,14 +40,26 @@ test('only allowed sites get cross-origin credentials', async () => {
   expect(bad.headers['access-control-allow-credentials']).toBeUndefined();
 });
 
+// The server refuses a large request without reading all of it, so the
+// connection can close while the test is still sending. Send it again then.
+const answer = async (send) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await send();
+    } catch (err) {
+      if (!['ECONNRESET', 'EPIPE', 'ECONNABORTED'].includes(err.code) || attempt === 20) throw err;
+    }
+  }
+};
+
 const big = 'x'.repeat(2 * 1024 * 1024);
 
 test('a large request without a login is refused', async () => {
-  const res = await request(app).post('/api/auth/login').send({ email: big, password: 'x' });
+  const res = await answer(() => request(app).post('/api/auth/login').send({ email: big, password: 'x' }));
   expect(res.status).toBe(413);
   expect(res.body).toEqual({ error: 'That is too large to send' });
   mockUser = null;
-  const scores = await request(app).post('/api/scores').send({ scores: [], pad: big });
+  const scores = await answer(() => request(app).post('/api/scores').send({ scores: [], pad: big }));
   expect(scores.status).toBe(401);
 });
 
@@ -66,6 +78,6 @@ test('malformed requests get a short answer with no internal details', async () 
 });
 
 test('an oversized attachment is refused', async () => {
-  const res = await request(app).post('/api/emails/send').field('subject', 's').attach('attachment', Buffer.alloc(11 * 1024 * 1024), 'a.bin');
+  const res = await answer(() => request(app).post('/api/emails/send').field('subject', 's').attach('attachment', Buffer.alloc(11 * 1024 * 1024), 'a.bin'));
   expect(res.status).toBe(413);
 });

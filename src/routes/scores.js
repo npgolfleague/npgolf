@@ -4,6 +4,7 @@ const pool = require('../db');
 const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
 const { requireOpenSeason, requireOpenSeasonForScores, requireOpenSeasonForScore } = require('../middleware/season');
 const { getHoleReveal, isScoreVisibleToPlayer, getUserFoursomes } = require('../utils/holeReveal');
+const { pointsForScore, loadPointsTable, loadPar } = require('../utils/quotaPoints');
 
 // True when the signed-in user is a league admin (admins see and fix everything).
 const isLeagueAdmin = async (req) => {
@@ -294,18 +295,33 @@ router.post('/', requireAuth, requireOpenSeasonForScores, async (req, res) => {
       }
     }
 
+    // Work out every score's quota points before saving any of them.
+    const tables = new Map();
+    const points = [];
+    for (const score of scores) {
+      const value = Number(score.score);
+      if (!Number.isInteger(value) || value < 1 || value > 30) {
+        return res.status(400).json({ error: 'A score must be a whole number from 1 to 30' });
+      }
+      const par = await loadPar(pool, score.tournament_id, score.player_id, score.hole_id);
+      if (par === null) return res.status(400).json({ error: 'That hole or player is not part of this round' });
+      const key = String(score.tournament_id);
+      if (!tables.has(key)) tables.set(key, await loadPointsTable(pool, score.tournament_id));
+      points.push(pointsForScore(value, par, tables.get(key)));
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
       
       const results = [];
-      for (const score of scores) {
+      for (const [index, score] of scores.entries()) {
+        const quota = points[index];
         const {
           tournament_id,
           player_id,
           hole_id,
           score: scoreValue,
-          quota,
           ctp_feet,
           ctp_inches,
           ctp_image_url,
@@ -431,7 +447,7 @@ router.post('/', requireAuth, requireOpenSeasonForScores, async (req, res) => {
           }
         }
         
-        results.push({ id: result.insertId, ...score, foursome: foursomeVal });
+        results.push({ id: result.insertId, ...score, quota, foursome: foursomeVal });
       }
       
       await connection.commit();
@@ -451,12 +467,22 @@ router.post('/', requireAuth, requireOpenSeasonForScores, async (req, res) => {
 // PUT /api/scores/:id - Update score
 router.put('/:id', requireAdmin, requireOpenSeasonForScore, async (req, res) => {
   try {
-    const { score, quota } = req.body;
+    const { score } = req.body;
+    const value = Number(score);
+    if (!Number.isInteger(value) || value < 1 || value > 30) {
+      return res.status(400).json({ error: 'A score must be a whole number from 1 to 30' });
+    }
+    const [existing] = await pool.query('SELECT tournament_id, player_id, hole_id FROM scores WHERE id = ? LIMIT 1', [req.params.id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Score not found' });
+    const { tournament_id, player_id, hole_id } = existing[0];
+    const par = await loadPar(pool, tournament_id, player_id, hole_id);
+    if (par === null) return res.status(400).json({ error: 'That hole has no par set' });
+    const quota = pointsForScore(value, par, await loadPointsTable(pool, tournament_id));
     // Accept either name for foursome field
     const foursomeVal = req.body.foursome || req.body.foursome_group || null;
     await pool.query(
       'UPDATE scores SET score = ?, quota = ?, foursome_group = ?, entered_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [score, quota, foursomeVal, req.params.id]
+      [value, quota, foursomeVal, req.params.id]
     );
     res.json({ id: req.params.id, score, quota, foursome: foursomeVal });
   } catch (err) {

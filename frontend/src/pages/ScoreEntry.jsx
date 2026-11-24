@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useContext } from 'react'
-import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI } from '../api'
+import { tournamentsAPI, coursesAPI, playersAPI, scoresAPI, settingsAPI } from '../api'
 import { formatDateOnly } from '../utils/date'
 import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
@@ -8,6 +8,9 @@ import { ConfirmModal } from '../components/ConfirmModal'
 
 // How long to wait after the last score on a hole before saving it automatically.
 const AUTOSAVE_DELAY_MS = 1200
+
+// The rules' points table, until the league's own has loaded
+const DEFAULT_POINTS = { albatross: 8, eagle: 6, birdie: 4, par: 2, bogey: 1, double_bogey: 0, worse: 0 }
 
 export const ScoreEntry = () => {
   const { user } = useContext(AuthContext)
@@ -21,6 +24,8 @@ export const ScoreEntry = () => {
   const [foursomePairs, setFoursomePairs] = useState({})
   const [currentHole, setCurrentHole] = useState(1)
   const [holes, setHoles] = useState([])
+  const [courseTees, setCourseTees] = useState([])
+  const [pointsTable, setPointsTable] = useState(DEFAULT_POINTS)
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -196,6 +201,20 @@ export const ScoreEntry = () => {
     </div>
   )
 
+  // The league's points table
+  useEffect(() => {
+    settingsAPI.get()
+      .then(({ data }) => {
+        const table = { ...DEFAULT_POINTS }
+        Object.keys(table).forEach(k => {
+          const v = data?.[`quota_points_${k}`]
+          if (v !== null && v !== undefined) table[k] = Number(v)
+        })
+        setPointsTable(table)
+      })
+      .catch(err => console.error('Error fetching points table:', err))
+  }, [])
+
   const fetchTournaments = async () => {
     try {
       const response = await tournamentsAPI.list()
@@ -229,6 +248,7 @@ export const ScoreEntry = () => {
     try {
       const response = await coursesAPI.get(courseId)
       // API returns { course, tees: [{ holes: [{ hole_id, hole_number, par, handicap }] }] }
+      setCourseTees(response.data.tees || [])
       const firstTee = response.data.tees?.[0]
       if (firstTee?.holes?.length > 0) {
         const mapped = firstTee.holes.map(h => ({
@@ -432,35 +452,31 @@ export const ScoreEntry = () => {
     })
   }
 
-  // Calculate quota points based on score relative to par
+  // Points shown while entering scores. The server works them out again when
+  // saving, so these only need to match what it will do (src/utils/quotaPoints.js).
   const calculateQuotaPoints = (score, par) => {
     if (!score || !par) return 0
     const scoreInt = parseInt(score)
-    const parInt = parseInt(par)
-    const relative = scoreInt - parInt
+    const relative = scoreInt - parseInt(par)
+    if (scoreInt === 1 || relative <= -3) return pointsTable.albatross
+    if (relative === -2) return pointsTable.eagle
+    if (relative === -1) return pointsTable.birdie
+    if (relative === 0) return pointsTable.par
+    if (relative === 1) return pointsTable.bogey
+    if (relative === 2) return pointsTable.double_bogey
+    return pointsTable.worse
+  }
 
-    // Ace (hole-in-one) = 8 points
-    if (scoreInt === 1) return 8
-    
-    // 3 under par = 8 points (double eagle)
-    if (relative === -3) return 8
-    
-    // 2 under par = 6 points (eagle)
-    if (relative === -2) return 6
-    
-    // 1 under par = 4 points (birdie)
-    if (relative === -1) return 4
-    
-    // Par = 2 points
-    if (relative === 0) return 2
-    
-    // 1 over par = 1 point (bogey)
-    if (relative === 1) return 1
-    
-    // 2+ over par = 0 points (double bogey or worse)
-    if (relative >= 2) return 0
-    
-    return 0
+  // Par for this player's tee: the one set for the round, else the first for
+  // their gender, else the first tee.
+  const getPlayerPar = (player, holeData) => {
+    if (!holeData) return undefined
+    const tees = [...courseTees].sort((a, b) => Number(a.id) - Number(b.id))
+    const tee = tees.find(t => Number(t.id) === Number(player?.tee_id))
+      || tees.find(t => t.gender === (player?.sex === 'F' ? 'F' : 'M'))
+      || tees[0]
+    const hole = tee?.holes?.find(h => h.hole_number === holeData.hole_number)
+    return hole?.par ?? holeData.mens_par
   }
 
   const getScoreColor = (score, par) => {
@@ -482,30 +498,13 @@ export const ScoreEntry = () => {
     if (quotaPoints === null || quotaPoints === undefined || quotaPoints === '' || !par) return ''
     const pts = parseInt(quotaPoints)
     const parInt = parseInt(par)
-
-    // 8 points
-    if (pts === 8) {
-      // For par 3 or 4, ace (score 1)
-      // For par 5, double eagle (score 2)
-      return parInt === 5 ? 2 : 1
-    }
-    
-    // 6 points = eagle (2 under par)
-    if (pts === 6) return parInt - 2
-    
-    // 4 points = birdie (1 under par)
-    if (pts === 4) return parInt - 1
-    
-    // 2 points = par
-    if (pts === 2) return parInt
-    
-    // 1 point = bogey (1 over par)
-    if (pts === 1) return parInt + 1
-    
-    // 0 points = double bogey or worse (2+ over par)
-    if (pts === 0) return parInt + 2
-    
-    return ''
+    const steps = [
+      // An ace on a par 3 or 4, a double eagle on a par 5
+      ['albatross', parInt === 5 ? 2 : 1], ['eagle', parInt - 2], ['birdie', parInt - 1],
+      ['par', parInt], ['bogey', parInt + 1], ['double_bogey', parInt + 2], ['worse', parInt + 3]
+    ]
+    const match = steps.find(([name]) => Number(pointsTable[name]) === pts)
+    return match ? match[1] : ''
   }
 
   const getPlayerCurrentQuota = (player) => {
@@ -537,8 +536,7 @@ export const ScoreEntry = () => {
       const player = players.find(p => p.id === playerId)
       
       if (currentHoleData && player) {
-        // Use mens_par or womens_par based on player's sex
-        const par = player.sex === 'F' ? currentHoleData.womens_par : currentHoleData.mens_par
+        const par = getPlayerPar(player, currentHoleData)
         
         // Auto-calculate quota points when score is entered
         if (field === 'score' && value) {
@@ -696,7 +694,16 @@ export const ScoreEntry = () => {
       savingRef.current = true
       setSaving(true)
       setSaveStatus('saving')
-      await scoresAPI.saveScores(scoresToSave)
+      const saved = await scoresAPI.saveScores(scoresToSave)
+      // Show the points the server worked out.
+      setScores(prev => {
+        const next = { ...prev }
+        ;(saved.data?.scores || []).forEach(row => {
+          const key = `${holeNumber}-${row.player_id}`
+          if (String(next[`${key}-score`]) === String(row.score)) next[`${key}-quota`] = row.quota
+        })
+        return next
+      })
 
       // Clear CTP data for saved players (it belongs to the hole just saved)
       if (holeNumber === currentHole) {
