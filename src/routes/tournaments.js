@@ -533,21 +533,6 @@ const isProviderThrottleError = (err) => {
   return details.includes('5.4.6') || details.includes('unusual sending activity detected');
 };
 
-const ensureTournamentResultsEmailTable = async (db) => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS tournament_results_email (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      tournament_id INT NOT NULL,
-      subject VARCHAR(500),
-      html MEDIUMTEXT,
-      generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      sent_at DATETIME DEFAULT NULL,
-      UNIQUE KEY uq_tournament (tournament_id),
-      INDEX idx_tournament_id (tournament_id)
-    )
-  `);
-};
-
 const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
   const [rows] = await db.query(
     `SELECT CASE
@@ -2175,7 +2160,6 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
 
     // Generate and store results email (non-fatal)
     try {
-      await ensureTournamentResultsEmailTable(pool);
       const tournamentDate = formatDateOnly(tournamentRows[0].date, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const courseName = tournamentRows[0].course_name || 'Unknown Course';
       const emailRankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
@@ -2465,7 +2449,6 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   const { customMessage } = req.body || {};
   try {
-    await ensureTournamentResultsEmailTable(pool);
     const [tournamentRows] = await pool.query(
       `SELECT t.date, t.number_of_holes, t.quota_collected, t.skins_collected, t.season_id, t.playoff_stage, t.league_id, c.name AS course_name
        FROM tournament t
@@ -2614,7 +2597,6 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
 router.get('/:id/results-email', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   try {
-    await ensureTournamentResultsEmailTable(pool);
     const [rows] = await pool.query(
       'SELECT id, tournament_id, subject, html, generated_at, sent_at FROM tournament_results_email WHERE tournament_id = ?',
       [tournamentId]
@@ -2644,7 +2626,6 @@ router.post('/:id/results-email/send', requireAdmin, async (req, res) => {
   const tournamentId = req.params.id;
   const { email: singleEmail } = req.body || {};
   try {
-    await ensureTournamentResultsEmailTable(pool);
     const [emailRows] = await pool.query(
       'SELECT subject, html FROM tournament_results_email WHERE tournament_id = ?',
       [tournamentId]
