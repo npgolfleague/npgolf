@@ -1,5 +1,4 @@
 // PDF generation utility using Puppeteer
-const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 
 function resolveChromiumPath() {
@@ -28,6 +27,9 @@ async function generatePDF(html, options = {}) {
   
   console.log(`Using Chromium at: ${executablePath}`);
   
+  // puppeteer-core is an ES module, so it's loaded when a PDF is needed.
+  const { default: puppeteer } = await import('puppeteer-core');
+
   let browser;
   try {
     browser = await puppeteer.launch({
