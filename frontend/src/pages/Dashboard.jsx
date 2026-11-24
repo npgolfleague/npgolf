@@ -1,3 +1,4 @@
+import { quotaForHoles } from '../utils/quota'
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tournamentsAPI, playersAPI, leaguesAPI } from '../api'
@@ -420,10 +421,10 @@ export const Dashboard = () => {
                             </span>
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <span className="text-sm font-semibold text-gray-900">{player.quota_18 ?? '-'}</span>
+                            <span className="text-sm font-semibold text-gray-900">{quotaForHoles(player, 18) ?? '-'}</span>
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <span className="text-sm font-semibold text-gray-900">{player.quota_9 ?? '-'}</span>
+                            <span className="text-sm font-semibold text-gray-900">{quotaForHoles(player, 9) ?? '-'}</span>
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-center">
                             <span className="text-sm text-gray-900">

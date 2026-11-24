@@ -272,6 +272,7 @@ CREATE TABLE `league_settings` (
   `live_scoring` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'If 1, scores are visible on leaderboard as they are entered. If 0, only visible after foursome posts scores.',
   `require_card_attest` tinyint(1) NOT NULL DEFAULT '0',
   `playoff_format` enum('none','fedex_cup') NOT NULL DEFAULT 'none',
+  `quota_method` enum('last_7','best_8_of_20') NOT NULL DEFAULT 'last_7',
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_league` (`league_id`),
   CONSTRAINT `league_settings_ibfk_1` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE

@@ -1,3 +1,4 @@
+import { quotaForHoles } from '../utils/quota'
 import { useState, useEffect, useContext } from 'react'
 import { playersAPI, tournamentsAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
@@ -368,7 +369,7 @@ export const Users = () => {
                           onMouseLeave={handleQuotaLeave}
                           className="cursor-help inline-block"
                         >
-                          {player.quota_18 || '-'}
+                          {quotaForHoles(player, 18) ?? '-'}
                           {quotaTooltip.show && quotaTooltip.playerId === player.id && quotaTooltip.data.length > 0 && (
                             <div className="absolute z-10 left-0 top-full mt-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 w-48">
                               <div className="font-bold mb-2">Last 7 Rounds</div>
@@ -382,7 +383,7 @@ export const Users = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-900">{player.quota_9 || '-'}</td>
+                      <td className="px-6 py-4 text-gray-900">{quotaForHoles(player, 9) ?? '-'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.fedex_points?.toLocaleString() || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">{player.tournaments_played || '0'}</td>
                       <td className="px-6 py-4 text-gray-900">${(player.prize_money || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

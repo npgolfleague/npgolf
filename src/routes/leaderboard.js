@@ -2,35 +2,8 @@ const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
 const { getHoleReveal } = require('../utils/holeReveal');
+const { quotaSql, recentAverageQuota } = require('../utils/leagueQuota');
 const router = express.Router();
-
-function calculateRecentAverageQuota(playerRow, holeCount) {
-  const points = [];
-
-  for (let i = 1; i <= 7; i++) {
-    const pointsRaw = playerRow[`points_${i}`];
-    const holesRaw = playerRow[`holes_${i}`];
-
-    if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
-      continue;
-    }
-
-    const pointsValue = Number(pointsRaw);
-    const holesValue = Number(holesRaw);
-
-    if (Number.isNaN(pointsValue) || holesValue !== holeCount) {
-      continue;
-    }
-
-    points.push(pointsValue);
-  }
-
-  if (points.length === 0) {
-    return null;
-  }
-
-  return Math.floor(points.reduce((sum, value) => sum + value, 0) / points.length);
-}
 
 // GET /api/leaderboard/:tournamentId - Get leaderboard for a tournament
 // Calculates total quota points earned vs player's quota and skins
@@ -96,13 +69,8 @@ router.get('/:tournamentId', async (req, res) => {
     const skinPrizePot = skinsCTPTotalPot * SKINS_PCT;
     const ctpPrizePot = skinsCTPTotalPot * CTP_PCT;
     
-    // Determine which quota to use based on tournament holes (validated whitelist)
-    const quotaColumn = holeCount === 9 ? 'quota_9' : 'quota_18';
-    
-    // Validate quota column to prevent SQL injection
-    if (quotaColumn !== 'quota_9' && quotaColumn !== 'quota_18') {
-      return res.status(400).json({ error: 'Invalid quota column' });
-    }
+    // Which quota applies to this round (fixed SQL, no user input)
+    const quotaColumn = quotaSql(holeCount, 'lpq');
     
     // Only holes that every player has finished count toward what anyone sees
     // (enforced here, not just hidden on screen). With live scoring off, nothing
@@ -132,7 +100,7 @@ router.get('/:tournamentId', async (req, res) => {
         p.id,
         p.name,
         tp.tournament_quota,
-        lpq.${quotaColumn} as default_player_quota,
+        ${quotaColumn} as default_player_quota,
         q.points_1,
         q.points_2,
         q.points_3,
@@ -164,7 +132,7 @@ router.get('/:tournamentId', async (req, res) => {
        AND tpp.player_id = p.id
       ${scoreJoinClause}
       WHERE tp.tournament_id = ? AND p.active = 1
-      GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
+      GROUP BY p.id, p.name, tp.tournament_quota, ${quotaColumn},
                q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
                q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
                tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points
@@ -390,7 +358,7 @@ router.get('/:tournamentId', async (req, res) => {
       // For completed tournaments, freeze to finalized values so standings never drift.
       const playerQuota = isCompleted
         ? (hasFinalizedValues ? (parseFloat(player.finalized_player_quota) || 0) : fallbackQuota)
-        : (calculateRecentAverageQuota(player, holeCount) ?? fallbackQuota);
+        : (recentAverageQuota(player, holeCount) ?? fallbackQuota);
 
       const totalQuotaPoints = isCompleted && player.finalized_total_quota_points !== null
         ? (parseFloat(player.finalized_total_quota_points) || 0)
@@ -664,6 +632,11 @@ router.get('/:tournamentId', async (req, res) => {
           losersBracketPoints: Number(row.losers_bracket_points) || 0,
           totalPoints: Number(row.total_points) || 0
         })),
+        // Who played this round of the championship bracket
+        finalists: tournament.playoff_stage === 'final'
+          ? playoffResults.filter((row) => row.result_type === 'performance')
+            .map((row) => ({ playerId: Number(row.player_id), name: row.name }))
+          : [],
         playoffResults,
         losersResults,
         losersStandings,

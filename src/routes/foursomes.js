@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { quotaForHoles, quotaSql } = require('../utils/leagueQuota');
 const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
 const { requireOpenSeason } = require('../middleware/season');
 const router = express.Router();
@@ -55,7 +56,7 @@ router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, requireO
     // Insert or update tournament_players row
     const holeCount = Number(tournament.number_of_holes);
     const player = players[0];
-    const tq = holeCount === 9 ? player.quota_9 : player.quota_18;
+    const tq = quotaForHoles(player, holeCount);
 
     await pool.query(
       `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota, foursome, pair)
@@ -192,13 +193,13 @@ router.put('/:tournamentId/foursomes/:foursome/roster', requireAuth, requireOpen
         await conn.query(
           `INSERT INTO tournament_players (tournament_id, player_id, attending_status, response_date, tournament_quota, foursome, pair)
            SELECT ?, ?, 'yes', NOW(),
-                  CASE WHEN ? = 9 THEN lp.quota_9 ELSE lp.quota_18 END,
+                  ${quotaSql(tournament.number_of_holes)},
                   ?, ?
            FROM (SELECT 1) one
            LEFT JOIN league_players lp ON lp.league_id = ? AND lp.player_id = ?
            ON DUPLICATE KEY UPDATE foursome = VALUES(foursome), pair = VALUES(pair),
              attending_status = IF(tournament_players.attending_status = 'no', 'yes', tournament_players.attending_status)`,
-          [tournamentId, pid, Number(tournament.number_of_holes), foursome, Number.isFinite(pair) ? pair : null, tournament.league_id, pid]
+          [tournamentId, pid, foursome, Number.isFinite(pair) ? pair : null, tournament.league_id, pid]
         );
       }
 

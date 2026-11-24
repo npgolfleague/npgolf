@@ -89,7 +89,9 @@ export const Tournaments = () => {
     const name = t ? `${t.course_name} (${formatDateOnly(t.date)})` : 'this tournament'
     setConfirmModal({
       title: 'Complete Tournament',
-      message: `Complete "${name}"? This will update all players\' quota history.`,
+      message: Number(t?.is_completed || 0) === 1
+        ? `"${name}" is already completed. Complete it again to recalculate results? Its scores replace the earlier ones; nothing is counted twice.`
+        : `Complete "${name}"? This will update all players\' quota history.`,
       confirmLabel: 'Complete',
       onConfirm: async () => {
         setConfirmModal(null)

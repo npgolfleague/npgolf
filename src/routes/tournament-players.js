@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { quotaForHoles } = require('../utils/leagueQuota');
 const { getLeagueId } = require('../utils/league');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
 const { hideContacts } = require('../utils/privacy');
@@ -72,7 +73,7 @@ router.post('/:tournamentId/players', requireAdmin, requireOpenSeason, async (re
     const tournament = tournaments[0];
     const player = players[0];
     const holeCount = Number(tournament.number_of_holes);
-    const tournamentQuota = holeCount === 9 ? player.quota_9 : player.quota_18;
+    const tournamentQuota = quotaForHoles(player, holeCount);
 
     // Resolve tee_id: use explicitly passed teeId, then player's default_tee_name,
     // then fall back to first tee matching player sex at this course.
@@ -266,7 +267,7 @@ router.post('/:tournamentId/foursome-group', requireAdmin, requireOpenSeason, as
 
         // Build multi-row insert values
         for (const p of players) {
-          const tq = holeCount === 9 ? p.quota_9 : p.quota_18
+          const tq = quotaForHoles(p, holeCount)
           insertValues.push('(?, ?, ?, NOW(), ?)')
           insertParams.push(tournamentId, p.id, 'yes', tq)
         }

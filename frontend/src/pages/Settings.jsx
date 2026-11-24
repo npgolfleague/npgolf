@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   quota_points_double_bogey: 0,
   quota_points_worse: 0,
   playoff_format: 'none',
+  quota_method: 'last_7',
   championship_pot: 0,
   losers_bracket_pot: 0,
   live_scoring: 1,
@@ -44,6 +45,7 @@ function settingsFromResponse(data) {
     quota_points_double_bogey: data.quota_points_double_bogey ?? DEFAULT_SETTINGS.quota_points_double_bogey,
     quota_points_worse: data.quota_points_worse ?? DEFAULT_SETTINGS.quota_points_worse,
     playoff_format: data.playoff_format || DEFAULT_SETTINGS.playoff_format,
+    quota_method: data.quota_method || DEFAULT_SETTINGS.quota_method,
     championship_pot: data.championship_pot ?? DEFAULT_SETTINGS.championship_pot,
     losers_bracket_pot: data.losers_bracket_pot ?? DEFAULT_SETTINGS.losers_bracket_pot,
     live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1,
@@ -364,6 +366,42 @@ export const Settings = () => {
                 />
               </div>
             </div>
+
+            <hr className="border-gray-200" />
+
+            <fieldset>
+              <legend className="text-lg font-semibold text-gray-800 mb-1">Quota Calculation</legend>
+              <p className="text-sm text-gray-500 mb-4">How players' quotas are worked out. Only rounds played in this league count.</p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="quota_method"
+                  value="last_7"
+                  checked={settings.quota_method === 'last_7'}
+                  onChange={handleChange}
+                  className="mt-1 w-4 h-4 accent-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-800">Use standard 7 round quota logic</span>
+                  <p className="text-sm text-gray-500">Average of the last 7 rounds, rounded down. 9-hole rounds are doubled for the 18-hole quota; 18-hole rounds are halved for the 9-hole quota.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 mt-4 opacity-60 cursor-not-allowed">
+                <input
+                  type="radio"
+                  name="quota_method"
+                  value="best_8_of_20"
+                  checked={settings.quota_method === 'best_8_of_20'}
+                  onChange={handleChange}
+                  disabled
+                  className="mt-1 w-4 h-4"
+                />
+                <div>
+                  <span className="font-medium text-gray-800">Use best 8 of last 20 quota logic</span>
+                  <p className="text-sm text-gray-500">Coming later.</p>
+                </div>
+              </label>
+            </fieldset>
 
             <hr className="border-gray-200" />
 

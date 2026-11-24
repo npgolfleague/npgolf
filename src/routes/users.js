@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { quotasFromHistory } = require('../utils/leagueQuota');
 const { passwordProblem, hashPassword } = require('../utils/passwords');
 const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
@@ -188,7 +189,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/users/refresh-quotas - Refresh players quota_18/quota_9 from average of latest 7 quota history slots (admin only)
+// POST /api/users/refresh-quotas - Recalculate quota_9 and quota_18 from the latest 7 rounds (admin only)
 router.post('/refresh-quotas', requireAdmin, async (req, res) => {
   try {
     // Quota is per league: refresh only the current league's quotas.
@@ -200,62 +201,17 @@ router.post('/refresh-quotas', requireAdmin, async (req, res) => {
     let playersTouched = 0;
 
     for (const quotaRow of quotaRows) {
-      const scores18 = [];
-      const scores9 = [];
-
-      for (let i = 1; i <= 7; i++) {
-        const holes = Number(quotaRow[`holes_${i}`]);
-        const pointsRaw = quotaRow[`points_${i}`];
-        if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
-          continue;
-        }
-
-        const points = Number(pointsRaw);
-        if (Number.isNaN(points)) {
-          continue;
-        }
-
-        if (holes === 18) {
-          scores18.push(points);
-        }
-
-        if (holes === 9) {
-          scores9.push(points);
-        }
-      }
-
-      const avg18 = scores18.length > 0
-        ? Math.floor(scores18.reduce((sum, value) => sum + value, 0) / scores18.length)
-        : null;
-      const avg9 = scores9.length > 0
-        ? Math.floor(scores9.reduce((sum, value) => sum + value, 0) / scores9.length)
-        : null;
-
-      if (avg18 === null && avg9 === null) {
+      const quotas = quotasFromHistory(quotaRow);
+      if (quotas.quota_9 === null) {
         continue;
       }
 
-      const updates = [];
-      const values = [];
-
-      if (avg18 !== null) {
-        updates.push('quota_18 = ?');
-        values.push(avg18);
-        updated18++;
-      }
-
-      if (avg9 !== null) {
-        updates.push('quota_9 = ?');
-        values.push(avg9);
-        updated9++;
-      }
-
-      values.push(quotaRow.player_id, leagueId);
-
       await pool.execute(
-        `UPDATE league_players SET ${updates.join(', ')} WHERE player_id = ? AND league_id = ?`,
-        values
+        'UPDATE league_players SET quota_9 = ?, quota_18 = ? WHERE player_id = ? AND league_id = ?',
+        [quotas.quota_9, quotas.quota_18, quotaRow.player_id, leagueId]
       );
+      updated18++;
+      updated9++;
 
       playersTouched++;
     }

@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { QUOTA_METHODS } = require('../utils/leagueQuota');
 const { requireAdmin, requireAuth, requireSuperAdmin } = require('../middleware/admin');
 const { hideContacts, hideFields, LEAGUE_CONTACTS, SETTINGS_CONTACTS } = require('../utils/privacy');
 const seasons = require('../seasons');
@@ -213,6 +214,7 @@ router.get('/:id/settings', async (req, res) => {
         quota_points_worse: 0,
         live_scoring: 1,
         require_card_attest: 0,
+        quota_method: 'last_7',
         playoff_format: 'none',
         championship_pot: Number(seasonRow?.championship_pot) || 0,
         losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
@@ -249,7 +251,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     quota_points_albatross, quota_points_eagle, quota_points_birdie,
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
     live_scoring,
-    require_card_attest
+    require_card_attest,
+    quota_method
   } = req.body;
 
   const normalizedEmailResult = normalizeSemicolonEmails(golf_course_email);
@@ -270,6 +273,12 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
   if (normalizedPlayoffFormat !== undefined && !['none', 'fedex_cup'].includes(normalizedPlayoffFormat)) {
     return res.status(400).json({ error: 'Invalid playoff format' });
   }
+  if (quota_method !== undefined && !QUOTA_METHODS[quota_method]) {
+    return res.status(400).json({ error: 'Invalid quota method' });
+  }
+  if (quota_method !== undefined && !QUOTA_METHODS[quota_method].available) {
+    return res.status(400).json({ error: `"${QUOTA_METHODS[quota_method].label}" is not available yet` });
+  }
 
   try {
     // Verify league exists
@@ -284,6 +293,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
       quota_points_albatross, quota_points_eagle, quota_points_birdie, quota_points_par,
       quota_points_bogey, quota_points_double_bogey, quota_points_worse,
       playoff_format: normalizedPlayoffFormat,
+      quota_method,
       golf_course_email: golf_course_email === undefined ? undefined : normalizedGolfCourseEmail,
       outgoing_email_from: outgoing_email_from === undefined ? undefined : normalizedOutgoingEmailFrom,
       live_scoring: live_scoring == null ? undefined : (live_scoring ? 1 : 0),

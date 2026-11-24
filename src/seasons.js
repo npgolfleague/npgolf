@@ -11,6 +11,7 @@
 // makes the season read-only (see assertSeasonOpen).
 
 const { rebuildTournamentPayouts } = require('./payouts');
+const { quotaForHoles } = require('./utils/leagueQuota');
 
 class SeasonError extends Error {
   constructor(status, message, details) {
@@ -399,8 +400,10 @@ const rolloverSeason = async (pool, leagueId, body, userId) => {
     if (opts.quotaMode === 'set') {
       const sets = [];
       const vals = [];
-      if (opts.quota18 !== null) { sets.push('quota_18 = ?'); vals.push(opts.quota18); }
-      if (opts.quota9 !== null) { sets.push('quota_9 = ?'); vals.push(opts.quota9); }
+      // Setting one length sets the other to match.
+      const start = { quota_9: opts.quota9, quota_18: opts.quota18 };
+      sets.push('quota_18 = ?', 'quota_9 = ?');
+      vals.push(quotaForHoles(start, 18), quotaForHoles(start, 9));
       const [qr] = await connection.query(
         `UPDATE league_players SET ${sets.join(', ')} WHERE league_id = ?`,
         [...vals, leagueId]

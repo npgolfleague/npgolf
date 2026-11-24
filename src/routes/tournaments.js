@@ -25,6 +25,8 @@ const {
   awardFinalRoundPoints,
   pickChampion
 } = require('../utils/playoffs');
+const { quotaSql, quotasFromHistory, recentAverageQuota } = require('../utils/leagueQuota');
+const { saveRound } = require('../utils/quotaHistory');
 
 const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
 
@@ -47,34 +49,6 @@ const formatDateOnly = (value, locale = 'en-US', options = {}) => {
   }
 
   return parsed.toLocaleDateString(locale, options);
-};
-
-const calculateRecentAverageQuota = (playerRow, holeCount) => {
-  const points = [];
-
-  for (let i = 1; i <= 7; i++) {
-    const pointsRaw = playerRow[`points_${i}`];
-    const holesRaw = playerRow[`holes_${i}`];
-
-    if (pointsRaw === null || pointsRaw === undefined || pointsRaw === '') {
-      continue;
-    }
-
-    const pointsValue = Number(pointsRaw);
-    const holesValue = Number(holesRaw);
-
-    if (Number.isNaN(pointsValue) || holesValue !== holeCount) {
-      continue;
-    }
-
-    points.push(pointsValue);
-  }
-
-  if (points.length === 0) {
-    return null;
-  }
-
-  return Math.floor(points.reduce((sum, value) => sum + value, 0) / points.length);
 };
 
 const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleCount) => {
@@ -107,14 +81,14 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
     }));
   }
 
-  const quotaColumn = Number(tournamentHoleCount) === 9 ? 'quota_9' : 'quota_18';
+  const quotaColumn = quotaSql(tournamentHoleCount, 'lpq');
 
   const [rows] = await db.query(
     `SELECT
        p.id AS player_id,
        p.name,
        tp.tournament_quota,
-       lpq.${quotaColumn} AS default_player_quota,
+       ${quotaColumn} AS default_player_quota,
        q.points_1,
        q.points_2,
        q.points_3,
@@ -145,7 +119,7 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
       AND tpp.player_id = p.id
      LEFT JOIN scores s ON s.player_id = p.id AND s.tournament_id = ?
      WHERE tp.tournament_id = ? AND p.active = 1
-     GROUP BY p.id, p.name, tp.tournament_quota, lpq.${quotaColumn},
+     GROUP BY p.id, p.name, tp.tournament_quota, ${quotaColumn},
               q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7,
               q.holes_1, q.holes_2, q.holes_3, q.holes_4, q.holes_5, q.holes_6, q.holes_7,
               tpp.place, tpp.player_quota, tpp.over_under, tpp.total_quota_points`,
@@ -158,11 +132,11 @@ const getRankedPlayersForResultsEmail = async (db, tournamentId, tournamentHoleC
         && row.finalized_player_quota !== null
         && row.finalized_over_under !== null
         && row.finalized_total_quota_points !== null;
-      const recentAverageQuota = calculateRecentAverageQuota(row, Number(tournamentHoleCount));
+      const averageQuota = recentAverageQuota(row, tournamentHoleCount);
       const fallbackQuota = Number(row.tournament_quota ?? row.default_player_quota) || 0;
       const playerQuota = hasFinalizedValues
         ? (Number(row.finalized_player_quota) || 0)
-        : (recentAverageQuota ?? fallbackQuota);
+        : (averageQuota ?? fallbackQuota);
       const totalPoints = hasFinalizedValues
         ? (Number(row.finalized_total_quota_points) || 0)
         : (Number(row.total_quota_points) || 0);
@@ -538,8 +512,8 @@ const isProviderThrottleError = (err) => {
 const saveTournamentQuotaSnapshot = async (db, tournamentId, playerId) => {
   const [rows] = await db.query(
     `SELECT CASE
-              WHEN t.number_of_holes = 9 THEN lp.quota_9
-              ELSE lp.quota_18
+              WHEN t.number_of_holes = 9 THEN ${quotaSql(9)}
+              ELSE ${quotaSql(18)}
             END AS tournament_quota
      FROM tournament t
      LEFT JOIN league_players lp ON lp.player_id = ? AND lp.league_id = t.league_id
@@ -1476,7 +1450,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     const tournamentPlayoffStage = normalizePlayoffStage(tournamentRows[0].playoff_stage);
     const isNineHoleTournament = tournamentHoleCount === 9;
     // Quota is per league: current quota lives on league_players (lp).
-    const quotaColumn = isNineHoleTournament ? 'lp.quota_9' : 'lp.quota_18';
+    const quotaColumn = quotaSql(tournamentHoleCount);
 
     if (!Number(tournamentRows[0].season_id)) {
       await connection.query('UPDATE tournament SET season_id = ? WHERE id = ?', [tournamentSeasonId, tournamentId]);
@@ -1551,6 +1525,15 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     await connection.beginTransaction();
     transactionStarted = true;
 
+    // One completion at a time, so a double click can't count a round twice.
+    await connection.query('SELECT id FROM tournament WHERE id = ? FOR UPDATE', [tournamentId]);
+    // Points from an earlier completion of this same round, if any.
+    const [earlierRows] = await connection.query(
+      'SELECT player_id, total_quota_points FROM tournament_paradise_points WHERE tournament_id = ?',
+      [tournamentId]
+    );
+    const earlierPoints = new Map(earlierRows.map((row) => [Number(row.player_id), Number(row.total_quota_points) || 0]));
+
     // Anyone who scored in this league's tournament is a member of the league,
     // so they have a league_players row to hold their quota for this league.
     await connection.query(
@@ -1622,13 +1605,10 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     await connection.query(
       `UPDATE tournament_players tp
        JOIN league_players lp ON lp.player_id = tp.player_id AND lp.league_id = ?
-       SET tp.tournament_quota = CASE
-         WHEN ? = 9 THEN lp.quota_9
-         ELSE lp.quota_18
-       END
+       SET tp.tournament_quota = ${quotaColumn}
        WHERE tp.tournament_id = ?
          AND tp.tournament_quota IS NULL`,
-      [leagueId, tournamentHoleCount, tournamentId]
+      [leagueId, tournamentId]
     );
 
     const [scoresRowsWithSnapshot] = await connection.query(
@@ -1664,10 +1644,13 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     await connection.query('DELETE FROM tournament_paradise_points WHERE tournament_id = ?', [tournamentId]);
 
     // Tied players share place and points (e.g. two tied for 1st get 95 each).
+    // Playoff rounds keep their results here but add no weekly points: the
+    // regular-season totals stop at the last regular round.
+    const isPlayoffRound = tournamentPlayoffStage !== PLAYOFF_STAGE.REGULAR;
     for (const award of awardRegularSeasonPoints(rankedPlayers)) {
       const player = award;
       const place = award.rank_position;
-      const pointsAwarded = award.points_awarded;
+      const pointsAwarded = isPlayoffRound ? 0 : award.points_awarded;
 
       await connection.query(
         `INSERT INTO tournament_paradise_points
@@ -1797,141 +1780,32 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
       );
     }
 
-    // For each player, shift quota history and add new result, then recalculate quota as floor average
-    for (const player of scoresRowsWithSnapshot) {
-      const playerId = player.player_id;
-      const totalPoints = player.total_points;
-      const currentQuota = Number(player.current_quota);
-      const quotaDiff = Number(totalPoints) - (Number.isNaN(currentQuota) ? 0 : currentQuota);
-
-      // Get current quota record for this player
-      const [quotaRows] = await connection.query(
-        'SELECT * FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1',
-        [playerId, leagueId]
-      );
-
-      if (quotaRows.length === 0) {
-        // Create new quota record with tournament result in slot 1
-        await connection.query(
-          `INSERT INTO quota (player_id, league_id, date_1, points_1, quota_diff_1, holes_1)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [playerId, leagueId, tournamentDate, totalPoints, quotaDiff, tournamentHoleCount]
-        );
-      } else {
-        // Shift: 6→7, 5→6, 4→5, 3→4, 2→3, 1→2, new tournament→1
-        const quota = quotaRows[0];
-        await connection.query(
-          `UPDATE quota SET
-            date_7 = ?, points_7 = ?, quota_diff_7 = ?, holes_7 = ?,
-            date_6 = ?, points_6 = ?, quota_diff_6 = ?, holes_6 = ?,
-            date_5 = ?, points_5 = ?, quota_diff_5 = ?, holes_5 = ?,
-            date_4 = ?, points_4 = ?, quota_diff_4 = ?, holes_4 = ?,
-            date_3 = ?, points_3 = ?, quota_diff_3 = ?, holes_3 = ?,
-            date_2 = ?, points_2 = ?, quota_diff_2 = ?, holes_2 = ?,
-            date_1 = ?, points_1 = ?, quota_diff_1 = ?, holes_1 = ?
-           WHERE player_id = ? AND league_id = ?`,
-          [
-            quota.date_6, quota.points_6, quota.quota_diff_6, quota.holes_6,
-            quota.date_5, quota.points_5, quota.quota_diff_5, quota.holes_5,
-            quota.date_4, quota.points_4, quota.quota_diff_4, quota.holes_4,
-            quota.date_3, quota.points_3, quota.quota_diff_3, quota.holes_3,
-            quota.date_2, quota.points_2, quota.quota_diff_2, quota.holes_2,
-            quota.date_1, quota.points_1, quota.quota_diff_1, quota.holes_1,
-            tournamentDate, totalPoints, quotaDiff, tournamentHoleCount,
-            playerId, leagueId
-          ]
-        );
-      }
-
-      // Recompute player quota = floor(average of all non-null points slots 1-7)
-      const [updatedQuotaRows] = await connection.query(
-        'SELECT points_1, points_2, points_3, points_4, points_5, points_6, points_7 FROM quota WHERE player_id = ? AND league_id = ? LIMIT 1',
-        [playerId, leagueId]
-      );
-      if (updatedQuotaRows.length > 0) {
-        const q = updatedQuotaRows[0];
-        const values = [q.points_1, q.points_2, q.points_3, q.points_4, q.points_5, q.points_6, q.points_7]
-          .filter(v => v !== null && v !== undefined && !isNaN(Number(v)))
-          .map(v => Number(v));
-        if (values.length > 0) {
-          const newQuota = Math.floor(values.reduce((sum, v) => sum + v, 0) / values.length);
-          await connection.query(
-            `UPDATE league_players SET ${isNineHoleTournament ? 'quota_9' : 'quota_18'} = ? WHERE player_id = ? AND league_id = ?`,
-            [newQuota, playerId, leagueId]
-          );
+    // Add the round to each player's histories and recalculate both quotas.
+    // Completing again corrects the round's own entry, and takes it out for
+    // anyone who no longer has a score in it.
+    const scoredIds = new Set(scoresRowsWithSnapshot.map((row) => Number(row.player_id)));
+    const historyUpdates = [
+      ...scoresRowsWithSnapshot.map((player) => ({
+        playerId: Number(player.player_id),
+        round: {
+          date: tournamentDate,
+          points: Number(player.total_points) || 0,
+          quota_diff: (Number(player.total_points) || 0) - (Number(player.current_quota) || 0),
+          holes: tournamentHoleCount
         }
-      }
-    }
-    
-    // Now do the same for skins_quota (20 slots instead of 7)
-    for (const player of scoresRowsWithSnapshot) {
-      const playerId = player.player_id;
-      const totalPoints = player.total_points;
-      const currentQuota = Number(player.current_quota);
-      const quotaDiff = Number(totalPoints) - (Number.isNaN(currentQuota) ? 0 : currentQuota);
-      
-      // Get current skins_quota record for this player
-      const [skinsQuotaRows] = await connection.query(
-        'SELECT * FROM skins_quota WHERE player_id = ? AND league_id = ? LIMIT 1',
-        [playerId, leagueId]
-      );
-      
-      if (skinsQuotaRows.length === 0) {
-        // Create new skins_quota record with tournament result in slot 1
+      })),
+      ...[...earlierPoints.keys()].filter((id) => !scoredIds.has(id)).map((playerId) => ({ playerId, round: null }))
+    ];
+    for (const { playerId, round } of historyUpdates) {
+      const change = { playerId, leagueId, round, earlierPoints: earlierPoints.get(playerId) ?? null, date: tournamentDate };
+      const history = await saveRound(connection, 'quota', change);
+      await saveRound(connection, 'skins_quota', change);
+
+      const newQuotas = quotasFromHistory(history);
+      if (newQuotas.quota_9 !== null) {
         await connection.query(
-          `INSERT INTO skins_quota (player_id, league_id, date_1, points_1, quota_diff_1)
-           VALUES (?, ?, ?, ?, ?)`,
-          [playerId, leagueId, tournamentDate, totalPoints, quotaDiff]
-        );
-      } else {
-        // Shift existing data: 19->20, 18->19, ..., 1->2, and new->1
-        const sq = skinsQuotaRows[0];
-        await connection.query(
-          `UPDATE skins_quota SET
-            date_20 = ?, points_20 = ?, quota_diff_20 = ?,
-            date_19 = ?, points_19 = ?, quota_diff_19 = ?,
-            date_18 = ?, points_18 = ?, quota_diff_18 = ?,
-            date_17 = ?, points_17 = ?, quota_diff_17 = ?,
-            date_16 = ?, points_16 = ?, quota_diff_16 = ?,
-            date_15 = ?, points_15 = ?, quota_diff_15 = ?,
-            date_14 = ?, points_14 = ?, quota_diff_14 = ?,
-            date_13 = ?, points_13 = ?, quota_diff_13 = ?,
-            date_12 = ?, points_12 = ?, quota_diff_12 = ?,
-            date_11 = ?, points_11 = ?, quota_diff_11 = ?,
-            date_10 = ?, points_10 = ?, quota_diff_10 = ?,
-            date_9 = ?, points_9 = ?, quota_diff_9 = ?,
-            date_8 = ?, points_8 = ?, quota_diff_8 = ?,
-            date_7 = ?, points_7 = ?, quota_diff_7 = ?,
-            date_6 = ?, points_6 = ?, quota_diff_6 = ?,
-            date_5 = ?, points_5 = ?, quota_diff_5 = ?,
-            date_4 = ?, points_4 = ?, quota_diff_4 = ?,
-            date_3 = ?, points_3 = ?, quota_diff_3 = ?,
-            date_2 = ?, points_2 = ?, quota_diff_2 = ?,
-            date_1 = ?, points_1 = ?, quota_diff_1 = ?
-           WHERE player_id = ? AND league_id = ?`,
-          [
-            sq.date_19, sq.points_19, sq.quota_diff_19,
-            sq.date_18, sq.points_18, sq.quota_diff_18,
-            sq.date_17, sq.points_17, sq.quota_diff_17,
-            sq.date_16, sq.points_16, sq.quota_diff_16,
-            sq.date_15, sq.points_15, sq.quota_diff_15,
-            sq.date_14, sq.points_14, sq.quota_diff_14,
-            sq.date_13, sq.points_13, sq.quota_diff_13,
-            sq.date_12, sq.points_12, sq.quota_diff_12,
-            sq.date_11, sq.points_11, sq.quota_diff_11,
-            sq.date_10, sq.points_10, sq.quota_diff_10,
-            sq.date_9, sq.points_9, sq.quota_diff_9,
-            sq.date_8, sq.points_8, sq.quota_diff_8,
-            sq.date_7, sq.points_7, sq.quota_diff_7,
-            sq.date_6, sq.points_6, sq.quota_diff_6,
-            sq.date_5, sq.points_5, sq.quota_diff_5,
-            sq.date_4, sq.points_4, sq.quota_diff_4,
-            sq.date_3, sq.points_3, sq.quota_diff_3,
-            sq.date_2, sq.points_2, sq.quota_diff_2,
-            sq.date_1, sq.points_1, sq.quota_diff_1,
-            tournamentDate, totalPoints, quotaDiff,
-            playerId, leagueId
-          ]
+          'UPDATE league_players SET quota_9 = ?, quota_18 = ? WHERE player_id = ? AND league_id = ?',
+          [newQuotas.quota_9, newQuotas.quota_18, playerId, leagueId]
         );
       }
     }
@@ -2213,13 +2087,20 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     });
     
   } catch (err) {
-    if (transactionStarted) {
-      await connection.rollback();
-    }
     console.error('Error completing tournament:', err);
     res.status(500).json({ error: 'Failed to complete tournament' });
   } finally {
-    connection.release();
+    // Refusals (early returns) and errors must leave nothing behind.
+    if (transactionStarted) {
+      try {
+        await connection.rollback();
+        connection.release();
+      } catch (_rollbackErr) {
+        connection.destroy();
+      }
+    } else {
+      connection.release();
+    }
   }
 });
 
@@ -2266,7 +2147,8 @@ router.post('/:id/playoff/points', requireAdmin, requireOpenSeason, async (req, 
   const connection = await pool.getConnection();
   try {
     const tournamentId = req.params.id;
-    const { bracket_type, playoff_week, points = [] } = req.body || {};
+    const { bracket_type, playoff_week } = req.body || {};
+    const points = Array.isArray(req.body?.points) ? req.body.points.filter(Boolean) : [];
     const normalizedBracket = String(bracket_type || '').toLowerCase();
     if (!['playoff', 'losers'].includes(normalizedBracket)) {
       return res.status(400).json({ error: 'bracket_type must be playoff or losers' });
@@ -2290,14 +2172,21 @@ router.post('/:id/playoff/points', requireAdmin, requireOpenSeason, async (req, 
       return res.status(400).json({ error: 'Tournament season is not set' });
     }
 
+    // The screen may also send the seed rows it shows; those aren't replaced.
+    const performanceRows = points.filter((row) => row.result_type !== 'seed');
+    const rowIds = performanceRows.map((row) => Number(row.player_id)).filter(Number.isInteger);
+    if (new Set(rowIds).size !== rowIds.length) {
+      return res.status(400).json({ error: 'Each player can only be listed once' });
+    }
+
     await connection.beginTransaction();
     await connection.query(
       // Only replace performance rows; seed points are kept.
-      "DELETE FROM tournament_playoff_points WHERE tournament_id = ? AND bracket_type = ? AND playoff_week = ? AND result_type = 'performance'",
-      [tournamentId, normalizedBracket, week]
+      "DELETE FROM tournament_playoff_points WHERE tournament_id = ? AND bracket_type = ? AND result_type = 'performance'",
+      [tournamentId, normalizedBracket]
     );
 
-    for (const pointRow of points) {
+    for (const pointRow of performanceRows) {
       const playerId = Number(pointRow.player_id);
       if (!Number.isInteger(playerId)) {
         continue;
