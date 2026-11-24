@@ -32,6 +32,8 @@ const resetAuthLimits = () => {
   [...Object.values(loginLimits), registerLimit, forgotIpLimit, forgotEmailLimit, resetLimit].forEach((l) => l.clear());
 };
 
+const MAX_SHARED_ACCOUNTS = 5;
+
 const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 // A person's name: no links, markup or control characters.
@@ -84,18 +86,22 @@ router.post('/login', async (req, res) => {
        WHERE LOWER(p.email) = LOWER(?)
        ORDER BY
          CASE
-           WHEN ? IS NOT NULL AND p.billing_entity_id = ? THEN 0
-           ELSE 1
+           WHEN lp.player_id IS NOT NULL THEN 0
+           WHEN ? IS NOT NULL AND p.billing_entity_id = ? THEN 1
+           ELSE 2
          END,
          p.id DESC
-       LIMIT 1`,
+       LIMIT ${MAX_SHARED_ACCOUNTS}`,
       [req.league?.id ?? null, normalizedEmail, leagueBillingEntityId, leagueBillingEntityId]
     );
-    const user = rows && rows[0];
-    if (!user || !user.password) return loginFailed();
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return loginFailed();
+    // Several accounts can share an email: sign in to the one this password
+    // belongs to, preferring this league and active accounts.
+    const matches = [];
+    for (const row of rows) {
+      if (row.password && await bcrypt.compare(password, row.password)) matches.push(row);
+    }
+    const user = matches.find((row) => Number(row.active) !== 0) || matches[0];
+    if (!user) return loginFailed();
     if (Number(user.active) === 0) {
       return res.status(403).json({ error: 'This account is deactivated. Contact your league admin.' });
     }
@@ -317,40 +323,54 @@ router.post('/forgot-password', limitByIp(forgotIpLimit), async (req, res) => {
   forgotEmailLimit.hit(emailKey);
 
   try {
-    const [rows] = await pool.query('SELECT id, name, email FROM players WHERE LOWER(email) = LOWER(?) AND COALESCE(active, 1) <> 0 LIMIT 1', [email.trim()]);
-    const user = rows && rows[0];
+    const [accounts] = await pool.query(
+      `SELECT p.id, p.name, p.email,
+              (SELECT GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ')
+               FROM league_players lp JOIN leagues l ON l.id = lp.league_id WHERE lp.player_id = p.id) AS leagues
+       FROM players p
+       WHERE LOWER(p.email) = LOWER(?) AND COALESCE(p.active, 1) <> 0
+       ORDER BY p.id LIMIT ${MAX_SHARED_ACCOUNTS}`,
+      [email.trim()]
+    );
 
-    if (user) {
+    // Accounts can share an email, so each gets its own link in one message.
+    const links = [];
+    for (const account of accounts) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
       await pool.query(
         'UPDATE players SET reset_password_token_hash = ?, reset_password_expires = ? WHERE id = ?',
-        [tokenHash, expiresAt, user.id]
+        [tokenHash, expiresAt, account.id]
       );
-
       const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-      const resetLink = `${appBaseUrl}/reset-password?token=${rawToken}`;
+      links.push({
+        url: `${appBaseUrl}/reset-password?token=${rawToken}`,
+        label: `${account.name || 'Your account'}${account.leagues ? ` (${account.leagues})` : ''}`
+      });
+    }
 
-      const subject = 'NPGOLF Password Reset';
+    if (links.length > 0) {
+      const several = links.length > 1;
+      const hello = several ? 'Hello,' : `Hello ${accounts[0].name || ''},`;
+      const intro = several
+        ? 'We received a request to reset your NPGOLF password. This email has more than one account, so choose which to reset:'
+        : 'We received a request to reset your NPGOLF password.';
+      const footer = 'Links expire in 1 hour. If you did not request this, you can safely ignore this email.';
       const html = `
-        <p>Hello ${escapeHtml(user.name)},</p>
-        <p>We received a request to reset your NPGOLF password.</p>
-        <p><a href="${resetLink}">Click here to reset your password</a></p>
-        <p>This link expires in 1 hour. If you did not request this, you can safely ignore this email.</p>
+        <p>${escapeHtml(hello)}</p>
+        <p>${intro}</p>
+        ${links.map((l) => `<p><a href="${l.url}">${several ? `Reset ${escapeHtml(l.label)}` : 'Click here to reset your password'}</a></p>`).join('')}
+        <p>${footer}</p>
       `;
-      const text = `Hello ${user.name || ''},\n\nWe received a request to reset your NPGOLF password.\n\nReset your password: ${resetLink}\n\nThis link expires in 1 hour. If you did not request this, you can safely ignore this email.`;
+      const text = [hello, intro, ...links.map((l) => `${several ? `${l.label}: ` : 'Reset your password: '}${l.url}`), footer].join('\n\n');
 
-      try {
+      // Not awaited: waiting would show, by the delay, that the account exists.
+      (async () => {
         const emailDelayMs = getOutgoingEmailDelayMs();
-        if (emailDelayMs > 0) {
-          await sleep(emailDelayMs);
-        }
-        await sendEmail(user.email, subject, html, text);
-      } catch (emailErr) {
-        console.error('Failed to send password reset email:', emailErr.message);
-      }
+        if (emailDelayMs > 0) await sleep(emailDelayMs);
+        await sendEmail(accounts[0].email, 'NPGOLF Password Reset', html, text, null, false);
+      })().catch((emailErr) => console.error('Failed to send password reset email:', emailErr.message));
     }
 
     return res.json(sentMessage);

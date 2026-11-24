@@ -1,10 +1,14 @@
 const express = require('express');
 const pool = require('../db');
+const { Limiter, limitByIp } = require('../middleware/rateLimit');
 const router = express.Router();
+
+// The league finder says which leagues an email is in, so it can't be used in bulk.
+const finderLimit = new Limiter({ max: 20, windowMs: 15 * 60 * 1000 });
 
 // GET /api/league-select/by-email?email=user@example.com
 // Returns all leagues where a player with this email exists
-router.get('/by-email', async (req, res) => {
+router.get('/by-email', limitByIp(finderLimit), async (req, res) => {
   try {
     const { email } = req.query;
     

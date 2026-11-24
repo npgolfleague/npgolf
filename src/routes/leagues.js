@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requireAdmin, requireAuth, requireSuperAdmin } = require('../middleware/admin');
+const { hideContacts, hideFields, LEAGUE_CONTACTS, SETTINGS_CONTACTS } = require('../utils/privacy');
 const seasons = require('../seasons');
 const router = express.Router();
 
@@ -101,7 +102,7 @@ router.get('/current', async (req, res) => {
       );
 
       if (rows.length > 0) {
-        return res.json(rows[0]);
+        return res.json(await hideFields(req, rows[0], LEAGUE_CONTACTS));
       }
     }
 
@@ -118,7 +119,7 @@ router.get('/current', async (req, res) => {
       return res.status(404).json({ error: 'No active leagues found' });
     }
 
-    return res.json(rows[0]);
+    return res.json(await hideFields(req, rows[0], LEAGUE_CONTACTS));
   } catch (err) {
     console.error('DB error', err);
     return res.status(500).json({ error: 'Failed to fetch current league' });
@@ -143,7 +144,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'League not found' });
     }
     
-    res.json(rows[0]);
+    res.json(await hideFields(req, rows[0], LEAGUE_CONTACTS));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch league' });
@@ -163,7 +164,7 @@ router.get('/', async (req, res) => {
         [req.league.id]
       );
 
-      return res.json(scopedRows);
+      return res.json(await hideFields(req, scopedRows, LEAGUE_CONTACTS));
     }
 
     const [rows] = await pool.query(
@@ -173,7 +174,7 @@ router.get('/', async (req, res) => {
        ORDER BY l.active DESC, l.season_year DESC, l.name`
     );
     
-    res.json(rows);
+    res.json(await hideFields(req, rows, LEAGUE_CONTACTS));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch leagues' });
@@ -220,13 +221,13 @@ router.get('/:id/settings', async (req, res) => {
       });
     }
     
-    res.json({
+    res.json(await hideFields(req, {
       ...rows[0],
       championship_pot: Number(seasonRow?.championship_pot) || 0,
       losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
       season_id: seasonRow?.id || null,
       season_year: Number(seasonRow?.season_year) || null
-    });
+    }, SETTINGS_CONTACTS));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch league settings' });
@@ -582,7 +583,7 @@ router.get('/:id/players', requireAuth, async (req, res) => {
       [id]
     );
     
-    res.json(rows);
+    res.json(await hideContacts(req, rows));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Failed to fetch league players' });
