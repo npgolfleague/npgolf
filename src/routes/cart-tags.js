@@ -6,6 +6,7 @@ const QRCode = require('qrcode');
 const { sendEmail } = require('../email');
 const { generatePDF } = require('../pdf');
 const { getLeagueId } = require('../utils/league');
+const { escapeHtml } = require('../utils/html');
 
 const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
 
@@ -66,20 +67,20 @@ const generateCartTagHTML = (leagueName, courseName, playerNames, teeTime, start
   return `
     <div class="cart-tag">
       <div style="text-align: center;">
-        <div class="cg-title">${leagueName}</div>
-        <div class="cg-course">${courseName}</div>
+        <div class="cg-title">${escapeHtml(leagueName)}</div>
+        <div class="cg-course">${escapeHtml(courseName)}</div>
       </div>
       <div class="cg-players">
         ${playerNames.map(player => {
-          const displayName = typeof player === 'string' ? player : (player.tee_name ? `${player.name} <span style="font-size: 0.65em;">(${player.tee_name})</span>` : player.name);
+          const displayName = typeof player === 'string' ? escapeHtml(player) : (player.tee_name ? `${escapeHtml(player.name)} <span style="font-size: 0.65em;">(${escapeHtml(player.tee_name)})</span>` : escapeHtml(player.name));
           return `
           <div class="cg-player">${displayName}</div>
         `;
         }).join('')}
       </div>
       <div class="cg-footer" style="align-items: center;">
-        <div style="flex:1"><span style="font-weight: normal;">Time:</span> ${teeTime}</div>
-        <div style="flex:1; text-align:center"><span style="font-weight: normal;">Hole:</span> ${startingHole}</div>
+        <div style="flex:1"><span style="font-weight: normal;">Time:</span> ${escapeHtml(teeTime)}</div>
+        <div style="flex:1; text-align:center"><span style="font-weight: normal;">Hole:</span> ${escapeHtml(startingHole)}</div>
         <div style="width: 88px; text-align: right;">
           ${qrDataURL ? `<img src="${qrDataURL}" alt="QR" style="width:72px;height:72px;border:0;"/>` : ''}
         </div>
@@ -103,17 +104,17 @@ const generateCartTagEmailHTML = (leagueName, courseName, playerNames, teeTime, 
       <tr>
         <td style="padding: 20px; text-align: center;">
           <div style="font-size: 24px; font-weight: bold; color: #1e5631; letter-spacing: 1px;">
-            ${leagueName}
+            ${escapeHtml(leagueName)}
           </div>
           <div style="font-size: 14px; color: #333; font-style: italic; margin-top: 8px;">
-            ${courseName}
+            ${escapeHtml(courseName)}
           </div>
         </td>
       </tr>
       <tr>
         <td style="padding: 40px 20px; text-align: center;">
           ${playerNames.map(player => {
-            const displayName = typeof player === 'string' ? player : (player.tee_name ? `${player.name} <span style="font-size: 0.65em;">(${player.tee_name})</span>` : player.name);
+            const displayName = typeof player === 'string' ? escapeHtml(player) : (player.tee_name ? `${escapeHtml(player.name)} <span style="font-size: 0.65em;">(${escapeHtml(player.tee_name)})</span>` : escapeHtml(player.name));
             return `
             <div style="font-size: 36px; font-weight: bold; color: #1e5631; margin: 15px 0; line-height: 1.2;">
               ${displayName}
@@ -127,10 +128,10 @@ const generateCartTagEmailHTML = (leagueName, courseName, playerNames, teeTime, 
           <table style="width: 100%;">
             <tr>
               <td style="font-size: 20px; font-weight: bold; color: #333; text-align: left;">
-                <span style="font-weight: normal;">Time:</span> ${teeTime}
+                <span style="font-weight: normal;">Time:</span> ${escapeHtml(teeTime)}
               </td>
               <td style="font-size: 20px; font-weight: bold; color: #333; text-align: right;">
-                <span style="font-weight: normal;">Hole:</span> ${startingHole}
+                <span style="font-weight: normal;">Hole:</span> ${escapeHtml(startingHole)}
               </td>
             </tr>
           </table>
@@ -157,7 +158,7 @@ const generateCartTagsDocument = (leagueNameOrTags, maybeTags) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Cart Tags - ${leagueName}</title>
+  <title>Cart Tags - ${escapeHtml(leagueName)}</title>
   <style>
     @page {
       size: letter;
@@ -466,8 +467,8 @@ router.post('/tournament/:tournamentId/send', requireAdmin, async (req, res) => 
       foursomeListHTML += `
         <tr style="background: ${groupIndex % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
           <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: bold;">${teeTime}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${groupName}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${players.join(', ')}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${escapeHtml(groupName)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${escapeHtml(players.join(', '))}</td>
         </tr>
       `;
     });
@@ -495,7 +496,7 @@ router.post('/tournament/:tournamentId/send', requireAdmin, async (req, res) => 
 <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5;">
   <div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden;">
     <div style="background: #1e5631; color: white; padding: 30px 24px; text-align: center;">
-      <h1 style="margin: 0; font-size: 28px;">${leagueName}</h1>
+      <h1 style="margin: 0; font-size: 28px;">${escapeHtml(leagueName)}</h1>
       <p style="margin: 8px 0 0 0; font-size: 16px;">Tournament Tee Sheet</p>
     </div>
     
@@ -503,7 +504,7 @@ router.post('/tournament/:tournamentId/send', requireAdmin, async (req, res) => 
       <h2 style="color: #1e5631; margin-top: 0;">Tournament Details</h2>
       <p style="font-size: 16px; line-height: 1.6;">
         <strong>Date:</strong> ${tournamentDate}<br>
-        <strong>Course:</strong> ${courseName}<br>
+        <strong>Course:</strong> ${escapeHtml(courseName)}<br>
         <strong>First Tee Time:</strong> ${formatTeeTime(firstTeeTime)}<br>
         <strong>Total Groups:</strong> ${groupNames.length}
       </p>
@@ -542,7 +543,7 @@ router.post('/tournament/:tournamentId/send', requireAdmin, async (req, res) => 
     </div>
     
     <div style="background: #f5f5f5; padding: 16px 24px; text-align: center; color: #999; font-size: 12px;">
-        ${leagueName} &bull; ${new Date().getFullYear()}
+        ${escapeHtml(leagueName)} &bull; ${new Date().getFullYear()}
     </div>
   </div>
 </body>

@@ -5,7 +5,8 @@ const { sendSMS } = require('../twilio');
 const { getLeagueId } = require('../utils/league');
 const { rebuildLeaguePayouts } = require('../payouts');
 const { getCurrentSeason } = require('../seasons');
-const { requireAdmin, requireAuth, isSuperAdminRole } = require('../middleware/admin');
+const { requireAdmin, requireAuth, isSuperAdminRole, isAdminCapableRole } = require('../middleware/admin');
+const { escapeHtml, htmlPageHeaders } = require('../utils/html');
 const router = express.Router();
 
 const ALLOWED_PLAYER_ROLES = new Set(['player', 'league_admin', 'admin', 'super_admin']);
@@ -291,7 +292,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const leagueId = getLeagueId(req);
     const [targetRows] = await pool.query(
-      `SELECT p.id, p.role
+      `SELECT p.id, p.role, p.email
        FROM players p
        INNER JOIN league_players lp ON lp.player_id = p.id
        WHERE p.id = ? AND lp.league_id = ?
@@ -305,8 +306,16 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
     const target = targetRows[0];
 
-    if (target.role === 'super_admin' && !isSuperAdminRole(req.user.role)) {
-      return res.status(403).json({ error: 'League admins cannot edit super admin players' });
+    if (isSuperAdminRole(target.role) && !isSuperAdminRole(req.user.role)) {
+      return res.status(403).json({ error: 'League admins cannot edit admin players' });
+    }
+
+    // Changing an account's email lets whoever controls it reset the password,
+    // so a league admin can't change another admin's.
+    if (email !== undefined && !isSuperAdminRole(req.user.role)
+      && isAdminCapableRole(target.role) && Number(target.id) !== Number(req.user.id)
+      && email !== target.email) {
+      return res.status(403).json({ error: "League admins cannot change another admin's email" });
     }
 
     if (role !== undefined) {
@@ -378,7 +387,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 });
 
 // GET /api/users/:id/sms-opt-in - Opt in to SMS notifications
-router.get('/:id/sms-opt-in', async (req, res) => {
+router.get('/:id/sms-opt-in', htmlPageHeaders, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -397,7 +406,7 @@ router.get('/:id/sms-opt-in', async (req, res) => {
           <head><title>Already Opted In</title></head>
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
             <h1>✓ Already Opted In</h1>
-            <p>Hi <strong>${player.name}</strong>,</p>
+            <p>Hi <strong>${escapeHtml(player.name)}</strong>,</p>
             <p>You're already receiving text messages.</p>
             <p style="margin-top: 30px; color: #666;">Reply 'STOP' to any message to opt out.</p>
           </body>
@@ -415,7 +424,7 @@ router.get('/:id/sms-opt-in', async (req, res) => {
         <head><title>SMS Opt-In Confirmed</title></head>
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
           <h1>✓ SMS Notifications Enabled!</h1>
-          <p>Thanks <strong>${player.name}</strong>!</p>
+          <p>Thanks <strong>${escapeHtml(player.name)}</strong>!</p>
           <p>You'll now receive tournament notifications and updates via text message.</p>
           <p style="margin-top: 30px; color: #666;">
             You can opt out at any time by replying 'STOP' to any message.
@@ -430,7 +439,7 @@ router.get('/:id/sms-opt-in', async (req, res) => {
 });
 
 // GET /api/users/:id/email-opt-in - Opt in to email notifications
-router.get('/:id/email-opt-in', async (req, res) => {
+router.get('/:id/email-opt-in', htmlPageHeaders, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -453,7 +462,7 @@ router.get('/:id/email-opt-in', async (req, res) => {
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
             <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <h1 style="color: #4CAF50;">✓ Already Opted In</h1>
-              <p>Hi <strong>${player.name}</strong>,</p>
+              <p>Hi <strong>${escapeHtml(player.name)}</strong>,</p>
               <p>You're already receiving email notifications.</p>
               <p style="margin-top: 30px; color: #666;">Contact admin to opt out of emails.</p>
             </div>
@@ -476,7 +485,7 @@ router.get('/:id/email-opt-in', async (req, res) => {
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
           <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h1 style="color: #4CAF50;">✓ Email Notifications Enabled!</h1>
-            <p>Thanks <strong>${player.name}</strong>!</p>
+            <p>Thanks <strong>${escapeHtml(player.name)}</strong>!</p>
             <p>You'll now receive tournament notifications and updates via email.</p>
             <p style="margin-top: 30px; color: #666;">
               Contact the administrator if you wish to opt out of emails.
@@ -513,9 +522,9 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     }
 
     const target = targetRows[0];
-    if (target.role === 'super_admin' && !isSuperAdminRole(req.user.role)) {
+    if (isSuperAdminRole(target.role) && !isSuperAdminRole(req.user.role)) {
       connection.release();
-      return res.status(403).json({ error: 'League admins cannot delete super admin players' });
+      return res.status(403).json({ error: 'League admins cannot delete admin players' });
     }
 
     await connection.beginTransaction();

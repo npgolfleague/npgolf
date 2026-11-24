@@ -8,6 +8,7 @@ const { sendEmail } = require('../email');
 const { rebuildTournamentPayouts } = require('../payouts');
 const { SeasonError, assertSeasonOpen } = require('../seasons');
 const { requireOpenSeason } = require('../middleware/season');
+const { escapeHtml, htmlPageHeaders } = require('../utils/html');
 const { rebuildTournamentSideGames, getTournamentSideGames, applyLeagueDefaults } = require('../sideGames');
 const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../utils/sideGames');
 const {
@@ -803,7 +804,7 @@ const buildSideGamesEmailSection = (sideGames) => {
           const winners = nassauWinners.filter((r) => r.segment === segment);
           return `<tr style="background:${rowBg(idx)}">
             <td style="${cell}">${segmentLabel(segment)}</td>
-            <td style="${cell}">${winners.map((w) => w.name).join(', ')}</td>
+            <td style="${cell}">${winners.map((w) => escapeHtml(w.name)).join(', ')}</td>
             <td style="${cell}text-align:center;">${formatSigned(winners[0].score)}</td>
             <td style="${cell}text-align:right;">${formatMoney(winners[0].prize_money)}</td>
           </tr>`;
@@ -820,7 +821,7 @@ const buildSideGamesEmailSection = (sideGames) => {
         : `<table style="width:100%;border-collapse:collapse;font-size:14px;">
         ${head([['Player', 'left'], ['Shares', 'center'], ['Prize', 'right']])}
         <tbody>${winners.map((w, idx) => `<tr style="background:${rowBg(idx)}">
-          <td style="${cell}">${w.name}</td>
+          <td style="${cell}">${escapeHtml(w.name)}</td>
           <td style="${cell}text-align:center;">${w.shares}</td>
           <td style="${cell}text-align:right;">${formatMoney(w.prize_money)}</td>
         </tr>`).join('')}</tbody>
@@ -862,7 +863,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
     const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
     return `<tr style="background:${rowBg}">
       <td style="padding:8px 12px;text-align:center;${bold}">${rankLabel}</td>
-      <td style="padding:8px 12px;${bold}">${p.name}</td>
+      <td style="padding:8px 12px;${bold}">${escapeHtml(p.name)}</td>
       <td style="padding:8px 12px;text-align:center;">${p.total_points}</td>
       <td style="padding:8px 12px;text-align:center;color:${p.over_under >= 0 ? '#15803d' : '#dc2626'}">${overUnder}</td>
       <td style="padding:8px 12px;text-align:right;">${p.quota_prize > 0 ? '$' + p.quota_prize.toLocaleString() : '-'}</td>
@@ -882,7 +883,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
         <tbody>${[...skinWinners].sort((a, b) => a.hole_number - b.hole_number).map((w, idx) =>
           `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
             <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
-            <td style="padding:8px 12px;">${w.player_name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(w.player_name)}</td>
             <td style="padding:8px 12px;text-align:center;">${w.score}</td>
             <td style="padding:8px 12px;text-align:right;">$${Number(w.prize_money ?? skinPrizePerSkin ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
           </tr>`).join('')}</tbody>
@@ -902,8 +903,8 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
         <tbody>${ctpWinners.map((w, idx) =>
           `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
             <td style="padding:8px 12px;">Hole ${w.hole_number}</td>
-            <td style="padding:8px 12px;">${w.player_name}</td>
-            <td style="padding:8px 12px;text-align:center;">${w.ctp_feet}'${w.ctp_inches}"</td>
+            <td style="padding:8px 12px;">${escapeHtml(w.player_name)}</td>
+            <td style="padding:8px 12px;text-align:center;">${escapeHtml(w.ctp_feet)}'${w.ctp_inches}"</td>
             <td style="padding:8px 12px;text-align:right;">$${Number(w.prize_money ?? ctpPrizePerWinner ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
           </tr>`).join('')}</tbody>
       </table>
@@ -911,16 +912,16 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
 
   const dashboardSection = dashboardTotals.length > 0 ? `
     <div style="background:white;padding:20px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;margin-top:16px;">
-      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 ${cupName} & YTD Totals</h2>
+      <h2 style="color:#1e3a5f;font-size:18px;margin:0 0 12px 0;">📈 ${escapeHtml(cupName)} & YTD Totals</h2>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead><tr style="background:#f0f4f8;">
           <th style="padding:8px 12px;text-align:left;color:#555;">Player</th>
-          <th style="padding:8px 12px;text-align:center;color:#555;">${cupName} Pts</th>
+          <th style="padding:8px 12px;text-align:center;color:#555;">${escapeHtml(cupName)} Pts</th>
           <th style="padding:8px 12px;text-align:right;color:#555;">Total Prize Money YTD</th>
         </tr></thead>
         <tbody>${dashboardTotals.map((p, idx) =>
           `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
-            <td style="padding:8px 12px;">${p.name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(p.name)}</td>
             <td style="padding:8px 12px;text-align:center;">${(Number(p.fedex_points) || 0).toLocaleString()}</td>
             <td style="padding:8px 12px;text-align:right;">$${(Number(p.prize_money) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>`).join('')}</tbody>
@@ -972,7 +973,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
         : `${Number(row.over_under) || 0}`;
     return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
       <td style="padding:8px 12px;">${row.display_rank_position ?? '-'}</td>
-      <td style="padding:8px 12px;">${row.name}</td>
+      <td style="padding:8px 12px;">${escapeHtml(row.name)}</td>
       <td style="padding:8px 12px;text-align:center;">${overUnder}</td>
       <td style="padding:8px 12px;text-align:center;">${row.tie_group_size ?? 1}</td>
       <td style="padding:8px 12px;text-align:right;">${Number(row.points_awarded || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
@@ -1026,7 +1027,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
         </tr></thead>
         <tbody>${playoffData.standings.slice(0, 10).map((row, idx) => `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9f9f9'}">
           <td style="padding:8px 12px;">${idx + 1}</td>
-          <td style="padding:8px 12px;">${row.name}</td>
+          <td style="padding:8px 12px;">${escapeHtml(row.name)}</td>
           <td style="padding:8px 12px;text-align:right;">${Number(row.regular_points || 0).toLocaleString()}</td>
           <td style="padding:8px 12px;text-align:right;">${Number(row.playoff_points || 0).toLocaleString()}</td>
           <td style="padding:8px 12px;text-align:right;">${Number(row.losers_bracket_points || 0).toLocaleString()}</td>
@@ -1045,7 +1046,7 @@ const buildResultsEmailHTML = ({ tournamentDate, courseName, cupName = 'Paradise
 <div style="max-width:600px;margin:0 auto;">
   <div style="background:#1e3a5f;color:white;padding:24px 20px;border-radius:8px 8px 0 0;text-align:center;">
     <h1 style="margin:0 0 8px 0;font-size:26px;">⛳ Tournament Results</h1>
-    <p style="margin:0;font-size:16px;">${tournamentDate} &bull; ${courseName}</p>
+    <p style="margin:0;font-size:16px;">${escapeHtml(tournamentDate)} &bull; ${escapeHtml(courseName)}</p>
     <p style="margin:4px 0 0 0;font-size:14px;opacity:0.85;">${numberOfHoles} Holes</p>
   </div>
   ${customMessageSection}
@@ -3064,16 +3065,16 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
                     <h1>🏌️ Tournament Invitation</h1>
                   </div>
                   <div class="content">
-                    <p>Hi ${player.name},</p>
+                    <p>Hi ${escapeHtml(player.name)},</p>
                     <p>We're organizing a tournament and would like to know if you'll be joining us!</p>
                     ${customMessage ? `
                     <div style="background-color: #fffbeb; padding: 15px; margin: 20px 0; border-left: 4px solid #f59e0b; color: #92400e;">
                       <p style="margin: 0; white-space: pre-wrap;">${customMessage}</p>
                     </div>` : ''}
                     <div class="details">
-                      <strong>📍 Course:</strong> ${tournament.course_name}<br>
+                      <strong>📍 Course:</strong> ${escapeHtml(tournament.course_name)}<br>
                       <strong>📅 Date:</strong> ${tournamentDate}<br>
-                      ${tournament.course_address ? `<strong>🗺️ Location:</strong> ${tournament.course_address}<br>` : ''}
+                      ${tournament.course_address ? `<strong>🗺️ Location:</strong> ${escapeHtml(tournament.course_address)}<br>` : ''}
                     </div>
                     
                     <p><strong>Will you be playing?</strong></p>
@@ -3141,7 +3142,7 @@ router.post('/:id/send-invitations', requireAdmin, async (req, res) => {
 });
 
 // GET /api/tournaments/:id/confirm - Confirm attendance (yes/no) via link
-router.get('/:id/confirm', async (req, res) => {
+router.get('/:id/confirm', htmlPageHeaders, async (req, res) => {
   const tournamentId = req.params.id;
   const { playerId, response } = req.query;
   
@@ -3220,10 +3221,10 @@ router.get('/:id/confirm', async (req, res) => {
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8f0;">
             <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <h1 style="color: #4CAF50;">✓ You're In!</h1>
-              <p style="font-size: 18px;">Thanks <strong>${player.name}</strong>!</p>
+              <p style="font-size: 18px;">Thanks <strong>${escapeHtml(player.name)}</strong>!</p>
               <p style="font-size: 16px;">You're registered for:</p>
               <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4CAF50;">
-                <p style="margin: 5px 0;"><strong>${tournament.course_name}</strong></p>
+                <p style="margin: 5px 0;"><strong>${escapeHtml(tournament.course_name)}</strong></p>
                 <p style="margin: 5px 0;">${tournamentDate}</p>
               </div>
               <p style="margin-top: 30px; color: #666;">See you on the course! 🏌️</p>
@@ -3261,10 +3262,10 @@ router.get('/:id/confirm', async (req, res) => {
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #fff5f5;">
             <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <h1 style="color: #666;">Thanks for Letting Us Know</h1>
-              <p style="font-size: 18px;">Hi <strong>${player.name}</strong>,</p>
+              <p style="font-size: 18px;">Hi <strong>${escapeHtml(player.name)}</strong>,</p>
               <p style="font-size: 16px;">We've recorded that you won't be able to make it to:</p>
               <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #999;">
-                <p style="margin: 5px 0;"><strong>${tournament.course_name}</strong></p>
+                <p style="margin: 5px 0;"><strong>${escapeHtml(tournament.course_name)}</strong></p>
                 <p style="margin: 5px 0;">${tournamentDate}</p>
               </div>
               <p style="margin-top: 30px; color: #666;">Hope to see you at the next one!</p>
@@ -3280,7 +3281,7 @@ router.get('/:id/confirm', async (req, res) => {
 });
 
 // GET /api/tournaments/:id/rsvp - RSVP to a tournament via SMS link
-router.get('/:id/rsvp', async (req, res) => {
+router.get('/:id/rsvp', htmlPageHeaders, async (req, res) => {
   const tournamentId = req.params.id;
   const { playerId } = req.query;
   
@@ -3335,8 +3336,8 @@ router.get('/:id/rsvp', async (req, res) => {
           <head><title>Already Registered</title></head>
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
             <h1>✓ Already Registered</h1>
-            <p><strong>${player.name}</strong>, you're already registered for:</p>
-            <p><strong>${tournament.course_name}</strong></p>
+            <p><strong>${escapeHtml(player.name)}</strong>, you're already registered for:</p>
+            <p><strong>${escapeHtml(tournament.course_name)}</strong></p>
             <p>${tournamentDate}</p>
             <p style="margin-top: 30px; color: #666;">See you on the course!</p>
           </body>
@@ -3357,9 +3358,9 @@ router.get('/:id/rsvp', async (req, res) => {
         <head><title>Registration Confirmed</title></head>
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
           <h1>✓ Registration Confirmed!</h1>
-          <p>Thanks <strong>${player.name}</strong>!</p>
+          <p>Thanks <strong>${escapeHtml(player.name)}</strong>!</p>
           <p>You're registered for:</p>
-          <p><strong>${tournament.course_name}</strong></p>
+          <p><strong>${escapeHtml(tournament.course_name)}</strong></p>
           <p>${tournamentDate}</p>
           <p style="margin-top: 30px; color: #666;">See you on the course!</p>
         </body>

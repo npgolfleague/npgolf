@@ -573,7 +573,8 @@ router.get('/:id/players', requireAuth, async (req, res) => {
     if (!ensureLeagueScope(req, res, id)) return;
     
     const [rows] = await pool.query(
-      `SELECT p.*, lp.joined_at
+      // Never p.*: players holds password and session-token hashes.
+      `SELECT p.id, p.name, p.email, p.phone, p.sex, p.role, p.active, lp.quota_18, lp.quota_9, lp.joined_at
        FROM league_players lp
        JOIN players p ON lp.player_id = p.id
        WHERE lp.league_id = ?

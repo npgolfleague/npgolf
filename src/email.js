@@ -15,6 +15,11 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Strip tags, then decode the entities escapeHtml produces (&amp; last).
+const htmlToText = (html) => html
+  .replace(/<[^>]*>/g, '')
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+
 /**
  * Send an email using Zoho SMTP
  * @param {string} to - Recipient email address
@@ -34,7 +39,7 @@ async function sendEmail(to, subject, html, text = null, attachments = null, inc
       to,
       subject,
       html,
-      text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags if text not provided
+      text: text || htmlToText(html) // Plain text version if not provided
     };
 
     // Keep replies going to the league-specific mailbox even when SMTP requires a different envelope From.

@@ -2,6 +2,7 @@ const express = require('express');
 const { requireAdmin } = require('../middleware/admin');
 const router = express.Router();
 const pool = require('../db');
+const crypto = require('crypto');
 const multer = require('multer');
 const upload = multer();
 const { sendEmail } = require('../email');
@@ -141,13 +142,21 @@ router.post('/send', requireAdmin, upload.single('attachment'), async (req, res)
   }
 });
 
+// The inbound webhook stays off unless INBOUND_EMAIL_SECRET is set; the caller
+// must then send it as the x-inbound-secret header or ?secret=. Checked before
+// the body is parsed. (Mail normally arrives through the IMAP poller instead.)
+const sha256 = (value) => crypto.createHash('sha256').update(String(value)).digest();
+const requireInboundSecret = (req, res, next) => {
+  const expected = process.env.INBOUND_EMAIL_SECRET;
+  if (!expected) return res.status(404).send('Not found');
+  const given = req.get('x-inbound-secret') || req.query.secret || '';
+  if (!crypto.timingSafeEqual(sha256(given), sha256(expected))) return res.status(403).send('Forbidden');
+  return next();
+};
+
 // POST /api/emails/inbound - Webhook for SendGrid Inbound Parse
-router.post('/inbound', upload.none(), async (req, res) => {
+router.post('/inbound', requireInboundSecret, upload.none(), async (req, res) => {
   try {
-    console.log('Received inbound email - headers:', req.headers);
-    console.log('Received inbound email - body keys:', Object.keys(req.body));
-    console.log('Received inbound email - full body:', JSON.stringify(req.body, null, 2));
-    
     const {
       from,
       to,
