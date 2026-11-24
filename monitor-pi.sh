@@ -2,6 +2,23 @@
 # NPGolf Raspberry Pi Performance Monitor
 # Logs system and database metrics every 5 minutes
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+
+if [[ ! -r "$ENV_FILE" ]]; then
+    echo "Error: cannot read environment file: $ENV_FILE" >&2
+    exit 1
+fi
+
+set -a
+source "$ENV_FILE"
+set +a
+
+if [[ -z "${DB_PASS:-}" ]]; then
+    echo "Error: DB_PASS is not set in $ENV_FILE" >&2
+    exit 1
+fi
+
 LOG_DIR="$HOME/npgolf/logs"
 LOG_FILE="$LOG_DIR/performance-$(date +%Y%m%d).log"
 
@@ -25,7 +42,7 @@ docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\
 # 3. MySQL Database Size
 echo "" >> "$LOG_FILE"
 echo "--- MYSQL DATABASE SIZE ---" >> "$LOG_FILE"
-docker exec npgolf-mysql-pi mysql -u root -p'A6qpNm8hKA&y#8' -e "
+docker exec -e MYSQL_PWD="$DB_PASS" npgolf-mysql-pi mysql -u root -e "
 SELECT 
     table_schema AS 'Database',
     ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
@@ -37,7 +54,7 @@ GROUP BY table_schema;
 # 4. MySQL Disk I/O Stats
 echo "" >> "$LOG_FILE"
 echo "--- MYSQL I/O STATS ---" >> "$LOG_FILE"
-docker exec npgolf-mysql-pi mysql -u root -p'A6qpNm8hKA&y#8' -e "
+docker exec -e MYSQL_PWD="$DB_PASS" npgolf-mysql-pi mysql -u root -e "
 SELECT 
     FILE_NAME,
     ROUND(SUM_NUMBER_OF_BYTES_READ / 1024 / 1024, 2) AS 'Read (MB)',
@@ -50,7 +67,7 @@ LIMIT 10;
 # 5. Active MySQL Connections
 echo "" >> "$LOG_FILE"
 echo "--- ACTIVE CONNECTIONS ---" >> "$LOG_FILE"
-docker exec npgolf-mysql-pi mysql -u root -p'A6qpNm8hKA&y#8' -e "
+docker exec -e MYSQL_PWD="$DB_PASS" npgolf-mysql-pi mysql -u root -e "
 SHOW STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Max_used_connections');
 " 2>/dev/null >> "$LOG_FILE"
 
