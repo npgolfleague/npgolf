@@ -144,6 +144,6 @@ try {
   )
 } catch (err) {
   console.error('Frontend error:', err)
-  document.getElementById('root').innerHTML = `<h1>Error: ${err.message}</h1><pre>${err.stack}</pre>`
+  document.getElementById('root').textContent = `Error: ${err.message}`
 }
 

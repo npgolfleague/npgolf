@@ -5,7 +5,7 @@ const router = express.Router();
 const pool = require('../db');
 const crypto = require('crypto');
 const multer = require('multer');
-const upload = multer();
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024, files: 1, fieldSize: 1024 * 1024 } });
 const { sendEmail } = require('../email');
 
 const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
