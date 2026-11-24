@@ -575,7 +575,12 @@ router.post('/:id/send-sms', requireAdmin, async (req, res) => {
   
   try {
     // Get player info
-    const [players] = await pool.query('SELECT name, phone, sms_allowed FROM players WHERE id = ?', [id]);
+    const [players] = await pool.query(
+      `SELECT p.name, p.phone, p.sms_allowed FROM players p
+       JOIN league_players lp ON lp.player_id = p.id AND lp.league_id = ?
+       WHERE p.id = ?`,
+      [getLeagueId(req), id]
+    );
     
     if (players.length === 0) {
       return res.status(404).json({ error: 'Player not found' });

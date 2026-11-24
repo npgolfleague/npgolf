@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const { getLeagueId } = require('../utils/league');
 const { passwordFingerprint } = require('../utils/authTokens');
 
 function isSuperAdminRole(role) {
@@ -80,6 +81,46 @@ async function assertLeagueAdmin(req, user) {
   }
 }
 
+async function assertLeagueMember(user, leagueId) {
+  if (isSuperAdminRole(user.role)) return;
+  const [rows] = await pool.query(
+    'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ? LIMIT 1',
+    [leagueId, user.id]
+  );
+  if (!rows.length) throw new AuthError(403, 'You are not a member of this league');
+}
+
+// A round may only be used from its own league, by a member of that league.
+// Unknown ids pass, so the route can answer 404 itself.
+async function assertTournamentAccess(req, user, tournamentId) {
+  if (!/^\d{1,10}$/.test(String(tournamentId))) throw new AuthError(400, 'Invalid tournament id');
+  const [rows] = await pool.query('SELECT league_id FROM tournament WHERE id = ? LIMIT 1', [Number(tournamentId)]);
+  if (!rows.length) return;
+  if (req.league?.id && Number(req.league.id) !== Number(rows[0].league_id)) {
+    throw new AuthError(404, 'Tournament not found in this league');
+  }
+  await assertLeagueMember(user, rows[0].league_id);
+}
+
+// The tournament or league named in the URL, whichever router it's on.
+function routeTournamentId(req) {
+  if (req.params?.tournamentId !== undefined) return req.params.tournamentId;
+  const onTournaments = /\/tournaments$/.test(req.baseUrl || '') || /^\/tournaments\//.test(req.path || '');
+  return onTournaments ? req.params?.id : undefined;
+}
+
+function routeLeagueId(req) {
+  if (req.league?.id) return req.league.id;
+  const onLeagues = /\/leagues$/.test(req.baseUrl || '') || /^\/leagues\//.test(req.path || '');
+  return onLeagues && req.params?.id !== undefined ? req.params.id : getLeagueId(req);
+}
+
+async function assertRouteAccess(req, user) {
+  const tournamentId = routeTournamentId(req);
+  if (tournamentId !== undefined) await assertTournamentAccess(req, user, tournamentId);
+  else await assertLeagueMember(user, routeLeagueId(req));
+}
+
 function handleAuthError(err, res, label) {
   if (err instanceof AuthError) {
     return res.status(err.status).json({ error: err.message });
@@ -88,11 +129,12 @@ function handleAuthError(err, res, label) {
   return res.status(500).json({ error: 'Authentication failed' });
 }
 
-function makeMiddleware(label, check) {
+function makeMiddleware(label, check, { league = true } = {}) {
   return async function (req, res, next) {
     try {
       const user = await authenticate(req);
       if (check) await check(req, user);
+      if (league) await assertRouteAccess(req, user);
       req.user = user;
       return next();
     } catch (err) {
@@ -113,13 +155,13 @@ const requireAnyAdmin = makeMiddleware('Admin auth', async (req, user) => {
   if (!isAdminCapableRole(user.role)) {
     throw new AuthError(403, 'Admin access required');
   }
-});
+}, { league: false });
 
 const requireSuperAdmin = makeMiddleware('Super admin auth', async (req, user) => {
   if (!isSuperAdminRole(user.role)) {
     throw new AuthError(403, 'Super admin access required');
   }
-});
+}, { league: false });
 
 module.exports = {
   requireAuth,
@@ -128,6 +170,8 @@ module.exports = {
   requireSuperAdmin,
   authenticate,
   assertLeagueAdmin,
+  assertLeagueMember,
+  assertTournamentAccess,
   AuthError,
   isAdminCapableRole,
   isSuperAdminRole

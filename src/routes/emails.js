@@ -1,5 +1,6 @@
 const express = require('express');
-const { requireAdmin } = require('../middleware/admin');
+const { requireAdmin, requireSuperAdmin, isSuperAdminRole } = require('../middleware/admin');
+const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 const pool = require('../db');
 const crypto = require('crypto');
@@ -14,6 +15,8 @@ const getOutgoingEmailDelayMs = () => Math.max(Number(process.env.OUTGOING_EMAIL
 
 // GET /api/emails - Get all received emails (admin only)
 router.get('/', requireAdmin, async (req, res) => {
+  // The inbox is shared by every league, so only super admins see it.
+  if (!isSuperAdminRole(req.user.role)) return res.json([]);
   try {
     const [rows] = await pool.query(
       `SELECT id, from_email, from_name, to_email, subject, 
@@ -29,7 +32,7 @@ router.get('/', requireAdmin, async (req, res) => {
 });
 
 // GET /api/emails/:id - Get single email
-router.get('/:id', requireAdmin, async (req, res) => {
+router.get('/:id', requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query(
       'SELECT * FROM emails WHERE id = ?',
@@ -48,7 +51,7 @@ router.get('/:id', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/emails/:id/read - Mark email as read
-router.put('/:id/read', requireAdmin, async (req, res) => {
+router.put('/:id/read', requireSuperAdmin, async (req, res) => {
   try {
     const { is_read } = req.body;
     await pool.query(
@@ -63,7 +66,7 @@ router.put('/:id/read', requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/emails/:id - Delete email
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM emails WHERE id = ?', [req.params.id]);
     res.json({ message: 'Email deleted' });
@@ -80,18 +83,22 @@ router.post('/send', requireAdmin, upload.single('attachment'), async (req, res)
 
   try {
     let recipients = [];
+    // League admins can only write to players in their league.
+    const leagueOnly = !isSuperAdminRole(req.user.role);
+    const scope = leagueOnly ? ' AND id IN (SELECT player_id FROM league_players WHERE league_id = ?)' : '';
+    const scopeParams = leagueOnly ? [getLeagueId(req)] : [];
 
     if (recipient_type === 'all') {
-      const [rows] = await pool.query("SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1");
+      const [rows] = await pool.query(`SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1${scope}`, scopeParams);
       recipients = rows.map(r => r.email);
     } else if (recipient_type === 'active') {
-      const [rows] = await pool.query("SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1");
+      const [rows] = await pool.query(`SELECT email FROM players WHERE active = 1 AND email IS NOT NULL AND email != '' AND email_allowed = 1${scope}`, scopeParams);
       recipients = rows.map(r => r.email);
     } else if (recipient_type === 'specific' && player_ids) {
       const ids = JSON.parse(player_ids);
       if (ids.length > 0) {
         const placeholders = ids.map(() => '?').join(',');
-        const [rows] = await pool.query(`SELECT email FROM players WHERE id IN (${placeholders}) AND email IS NOT NULL AND email != ''`, ids);
+        const [rows] = await pool.query(`SELECT email FROM players WHERE id IN (${placeholders}) AND email IS NOT NULL AND email != ''${scope}`, [...ids, ...scopeParams]);
         recipients = rows.map(r => r.email);
       }
     } else if (recipient_type === 'custom' && custom_emails) {

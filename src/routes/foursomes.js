@@ -143,6 +143,36 @@ router.put('/:tournamentId/foursomes/:foursome/roster', requireAuth, requireOpen
       if (found.length !== playerIds.length) return res.status(400).json({ error: 'Unknown player in playerIds' });
     }
 
+    // Players can rearrange foursomes (no-shows, late arrivals), but only with
+    // league members and without taking anyone from a card that's been posted.
+    let admin = true;
+    try {
+      await assertLeagueAdmin(req, req.user);
+    } catch (authErr) {
+      if (!(authErr instanceof AuthError)) throw authErr;
+      admin = false;
+    }
+    if (!admin && playerIds.length > 0) {
+      const marks = playerIds.map(() => '?').join(',');
+      const [members] = await pool.query(
+        `SELECT player_id FROM league_players WHERE league_id = ? AND player_id IN (${marks})`,
+        [tournament.league_id, ...playerIds]
+      );
+      if (members.length !== playerIds.length) {
+        return res.status(403).json({ error: 'Only players in this league can be added to a foursome.' });
+      }
+      const [locked] = await pool.query(
+        `SELECT p.name FROM tournament_players tp
+         JOIN foursome_posts fp ON fp.tournament_id = tp.tournament_id AND fp.foursome_group = tp.foursome
+         JOIN players p ON p.id = tp.player_id
+         WHERE tp.tournament_id = ? AND tp.foursome <> ? AND tp.player_id IN (${marks}) LIMIT 1`,
+        [tournamentId, foursome, ...playerIds]
+      );
+      if (locked.length > 0) {
+        return res.status(403).json({ error: `${locked[0].name}'s foursome has posted its card. Ask an admin to move them.` });
+      }
+    }
+
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();

@@ -204,7 +204,8 @@ router.put('/:tournamentId/players/:playerId/tee', requireAdmin, requireOpenSeas
 
 // POST /api/tournaments/:tournamentId/foursome-group - Assign a foursome identifier to one or more tournament players
 // Body: { group: string, playerIds: [int], pairs?: { playerId: pairNumber } }
-router.post('/:tournamentId/foursome-group', requireAuth, requireOpenSeason, async (req, res) => {
+// Admin screen only; players arrange foursomes through .../foursomes/:foursome/roster.
+router.post('/:tournamentId/foursome-group', requireAdmin, requireOpenSeason, async (req, res) => {
   const { tournamentId } = req.params;
   const { group, playerIds } = req.body;
 
