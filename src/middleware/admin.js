@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const { passwordFingerprint } = require('../utils/authTokens');
 
 function isSuperAdminRole(role) {
   return role === 'super_admin' || role === 'admin';
@@ -39,14 +40,21 @@ async function authenticate(req) {
   }
 
   const [rows] = await pool.query(
-    'SELECT id, name, email, role FROM players WHERE id = ? LIMIT 1',
+    'SELECT id, name, email, role, active, password FROM players WHERE id = ? LIMIT 1',
     [decoded.sub]
   );
   const user = rows && rows[0];
   if (!user) {
     throw new AuthError(401, 'User not found');
   }
-  return user;
+  if (Number(user.active) === 0) {
+    throw new AuthError(401, 'This account is deactivated');
+  }
+  // The password has changed since this token was issued.
+  if (decoded.pv !== passwordFingerprint(user.password, secret)) {
+    throw new AuthError(401, 'Please log in again');
+  }
+  return { id: user.id, name: user.name, email: user.email, role: user.role };
 }
 
 // Throws AuthError unless the user may administer the league in req.league.

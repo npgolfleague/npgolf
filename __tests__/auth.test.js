@@ -17,9 +17,9 @@ const ROLES = { 1: 'super_admin', 2: 'player' };
 jest.mock('../src/db', () => ({
   query: jest.fn(async (sql, params) => {
     const normalized = (sql || '').toString().toLowerCase();
-    if (normalized.startsWith('select id, name, email, role from players where id = ?')) {
+    if (normalized.startsWith('select id, name, email, role, active, password from players where id = ?')) {
       const id = Number(params[0]);
-      return ROLES[id] ? [[{ id, name: `User ${id}`, email: `u${id}@example.com`, role: ROLES[id] }], []] : [[], []];
+      return ROLES[id] ? [[{ id, name: `User ${id}`, email: `u${id}@example.com`, role: ROLES[id], active: 1, password: 'hash' }], []] : [[], []];
     }
     return [[], []];
   }),
@@ -29,7 +29,9 @@ jest.mock('../src/db', () => ({
 
 const app = require('../src/server');
 
-const tokenFor = (id) => `Bearer ${jwt.sign({ sub: id }, process.env.JWT_SECRET)}`;
+const { signAccessToken } = require('../src/utils/authTokens');
+
+const tokenFor = (id, password = 'hash') => `Bearer ${signAccessToken({ id, password }, process.env.JWT_SECRET, '1h')}`;
 
 const adminOnly = [
   ['post', '/api/tournaments'],
@@ -72,6 +74,18 @@ describe('route protection', () => {
   test('rejects a token signed with the wrong secret', async () => {
     const forged = `Bearer ${jwt.sign({ sub: 1 }, 'wrong-secret')}`;
     const res = await request(app).post('/api/tournaments').set('Authorization', forged).send({});
+    expect(res.status).toBe(401);
+  });
+
+  test('rejects a token issued before a password change', async () => {
+    const res = await request(app).post('/api/tournaments').set('Authorization', tokenFor(1, 'old-hash')).send({});
+    expect(res.status).toBe(401);
+  });
+
+  test('rejects a deactivated account', async () => {
+    const pool = require('../src/db');
+    pool.query.mockImplementationOnce(async () => [[{ id: 1, name: 'U', email: 'u', role: 'super_admin', active: 0, password: 'hash' }], []]);
+    const res = await request(app).post('/api/tournaments').set('Authorization', tokenFor(1)).send({});
     expect(res.status).toBe(401);
   });
 
