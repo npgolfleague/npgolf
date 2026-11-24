@@ -92,6 +92,35 @@ describe('closed seasons are read-only', () => {
   });
 });
 
+describe('closed seasons block roster, score and side-game changes', () => {
+  beforeEach(() => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql) => {
+      if (sql.startsWith('SELECT tournament_id FROM scores')) return [[{ tournament_id: 12 }]];
+      if (sql.startsWith('SELECT season_id FROM tournament')) return [[{ season_id: 5 }]];
+      if (sql.startsWith('SELECT season_year, status')) return [[{ season_year: 2025, status: 'closed' }]];
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+  });
+
+  test.each([
+    ['post', '/api/scores', { scores: [{ tournament_id: 12, player_id: 1, hole_id: 1, score: 4 }] }],
+    ['put', '/api/scores/7', { score: 4 }],
+    ['delete', '/api/scores/7', undefined],
+    ['put', '/api/scores/tournament/12/ctp-winners', { winners: [] }],
+    ['post', '/api/scores/tournament/12/foursome/1/reopen', {}],
+    ['post', '/api/tournaments/12/players', { player_id: 1 }],
+    ['put', '/api/tournaments/12/players/1/paid', { paid: true }],
+    ['put', '/api/tournaments/12/foursomes/1/roster', {}],
+    ['put', '/api/tournaments/12/side-games', { games: [] }],
+    ['post', '/api/tournaments/12/playoff/champion-tiebreak', {}]
+  ])('%s %s returns 409', async (method, url, body) => {
+    const res = await request(app)[method](url).send(body);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/2025 season is closed/);
+  });
+});
+
 describe('rollover endpoint', () => {
   beforeEach(() => {
     pool.query.mockReset();

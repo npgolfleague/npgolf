@@ -7,6 +7,7 @@ const { sendSMS } = require('../twilio');
 const { sendEmail } = require('../email');
 const { rebuildTournamentPayouts } = require('../payouts');
 const { SeasonError, assertSeasonOpen } = require('../seasons');
+const { requireOpenSeason } = require('../middleware/season');
 const { rebuildTournamentSideGames, getTournamentSideGames, applyLeagueDefaults } = require('../sideGames');
 const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../utils/sideGames');
 const {
@@ -1223,7 +1224,7 @@ router.get('/', async (req, res) => {
   try {
       const leagueId = getLeagueId(req);
       const [rows] = await pool.query(
-      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.season_id, ls.season_year, t.playoff_stage, t.created_at, t.completed,
+      `SELECT t.id, t.date, t.number_of_holes, t.nine_hole_side, t.standard_quota_game, t.season_id, ls.season_year, ls.status AS season_status, t.playoff_stage, t.created_at, t.completed,
               c.id as course_id, c.name as course_name, c.address as course_address,
               CASE
                 WHEN EXISTS (
@@ -1323,20 +1324,6 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch tournament' });
   }
 });
-
-// Closed seasons are read-only (src/seasons.js). Blocks changes to a
-// tournament whose season has been closed.
-const requireOpenSeason = async (req, res, next) => {
-  try {
-    const [rows] = await pool.query('SELECT season_id FROM tournament WHERE id = ? LIMIT 1', [req.params.id]);
-    if (rows.length > 0) await assertSeasonOpen(pool, rows[0].season_id);
-    return next();
-  } catch (err) {
-    if (err instanceof SeasonError) return res.status(err.status).json({ error: err.message });
-    console.error('Error checking tournament season:', err);
-    return res.status(500).json({ error: 'Failed to check tournament season' });
-  }
-};
 
 const sendSeasonError = (res, err) => {
   if (err instanceof SeasonError) {
@@ -2246,7 +2233,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
 });
 
 // POST /api/tournaments/:id/playoff/semifinal-participants
-router.post('/:id/playoff/semifinal-participants', requireAdmin, async (req, res) => {
+router.post('/:id/playoff/semifinal-participants', requireAdmin, requireOpenSeason, async (req, res) => {
   try {
     const tournamentId = req.params.id;
     const { playerIds = [] } = req.body || {};
@@ -2265,7 +2252,7 @@ router.post('/:id/playoff/semifinal-participants', requireAdmin, async (req, res
 });
 
 // POST /api/tournaments/:id/playoff/finals-participants
-router.post('/:id/playoff/finals-participants', requireAdmin, async (req, res) => {
+router.post('/:id/playoff/finals-participants', requireAdmin, requireOpenSeason, async (req, res) => {
   try {
     const tournamentId = req.params.id;
     const { playerIds = [] } = req.body || {};
@@ -2371,7 +2358,7 @@ router.post('/:id/playoff/points', requireAdmin, requireOpenSeason, async (req, 
 // Records the winner of the 20 ft putt-off. For a completed final, this
 // re-scores the final round and the champion with the putt-off result applied
 // (no need to re-complete the tournament).
-router.post('/:id/playoff/champion-tiebreak', requireAdmin, async (req, res) => {
+router.post('/:id/playoff/champion-tiebreak', requireAdmin, requireOpenSeason, async (req, res) => {
   const tournamentId = Number(req.params.id);
   const { playerId } = req.body || {};
   const selectedPlayerId = Number(playerId);
@@ -2483,8 +2470,14 @@ router.post('/:id/results-email/generate', requireAdmin, async (req, res) => {
     const rankedPlayers = await getRankedPlayersForResultsEmail(pool, tournamentId, tournamentHoleCount);
     if (rankedPlayers.length === 0) return res.status(400).json({ error: 'No score data found for this tournament' });
 
-    // Refresh this tournament's payouts in case paid flags or winners changed since completion.
-    await rebuildTournamentPayouts(pool, tournamentId);
+    // Refresh this tournament's payouts in case paid flags or winners changed since
+    // completion. A closed season's payouts stay as they were.
+    try {
+      await assertSeasonOpen(pool, season_id);
+      await rebuildTournamentPayouts(pool, tournamentId);
+    } catch (seasonErr) {
+      if (!(seasonErr instanceof SeasonError)) throw seasonErr;
+    }
     const rankedPlayerIds = [...new Set(rankedPlayers.map((p) => p.player_id).filter(Boolean))];
     let dashboardTotals = [];
     if (rankedPlayerIds.length > 0) {

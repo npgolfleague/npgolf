@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tournamentsAPI, cartTagsAPI } from '../api'
+import { tournamentsAPI, cartTagsAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
 import { ToastContext } from '../context/ToastContext'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -13,6 +13,8 @@ export const Tournaments = () => {
   const { user } = useContext(AuthContext)
   const { addToast } = useContext(ToastContext)
   const [tournaments, setTournaments] = useState([])
+  const [seasons, setSeasons] = useState([])
+  const [seasonYear, setSeasonYear] = useState('all') // season year, or 'all'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -35,10 +37,22 @@ export const Tournaments = () => {
     fetchTournaments()
   }, [])
 
+  const loadSeasons = async () => {
+    const current = await leaguesAPI.current()
+    const res = await leaguesAPI.getSeasons(current.data.id)
+    setSeasons(res.data)
+    const active = res.data.find((s) => s.is_current)
+    if (active) setSeasonYear(String(active.season_year))
+  }
+
   const fetchTournaments = async () => {
     try {
       setLoading(true)
       const response = await tournamentsAPI.list()
+      if (seasons.length === 0) {
+        // Without the season list the page still works, showing every tournament.
+        await loadSeasons().catch((err) => console.error('Error fetching seasons:', err))
+      }
       setTournaments(response.data)
       setError('')
     } catch (err) {
@@ -224,6 +238,11 @@ export const Tournaments = () => {
     return String(tournament.number_of_holes)
   }
 
+  const visibleTournaments = seasonYear === 'all'
+    ? tournaments
+    : tournaments.filter((t) => String(t.season_year) === seasonYear)
+  const isSeasonArchived = seasons.some((s) => String(s.season_year) === seasonYear && s.status === 'closed')
+
   return (
     <div className="min-h-screen bg-gray-100 pb-6">
       <div className="w-full px-4 md:px-6 py-8 max-w-full">
@@ -231,7 +250,28 @@ export const Tournaments = () => {
           <h1 className="text-2xl font-bold text-slate-900">Tournaments</h1>
           <p className="text-slate-500 text-sm mt-1">Schedule and results</p>
         </div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+          {seasons.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label htmlFor="season-filter" className="text-sm font-medium text-slate-700">Season</label>
+              <select
+                id="season-filter"
+                value={seasonYear}
+                onChange={(e) => setSeasonYear(e.target.value)}
+                className="rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                {seasons.map((s) => (
+                  <option key={s.id} value={String(s.season_year)}>
+                    {s.season_year}{s.is_current ? ' (current)' : ''}
+                  </option>
+                ))}
+                <option value="all">All seasons</option>
+              </select>
+              {isSeasonArchived && (
+                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">Archived</span>
+              )}
+            </div>
+          )}
           {isAdmin && (
             <div className="flex gap-2">
               <button
@@ -310,18 +350,23 @@ export const Tournaments = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tournaments.length === 0 ? (
+                  {visibleTournaments.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="px-4 md:px-6 py-4 text-center text-gray-600">
-                        No tournaments found
+                        {seasonYear === 'all' ? 'No tournaments found' : `No ${seasonYear} tournaments yet`}
                       </td>
                     </tr>
                   ) : (
-                    tournaments.map((tournament) => (
+                    visibleTournaments.map((tournament) => {
+                      const archived = tournament.season_status === 'closed'
+                      return (
                       <tr key={tournament.id} className="border-t hover:bg-gray-50">
                         <td className="px-4 md:px-6 py-4 text-gray-900 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             <span>{formatDateOnly(tournament.date)}</span>
+                            {archived && seasonYear === 'all' && (
+                              <span className="inline-flex w-fit items-center rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700">Archived</span>
+                            )}
                             {tournament.playoff_stage && tournament.playoff_stage !== 'regular' && (
                               <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tournament.playoff_stage === 'final' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
                                 {tournament.playoff_stage === 'final' ? 'Playoff Final' : 'Playoff Semifinal'}
@@ -356,6 +401,7 @@ export const Tournaments = () => {
                             )}
                             {isAdmin && (
                               <>
+                                {!archived && (
                                 <button
                                   onClick={() => openInviteModal(tournament.id)}
                                   disabled={sendingInvitations === tournament.id}
@@ -364,6 +410,7 @@ export const Tournaments = () => {
                                   <Mail className="w-3.5 h-3.5" />
                                   <span className="hidden lg:inline">{sendingInvitations === tournament.id ? 'Sending...' : 'Invitations'}</span>
                                 </button>
+                                )}
                                 <button
                                   onClick={() => handleOpenCartTags(tournament.id)}
                                   className="text-cyan-600 hover:text-cyan-800 text-sm font-medium flex items-center gap-1 whitespace-nowrap"
@@ -371,6 +418,7 @@ export const Tournaments = () => {
                                 >
                                   <Tag className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Cart Tags</span>
                                 </button>
+                                {!archived && (
                                 <button
                                   onClick={() => handleSendCartTags(tournament.id)}
                                   disabled={sendingCartTags}
@@ -380,36 +428,44 @@ export const Tournaments = () => {
                                   <Mail className="w-3.5 h-3.5" />
                                   <span className="hidden lg:inline">{sendingCartTags ? 'Sending...' : 'Send Tags'}</span>
                                 </button>
+                                )}
+                                {!archived && (
                                 <button
                                   onClick={() => navigate(`/tournaments/${tournament.id}/edit`)}
                                   className="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center gap-1 whitespace-nowrap"
                                 >
                                   <Pencil className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Edit</span>
                                 </button>
+                                )}
                                 <button
                                   onClick={() => handleOpenResultsEmail(tournament.id)}
                                   className="text-orange-600 hover:text-orange-800 text-sm font-medium flex items-center gap-1 whitespace-nowrap"
                                 >
                                   <BarChart2 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Results</span>
                                 </button>
+                                {!archived && (
                                 <button
                                   onClick={() => handleComplete(tournament.id)}
                                   className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1 whitespace-nowrap"
                                 >
                                   <Check className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Complete</span>
                                 </button>
+                                )}
+                                {!archived && (
                                 <button
                                   onClick={() => handleDelete(tournament.id)}
                                   className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1 whitespace-nowrap"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Delete</span>
                                 </button>
+                                )}
                               </>
                             )}
                           </div>
                         </td>
                       </tr>
-                    ))
+                      )
+                    })
                   )}
                 </tbody>
               </table>

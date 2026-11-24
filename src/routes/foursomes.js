@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requireAdmin, requireAuth, assertLeagueAdmin, AuthError } = require('../middleware/admin');
+const { requireOpenSeason } = require('../middleware/season');
 const router = express.Router();
 
 // GET /api/tournaments/:tournamentId/foursomes/:foursome - return players in a foursome
@@ -25,7 +26,7 @@ router.get('/:tournamentId/foursomes/:foursome', requireAuth, async (req, res) =
 
 // POST /api/tournaments/:tournamentId/foursomes/:foursome/players - add a player to a foursome
 // Body: { playerId, pair }
-router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, async (req, res) => {
+router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, requireOpenSeason, async (req, res) => {
   const { tournamentId, foursome } = req.params;
   const { playerId, pair } = req.body;
   if (!playerId) return res.status(400).json({ error: 'playerId required' });
@@ -71,7 +72,7 @@ router.post('/:tournamentId/foursomes/:foursome/players', requireAdmin, async (r
 });
 
 // DELETE /api/tournaments/:tournamentId/foursomes/:foursome/players/:playerId - remove player from tournament (or remove from foursome)
-router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', requireAdmin, async (req, res) => {
+router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', requireAdmin, requireOpenSeason, async (req, res) => {
   const { tournamentId, foursome, playerId } = req.params;
   try {
     // Remove the foursome/pair info for this player in this tournament
@@ -98,7 +99,7 @@ router.delete('/:tournamentId/foursomes/:foursome/players/:playerId', requireAdm
 // of it. Any signed-in player can change their foursome while scores are
 // being entered; once the foursome is posted or the tournament is completed,
 // only a league admin can.
-router.put('/:tournamentId/foursomes/:foursome/roster', requireAuth, async (req, res) => {
+router.put('/:tournamentId/foursomes/:foursome/roster', requireAuth, requireOpenSeason, async (req, res) => {
   const { tournamentId, foursome } = req.params;
   const playerIds = Array.isArray(req.body?.playerIds)
     ? [...new Set(req.body.playerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
