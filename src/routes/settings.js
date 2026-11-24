@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/admin');
+const { hideFields, SETTINGS_CONTACTS } = require('../utils/privacy');
 const { getLeagueId } = require('../utils/league');
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Settings not found' });
     }
-    res.json(rows[0]);
+    res.json(await hideFields(req, rows[0], SETTINGS_CONTACTS));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });

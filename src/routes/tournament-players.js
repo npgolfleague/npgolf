@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { getLeagueId } = require('../utils/league');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
+const { hideContacts } = require('../utils/privacy');
 const { requireOpenSeason } = require('../middleware/season');
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.get('/:tournamentId/players', requireAuth, async (req, res) => {
       ORDER BY p.name ASC
     `, [leagueId, tournamentId]);
     
-    res.json(rows);
+    res.json(await hideContacts(req, rows));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });

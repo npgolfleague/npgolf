@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { leaguesAPI } from '../api'
+import { AuthContext } from '../context/AuthContext'
+import { isAdminCapable } from '../utils/roles'
 
 export const League = () => {
   const navigate = useNavigate()
+  const { user } = useContext(AuthContext)
+  const admin = isAdminCapable(user) // contact details are only sent to admins
   const [league, setLeague] = useState(null)
   const [settings, setSettings] = useState(null)
   const [players, setPlayers] = useState([])
@@ -98,10 +102,12 @@ export const League = () => {
                   <p className="text-sm text-gray-600">Billing Entity</p>
                   <p className="text-lg font-semibold">{league.billing_entity_name}</p>
                 </div>
+                {admin && (
                 <div>
                   <p className="text-sm text-gray-600">Billing Email</p>
                   <p className="text-lg font-semibold">{league.billing_email || 'N/A'}</p>
                 </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Season Year</p>
                   <p className="text-lg font-semibold">{league.season_year || 'N/A'}</p>
@@ -195,10 +201,12 @@ export const League = () => {
                     <p className="text-sm text-gray-600">9 Hole Skins/CTP Fee</p>
                     <p className="text-lg font-semibold">{formatCurrency(settings.skins_ctp_fee_9_holes)}</p>
                   </div>
+                  {admin && (
                   <div className="md:col-span-2">
                     <p className="text-sm text-gray-600">Golf Course Email</p>
                     <p className="text-lg font-semibold">{settings.golf_course_email || 'N/A'}</p>
                   </div>
+                  )}
                 </div>
               </div>
             )}
@@ -211,8 +219,8 @@ export const League = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                        {admin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>}
+                        {admin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                       </tr>
                     </thead>
@@ -220,8 +228,8 @@ export const League = () => {
                       {players.map((player) => (
                         <tr key={player.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{player.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{player.email || 'N/A'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{player.phone || 'N/A'}</td>
+                          {admin && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{player.email || 'N/A'}</td>}
+                          {admin && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{player.phone || 'N/A'}</td>}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(player.joined_at)}</td>
                         </tr>
                       ))}

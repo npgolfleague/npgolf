@@ -6,6 +6,7 @@ const { getLeagueId } = require('../utils/league');
 const { rebuildLeaguePayouts } = require('../payouts');
 const { getCurrentSeason } = require('../seasons');
 const { requireAdmin, requireAuth, isSuperAdminRole, isAdminCapableRole } = require('../middleware/admin');
+const { hideContacts } = require('../utils/privacy');
 const { escapeHtml, htmlPageHeaders } = require('../utils/html');
 const { optInLink, requireSignedLink } = require('../utils/signedLinks');
 const { requireTwilioSignature } = require('../middleware/twilio');
@@ -54,7 +55,7 @@ router.get('/', requireAuth, async (req, res) => {
     query += ' ORDER BY fedex_points DESC, p.name ASC';
     
     const [rows] = await pool.query(query, params);
-    res.json(rows);
+    res.json(await hideContacts(req, rows));
   } catch (err) {
     console.error('DB error', err);
     res.status(500).json({ error: 'Database error' });

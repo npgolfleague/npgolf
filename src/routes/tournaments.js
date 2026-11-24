@@ -1,5 +1,6 @@
 const express = require('express');
 const { requireAdmin, requireAuth } = require('../middleware/admin');
+const { hideContacts } = require('../utils/privacy');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
@@ -3457,9 +3458,9 @@ router.get('/:id/attendance', requireAuth, async (req, res) => {
       tournament: tournamentRows[0],
       summary: summary[0],
       players: {
-        confirmed_yes: playersYes,
-        confirmed_no: playersNo,
-        pending: playersPending
+        confirmed_yes: await hideContacts(req, playersYes),
+        confirmed_no: await hideContacts(req, playersNo),
+        pending: await hideContacts(req, playersPending)
       }
     });
   } catch (err) {
