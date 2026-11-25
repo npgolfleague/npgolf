@@ -629,6 +629,7 @@ router.post('/', requireSuperAdmin, async (req, res) => {
     billing_entity_id,
     name,
     slug,
+    cup_name,
     description,
     season_year,
     start_date,
