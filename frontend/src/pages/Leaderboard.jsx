@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { leaderboardAPI, tournamentsAPI, scoresAPI, sideGamesAPI } from '../api';
 import { SideGamesResults } from '../components/SideGamesResults';
+import { NassauMatches } from '../components/NassauMatches';
 import { AuthContext } from '../context/AuthContext';
 import { isAdminCapable } from '../utils/roles';
 import { isArchivedRound } from '../utils/season';
@@ -1045,6 +1046,8 @@ export function Leaderboard() {
       )}
 
       <SideGamesResults sideGames={sideGames} />
+
+      <NassauMatches mode="board" tournament={tournament} />
 
       {/* CTP Winners */}
       {ctpWinners.length > 0 && (

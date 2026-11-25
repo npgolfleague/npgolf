@@ -318,6 +318,35 @@ CREATE TABLE `leagues` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `nassau_matches` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tournament_id` int unsigned NOT NULL,
+  `player_a` int unsigned NOT NULL,
+  `player_b` int unsigned NOT NULL,
+  `pair_low` int unsigned NOT NULL,
+  `pair_high` int unsigned NOT NULL,
+  `amount_front` decimal(8,2) NOT NULL DEFAULT '0.00',
+  `amount_back` decimal(8,2) NOT NULL DEFAULT '0.00',
+  `amount_overall` decimal(8,2) NOT NULL DEFAULT '0.00',
+  `use_handicaps` tinyint(1) NOT NULL DEFAULT '0',
+  `handicap_a` smallint DEFAULT NULL,
+  `handicap_b` smallint DEFAULT NULL,
+  `auto_press` tinyint(1) NOT NULL DEFAULT '0',
+  `carry_halved` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('pending','accepted','declined') NOT NULL DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `accepted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_nassau_pair` (`tournament_id`,`pair_low`,`pair_high`),
+  KEY `idx_nassau_a` (`player_a`),
+  KEY `idx_nassau_b` (`player_b`),
+  CONSTRAINT `fk_nassau_a` FOREIGN KEY (`player_a`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_nassau_b` FOREIGN KEY (`player_b`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_nassau_tournament` FOREIGN KEY (`tournament_id`) REFERENCES `tournament` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `players` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `billing_entity_id` int unsigned NOT NULL,

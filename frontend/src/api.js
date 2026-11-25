@@ -275,4 +275,11 @@ export const sideGamesAPI = {
   saveLeagueDefaults: (leagueId, defaults) => apiClient.put(`/leagues/${leagueId}/side-game-defaults`, { defaults })
 }
 
+export const nassauAPI = {
+  list: (tournamentId) => apiClient.get(`/tournaments/${tournamentId}/nassau-matches`),
+  propose: (tournamentId, match) => apiClient.post(`/tournaments/${tournamentId}/nassau-matches`, match),
+  answer: (tournamentId, matchId, action) => apiClient.post(`/tournaments/${tournamentId}/nassau-matches/${matchId}/${action}`),
+  remove: (tournamentId, matchId) => apiClient.delete(`/tournaments/${tournamentId}/nassau-matches/${matchId}`)
+}
+
 export default apiClient

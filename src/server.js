@@ -18,6 +18,7 @@ const cartTagsRouter = require('./routes/cart-tags');
 const rulesRouter = require('./routes/rules');
 const billingEntitiesRouter = require('./routes/billing-entities');
 const sideGamesRouter = require('./routes/side-games');
+const nassauMatchesRouter = require('./routes/nassau-matches');
 const { leagueAliasMiddleware } = require('./middleware/league');
 const { requireAuth } = require('./middleware/admin');
 const { securityHeaders } = require('./middleware/securityHeaders');
@@ -82,6 +83,7 @@ app.use('/api/cart-tags', cartTagsRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/billing-entities', billingEntitiesRouter);
 app.use('/api', sideGamesRouter);
+app.use('/api', nassauMatchesRouter);
 
 // GET /api/version - which build is running (public: commit, branch, build time)
 app.get('/api/version', (req, res) => {

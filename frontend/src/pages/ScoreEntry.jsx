@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext'
 import { isAdminCapable } from '../utils/roles'
 import { isArchivedRound } from '../utils/season'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { NassauMatches } from '../components/NassauMatches'
 
 // How long to wait after the last score on a hole before saving it automatically.
 const AUTOSAVE_DELAY_MS = 1200
@@ -1435,6 +1436,9 @@ export const ScoreEntry = () => {
             )}
           </div>
         )}
+
+        {/* Individual Nassau match play: 18-hole rounds only */}
+        <NassauMatches mode="entry" tournament={selectedTournament} players={players} refreshKey={saveStatus === 'saved'} />
 
         {/* Score Entry for Current Hole */}
         {selectedPlayers.length > 0 && holeData && (
