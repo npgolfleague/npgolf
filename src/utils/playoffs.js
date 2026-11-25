@@ -22,9 +22,11 @@ const PLAYOFF_STAGE = Object.freeze({
   FINAL: 'final'
 });
 
+// Standard points tables. A league can set its own (src/utils/pointsTables.js).
 // Regular-season weekly points: 1st-10th get 100..10, everyone below gets 1.
 const REGULAR_SEASON_POINTS = Object.freeze([100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1]);
 const PLAYOFF_SEED_POINTS = Object.freeze([100, 90, 80, 70, 60, 50, 40, 30]);
+const PLAYOFF_SEMIFINAL_POINTS = Object.freeze([100, 90, 80, 70, 60, 50, 40, 30]);
 const PLAYOFF_FINAL_POINTS = Object.freeze([200, 90, 80, 70, 60, 50, 40, 30]);
 const LOSERS_BRACKET_POINTS = Object.freeze([100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1]);
 
@@ -133,8 +135,8 @@ function sumPoints(pointsTable, startRank, endRank) {
 }
 
 // Weekly regular-season points from each player's over/under for the day.
-function awardRegularSeasonPoints(players) {
-  return awardRankedPoints(players, REGULAR_SEASON_POINTS, 'over_under');
+function awardRegularSeasonPoints(players, pointsTable = REGULAR_SEASON_POINTS) {
+  return awardRankedPoints(players, pointsTable, 'over_under');
 }
 
 // Breaks a tie using regular-season points, then the putt-off winner.
@@ -164,7 +166,8 @@ function breakTieByRegularPoints(tiedPlayers, puttoffWinnerId = null) {
 // Returns { error, missing, extra } when the roster is wrong, otherwise the
 // seed/performance awards (with running totals), the finalists and the
 // losers bracket awards.
-function computeSemifinal({ regularStandings = [], participants = [], scores = [], overrideIds = [] }) {
+function computeSemifinal({ regularStandings = [], participants = [], scores = [], overrideIds = [], tables = {} }) {
+  const { seed = PLAYOFF_SEED_POINTS, semifinal = PLAYOFF_SEMIFINAL_POINTS, losers = LOSERS_BRACKET_POINTS } = tables;
   const regularById = new Map(regularStandings.map((row) => [Number(row.player_id), row]));
   const participantById = new Map(participants.map((row) => [Number(row.player_id), row]));
   const override = [...new Set(overrideIds.map(Number).filter(Number.isInteger))];
@@ -205,9 +208,9 @@ function computeSemifinal({ regularStandings = [], participants = [], scores = [
     return { ...award, player_id: playerId, result_type: resultType, cumulative_points_after: total };
   };
 
-  const seedAwards = awardRankedPoints(seeded, PLAYOFF_SEED_POINTS, 'regular_points')
+  const seedAwards = awardRankedPoints(seeded, seed, 'regular_points')
     .map((award) => withRunningTotal(award, 'seed'));
-  const performanceAwards = awardRankedPoints(semifinalScores, PLAYOFF_SEED_POINTS, 'over_under')
+  const performanceAwards = awardRankedPoints(semifinalScores, semifinal, 'over_under')
     .map((award) => withRunningTotal(award, 'performance'));
 
   const semifinalTotals = semifinalScores.map((player) => ({
@@ -223,7 +226,7 @@ function computeSemifinal({ regularStandings = [], participants = [], scores = [
   const losersBracketScores = scores.filter((row) => (
     participantById.has(Number(row.player_id)) && !finalistIds.has(Number(row.player_id))
   ));
-  const losersAwards = awardRankedPoints(losersBracketScores, LOSERS_BRACKET_POINTS, 'over_under');
+  const losersAwards = awardRankedPoints(losersBracketScores, losers, 'over_under');
 
   return { error: null, seeded, seedAwards, performanceAwards, finalists, losersAwards };
 }
@@ -233,7 +236,7 @@ function computeSemifinal({ regularStandings = [], participants = [], scores = [
 // Ties share points, except a tie for 1st: that is decided by regular-season
 // points, then the putt-off. If the putt-off is still needed, the tied
 // players share for now and firstPlaceTie.resolved is false.
-function awardFinalRoundPoints(finalists = [], puttoffWinnerId = null) {
+function awardFinalRoundPoints(finalists = [], puttoffWinnerId = null, pointsTable = PLAYOFF_FINAL_POINTS) {
   if (finalists.length === 0) {
     return { awards: [], firstPlaceTie: null };
   }
@@ -243,13 +246,13 @@ function awardFinalRoundPoints(finalists = [], puttoffWinnerId = null) {
   const tiedForFirst = sorted.filter((player) => numericValue(player.over_under) === topScore);
 
   if (tiedForFirst.length === 1) {
-    return { awards: awardRankedPoints(finalists, PLAYOFF_FINAL_POINTS, 'over_under'), firstPlaceTie: null };
+    return { awards: awardRankedPoints(finalists, pointsTable, 'over_under'), firstPlaceTie: null };
   }
 
   const tiebreak = breakTieByRegularPoints(tiedForFirst, puttoffWinnerId);
   if (!tiebreak.winner) {
     return {
-      awards: awardRankedPoints(finalists, PLAYOFF_FINAL_POINTS, 'over_under'),
+      awards: awardRankedPoints(finalists, pointsTable, 'over_under'),
       firstPlaceTie: { resolved: false, decidedBy: null, winner_id: null, candidates: tiebreak.candidates }
     };
   }
@@ -261,10 +264,10 @@ function awardFinalRoundPoints(finalists = [], puttoffWinnerId = null) {
       ...tiebreak.winner,
       rank_position: 1,
       tie_group_size: 1,
-      points_awarded: getPointsForRank(1, PLAYOFF_FINAL_POINTS),
+      points_awarded: getPointsForRank(1, pointsTable),
       score_value: topScore
     },
-    ...awardRankedPoints(others, PLAYOFF_FINAL_POINTS, 'over_under', 2)
+    ...awardRankedPoints(others, pointsTable, 'over_under', 2)
   ];
 
   return {
@@ -301,6 +304,7 @@ module.exports = {
   PLAYOFF_STAGE,
   REGULAR_SEASON_POINTS,
   PLAYOFF_SEED_POINTS,
+  PLAYOFF_SEMIFINAL_POINTS,
   PLAYOFF_FINAL_POINTS,
   LOSERS_BRACKET_POINTS,
   SEMIFINAL_FIELD_SIZE,

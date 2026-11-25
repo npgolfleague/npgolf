@@ -45,7 +45,7 @@ emails, schema_migrations  (standalone)
 | Area | Tables |
 |---|---|
 | Identity & tenancy | `players`, `billing_entities`, `billing_entity_roles`, `leagues`, `league_players`, `league_player_stats` |
-| League config | `league_settings` (fees, quota points table, live scoring, playoff format), `league_rulesets`, `league_seasons` |
+| League config | `league_settings` (fees, quota points table, cup points tables, live scoring, playoff format), `league_rulesets`, `league_seasons` |
 | Courses | `course`, `hole`, `course_tee`, `hole_tee` |
 | Tournaments | `tournament`, `tournament_players`, `scores`, `foursome_posts` |
 | Results | `tournament_paradise_points`, `tournament_skin_winners`, `tournament_ctp_winners`, `tournament_playoff_points`, `season_player_stats`, `tournament_results_email`, `tournament_completion_backups` |

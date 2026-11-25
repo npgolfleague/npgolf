@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import { leaguesAPI, sideGamesAPI } from '../api'
 import { SIDE_GAME_DESCRIPTIONS } from '../utils/sideGames'
+import { PointsTablesEditor } from '../components/PointsTablesEditor'
+import { DEFAULT_POINTS_TABLES } from '../utils/pointsTables'
 import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_SETTINGS = {
@@ -24,7 +26,8 @@ const DEFAULT_SETTINGS = {
   championship_pot: 0,
   losers_bracket_pot: 0,
   live_scoring: 1,
-  require_card_attest: 0
+  require_card_attest: 0,
+  points_tables: DEFAULT_POINTS_TABLES
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -49,7 +52,8 @@ function settingsFromResponse(data) {
     championship_pot: data.championship_pot ?? DEFAULT_SETTINGS.championship_pot,
     losers_bracket_pot: data.losers_bracket_pot ?? DEFAULT_SETTINGS.losers_bracket_pot,
     live_scoring: data.live_scoring != null ? Number(data.live_scoring) : 1,
-    require_card_attest: data.require_card_attest != null ? Number(data.require_card_attest) : 0
+    require_card_attest: data.require_card_attest != null ? Number(data.require_card_attest) : 0,
+    points_tables: { ...DEFAULT_POINTS_TABLES, ...(data.points_tables || {}) }
   }
 }
 
@@ -437,6 +441,11 @@ export const Settings = () => {
               </div>
             </div>
           </div>
+
+          <PointsTablesEditor
+            value={settings.points_tables}
+            onChange={points_tables => setSettings(prev => ({ ...prev, points_tables }))}
+          />
 
           {/* Live Scoring Toggle */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">

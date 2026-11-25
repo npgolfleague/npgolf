@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { rulesAPI, leaguesAPI } from '../api'
 import { AuthContext } from '../context/AuthContext'
+import { DEFAULT_POINTS_TABLES, ordinal, places } from '../utils/pointsTables'
 import { isAdminCapable } from '../utils/roles'
 
 const DEFAULT_LOCAL_RULES = [
@@ -17,6 +18,7 @@ export const Rules = () => {
   const [localRules, setLocalRules] = useState(DEFAULT_LOCAL_RULES)
   const [sections, setSections] = useState([])
   const [currentLeague, setCurrentLeague] = useState(null)
+  const [tables, setTables] = useState(DEFAULT_POINTS_TABLES)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,6 +36,9 @@ export const Rules = () => {
         if (isMounted) {
           if (leagueResult.status === 'fulfilled') {
             setCurrentLeague(leagueResult.value.data)
+            leaguesAPI.getSettings(leagueResult.value.data.id)
+              .then(({ data }) => { if (isMounted && data.points_tables) setTables({ ...DEFAULT_POINTS_TABLES, ...data.points_tables }) })
+              .catch(() => console.warn('Failed to load the points tables, using defaults'))
           }
           if (Array.isArray(fetchedSections) && fetchedSections.length > 0) {
             setSections(fetchedSections)
@@ -88,6 +93,9 @@ export const Rules = () => {
     }
     return null
   }
+
+  const [second, third] = places(tables.weekly, 3).slice(1)
+  const lastWeekly = tables.weekly[tables.weekly.length - 1]
 
   if (loading) {
     return (
@@ -270,54 +278,20 @@ export const Rules = () => {
           </p>
           <div className="bg-ink-50 rounded-lg p-6 mb-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-purple-600">100</div>
-                <div className="text-xs text-gray-700">1st Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-blue-600">90</div>
-                <div className="text-xs text-gray-700">2nd Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-blue-600">80</div>
-                <div className="text-xs text-gray-700">3rd Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-blue-600">70</div>
-                <div className="text-xs text-gray-700">4th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-blue-600">60</div>
-                <div className="text-xs text-gray-700">5th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-green-600">50</div>
-                <div className="text-xs text-gray-700">6th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-green-600">40</div>
-                <div className="text-xs text-gray-700">7th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-green-600">30</div>
-                <div className="text-xs text-gray-700">8th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-gray-600">20</div>
-                <div className="text-xs text-gray-700">9th Place</div>
-              </div>
-              <div className="text-center bg-white rounded p-2">
-                <div className="text-2xl font-bold text-gray-600">10</div>
-                <div className="text-xs text-gray-700">10th Place</div>
-              </div>
+              {tables.weekly.slice(0, -1).map((points, index) => (
+                <div key={index} className="text-center bg-white rounded p-2">
+                  <div className="text-2xl font-bold text-blue-600">{points}</div>
+                  <div className="text-xs text-gray-700">{ordinal(index + 1)} Place</div>
+                </div>
+              ))}
             </div>
             <div className="text-center mt-4 text-gray-700">
-              <strong>1 point</strong> for all other competitors who played that week
+              <strong>{lastWeekly} {lastWeekly === 1 ? 'point' : 'points'}</strong> for all other competitors who played that week
             </div>
           </div>
           <p className="text-gray-700 text-sm">
             <strong>Ties:</strong> Points are added and divided between tied players. 
-            (Example: Two players tied for 2nd get (90+80)/2 = 85 points each, next player gets 4th place points)
+            (Example: Two players tied for 2nd get ({second}+{third})/2 = {Math.ceil((second + third) / 2)} points each, next player gets 4th place points. Half points are rounded up.)
           </p>
         </section>
 
@@ -335,7 +309,8 @@ export const Rules = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-3">First 9 Holes - Semi-Finals</h3>
               <ul className="list-disc list-inside space-y-2 text-gray-700">
                 <li>Top 8 point leaders + ties from regular season qualify</li>
-                <li>Points are reset: 100, 90, 80, 70, 60, 50, 40, 30 (1st through 8th place)</li>
+                <li>Points are reset: {places(tables.seed, 8).join(', ')} (1st through 8th place)</li>
+                <li>The round adds: {places(tables.semifinal, 8).join(', ')} (1st through 8th place)</li>
               </ul>
             </div>
 
@@ -344,7 +319,7 @@ export const Rules = () => {
               <ul className="list-disc list-inside space-y-2 text-gray-700">
                 <li>Top 4 + ties from the semi-finals compete</li>
                 <li>{cupName} points carried over from first 9 holes</li>
-                <li>1st place points doubled to 200 (2nd: 90, 3rd: 80, 4th: 70)</li>
+                <li>The round adds: {places(tables.final, 4).map((points, index) => `${ordinal(index + 1)} ${points}`).join(', ')}</li>
                 <li><strong>Win the last 9 holes = Win the championship!</strong></li>
               </ul>
             </div>

@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { QUOTA_METHODS } = require('../utils/leagueQuota');
+const { pointsTablesError, resolvePointsTables } = require('../utils/pointsTables');
 const { requireAdmin, requireAuth, requireSuperAdmin } = require('../middleware/admin');
 const { hideContacts, hideFields, LEAGUE_CONTACTS, SETTINGS_CONTACTS } = require('../utils/privacy');
 const seasons = require('../seasons');
@@ -215,6 +216,7 @@ router.get('/:id/settings', async (req, res) => {
         live_scoring: 1,
         require_card_attest: 0,
         quota_method: 'last_7',
+        points_tables: resolvePointsTables(null),
         playoff_format: 'none',
         championship_pot: Number(seasonRow?.championship_pot) || 0,
         losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
@@ -225,6 +227,7 @@ router.get('/:id/settings', async (req, res) => {
     
     res.json(await hideFields(req, {
       ...rows[0],
+      points_tables: resolvePointsTables(rows[0]?.points_tables),
       championship_pot: Number(seasonRow?.championship_pot) || 0,
       losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
       season_id: seasonRow?.id || null,
@@ -252,7 +255,8 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
     live_scoring,
     require_card_attest,
-    quota_method
+    quota_method,
+    points_tables
   } = req.body;
 
   const normalizedEmailResult = normalizeSemicolonEmails(golf_course_email);
@@ -278,6 +282,11 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
   }
   if (quota_method !== undefined && !QUOTA_METHODS[quota_method].available) {
     return res.status(400).json({ error: `"${QUOTA_METHODS[quota_method].label}" is not available yet` });
+  }
+
+  if (points_tables !== undefined) {
+    const tablesError = pointsTablesError(points_tables);
+    if (tablesError) return res.status(400).json({ error: tablesError });
   }
 
   try {
@@ -310,6 +319,11 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
         changes[name] = value;
       }
     }
+    if (points_tables !== undefined) {
+      // Tables left out keep their values.
+      const [current] = await pool.query('SELECT points_tables FROM league_settings WHERE league_id = ? LIMIT 1', [id]);
+      changes.points_tables = JSON.stringify({ ...resolvePointsTables(current[0]?.points_tables), ...points_tables });
+    }
     const names = Object.keys(changes).filter((k) => changes[k] !== undefined);
     await pool.query('INSERT IGNORE INTO league_settings (league_id) VALUES (?)', [id]);
     if (names.length > 0) {
@@ -332,6 +346,7 @@ router.put('/:id/settings', requireAdmin, async (req, res) => {
     const seasonRow = await getCurrentLeagueSeasonRow(id);
     res.json({
       ...rows[0],
+      points_tables: resolvePointsTables(rows[0]?.points_tables),
       championship_pot: Number(seasonRow?.championship_pot) || 0,
       losers_bracket_pot: Number(seasonRow?.losers_bracket_pot) || 0,
       season_id: seasonRow?.id || null,

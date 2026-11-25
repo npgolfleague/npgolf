@@ -17,7 +17,6 @@ const { segmentLabel, segmentOrder, blindDrawTeamsFromResults } = require('../ut
 const {
   PLAYOFF_STAGE,
   FINAL_FIELD_SIZE,
-  LOSERS_BRACKET_POINTS,
   awardRankedPoints,
   selectTopWithTies,
   awardRegularSeasonPoints,
@@ -27,6 +26,7 @@ const {
 } = require('../utils/playoffs');
 const { quotaSql, quotasFromHistory, recentAverageQuota } = require('../utils/leagueQuota');
 const { saveRound } = require('../utils/quotaHistory');
+const { resolvePointsTables } = require('../utils/pointsTables');
 
 const GROUP_EMAIL_COPY_TO = 'commish@npgolf.net';
 
@@ -459,7 +459,15 @@ const scoreFinalRound = async (db, { tournamentId, seasonId, finalistScores, put
     over_under: Number(player.over_under) || 0,
     regular_points: regularById.get(Number(player.player_id)) || 0
   }));
-  const { awards, firstPlaceTie } = awardFinalRoundPoints(finalists, puttoffWinnerId);
+  const [tableRows] = await db.query(
+    `SELECT s.points_tables FROM league_seasons ls
+     JOIN league_settings s ON s.league_id = ls.league_id
+     WHERE ls.id = ? LIMIT 1`,
+    [seasonId]
+  );
+  const { awards, firstPlaceTie } = awardFinalRoundPoints(
+    finalists, puttoffWinnerId, resolvePointsTables(tableRows[0]?.points_tables).final
+  );
 
   await db.query(
     `DELETE FROM tournament_playoff_points
@@ -1498,11 +1506,12 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     const [settingsRows] = await connection.query(
       `SELECT quota_points_albatross, quota_points_eagle, quota_points_birdie,
               quota_points_par, quota_points_bogey, quota_points_double_bogey, quota_points_worse,
-              playoff_format
+              points_tables, playoff_format
        FROM league_settings WHERE league_id = ? LIMIT 1`,
       [leagueId]
     );
     const qp = settingsRows.length > 0 ? settingsRows[0] : {};
+    const pointsTables = resolvePointsTables(qp.points_tables);
     const playoffFormat = String(qp.playoff_format || 'none').toLowerCase();
     const pts = {};
     Object.entries(DEFAULT_TABLE).forEach(([name, value]) => {
@@ -1647,7 +1656,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
     // Playoff rounds keep their results here but add no weekly points: the
     // regular-season totals stop at the last regular round.
     const isPlayoffRound = tournamentPlayoffStage !== PLAYOFF_STAGE.REGULAR;
-    for (const award of awardRegularSeasonPoints(rankedPlayers)) {
+    for (const award of awardRegularSeasonPoints(rankedPlayers, pointsTables.weekly)) {
       const player = award;
       const place = award.rank_position;
       const pointsAwarded = isPlayoffRound ? 0 : award.points_awarded;
@@ -1839,7 +1848,8 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
         })),
         participants: participantRows.map((row) => ({ player_id: Number(row.player_id), name: row.name })),
         scores: rankedPlayers,
-        overrideIds: parseIdList(tournamentRows[0].playoff_override_semifinal_player_ids)
+        overrideIds: parseIdList(tournamentRows[0].playoff_override_semifinal_player_ids),
+        tables: pointsTables
       });
 
       if (semifinal.error === 'roster_mismatch') {
@@ -1945,7 +1955,7 @@ router.post('/:id/complete', requireAdmin, requireOpenSeason, async (req, res) =
 
       const loserAwards = awardRankedPoints(
         rankedPlayers.filter((player) => !finalistIdSet.has(player.player_id)),
-        LOSERS_BRACKET_POINTS,
+        pointsTables.losers,
         'over_under'
       );
 
