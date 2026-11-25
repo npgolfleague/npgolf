@@ -47,6 +47,18 @@ function normalizeSingleEmail(value) {
   return { normalized: raw };
 }
 
+// The slug is also the league's web address (alias), so it must be unique
+// across all billing entities.
+const ADDRESS_TAKEN = 'That address is already used by another league';
+
+async function addressTaken(slug, billingEntityId, exceptId = 0) {
+  const [rows] = await pool.query(
+    'SELECT id FROM leagues WHERE (alias = ? OR (billing_entity_id = ? AND slug = ?)) AND id != ? LIMIT 1',
+    [slug, billingEntityId, slug, exceptId]
+  );
+  return rows.length > 0;
+}
+
 function ensureLeagueScope(req, res, id) {
   if (!req.league?.id) return true;
 
@@ -652,14 +664,8 @@ router.post('/', requireSuperAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Billing entity not found' });
     }
 
-    // Check if slug is unique within the billing entity
-    const [existing] = await pool.query(
-      'SELECT id FROM leagues WHERE billing_entity_id = ? AND slug = ? LIMIT 1',
-      [billing_entity_id, slug]
-    );
-
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'Slug already exists for this billing entity' });
+    if (await addressTaken(slug, billing_entity_id)) {
+      return res.status(400).json({ error: ADDRESS_TAKEN });
     }
 
     const [result] = await pool.query(
@@ -687,6 +693,7 @@ router.post('/', requireSuperAdmin, async (req, res) => {
 
     res.status(201).json({ league: leagues[0] });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: ADDRESS_TAKEN });
     console.error('Error creating league:', err);
     res.status(500).json({ error: 'Failed to create league' });
   }
@@ -718,16 +725,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'League not found' });
     }
 
-    // Check if new slug conflicts with another league in the same entity
-    if (slug) {
-      const [conflict] = await pool.query(
-        'SELECT id FROM leagues WHERE billing_entity_id = ? AND slug = ? AND id != ? LIMIT 1',
-        [existing[0].billing_entity_id, slug, id]
-      );
-
-      if (conflict.length > 0) {
-        return res.status(400).json({ error: 'Slug already exists for this billing entity' });
-      }
+    if (slug && await addressTaken(slug, existing[0].billing_entity_id, id)) {
+      return res.status(400).json({ error: ADDRESS_TAKEN });
     }
 
     // Build update query dynamically
@@ -771,6 +770,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
     res.json({ league: leagues[0] });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: ADDRESS_TAKEN });
     console.error('Error updating league:', err);
     res.status(500).json({ error: 'Failed to update league' });
   }

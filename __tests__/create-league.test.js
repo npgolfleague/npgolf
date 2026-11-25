@@ -36,3 +36,28 @@ test.each([
   expect(insert()).toMatchObject({ name: 'New', slug: 'newleague', alias: 'newleague', cup_name: saved, season_year: 2027 });
   expect(pool.query.mock.calls.some(([s]) => /INSERT INTO league_settings/.test(s))).toBe(true);
 });
+
+describe('an address another league already uses', () => {
+  const message = 'That address is already used by another league';
+  const taken = (sql) => (/alias = \? OR/.test(sql) ? [[{ id: 1 }]] : [[{ id: 9, billing_entity_id: 2 }]]);
+
+  test.each([['post', '/api/leagues', body], ['put', '/api/leagues/9', { slug: 'newleague' }]])('%s is refused clearly', async (method, url, data) => {
+    pool.query.mockImplementation(async (sql) => taken(sql));
+    const res = await request(app)[method](url).send(data);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(message);
+    expect(pool.query.mock.calls.some(([s]) => /^\s*(INSERT|UPDATE)/.test(s))).toBe(false);
+  });
+
+  test('also when it is taken between the check and the save', async () => {
+    const answer = pool.query.getMockImplementation();
+    pool.query.mockImplementation(async (sql) => {
+      if (/alias = \? OR/.test(sql)) return [[]];
+      if (/INSERT INTO leagues/.test(sql)) throw Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' });
+      return answer(sql);
+    });
+    const res = await request(app).post('/api/leagues').send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(message);
+  });
+});
